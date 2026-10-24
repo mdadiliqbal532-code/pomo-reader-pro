@@ -668,6 +668,8 @@ window.updateDisplay = function() {
     }
 };
 
+let lastPersistedTickSec = -1;
+let lastPersistedTickSec = -1;
 function timerCoreTick() {
     if (!isRunning) return;
     const now = Date.now();
@@ -692,7 +694,10 @@ function timerCoreTick() {
         }
         window.timeLeft = Math.abs(remaining);
         updateDisplay();
-        persistState();
+        if (window.timeLeft !== lastPersistedTickSec) {
+            lastPersistedTickSec = window.timeLeft;
+            persistState();
+        }
     } else {
         window.isOvertime = false;
         timeDisplay.classList.remove('overtime-glow');
@@ -704,10 +709,12 @@ function timerCoreTick() {
         }
         window.timeLeft = remaining;
         updateDisplay();
-        persistState();
+        if (remaining !== lastPersistedTickSec) {
+            lastPersistedTickSec = remaining;
+            persistState();
+        }
     }
 }
-
 window.startTimer = function(skipBc = false) {
     if (isRunning || currentStepIndex >= schedule.length) return;
     enforceKeepScreenOn();

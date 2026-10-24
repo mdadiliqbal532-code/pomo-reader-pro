@@ -1,9 +1,10 @@
-const CACHE_NAME = 'deentimer-pro-offline-v5';
+const CACHE_NAME = 'deentimer-pro-offline-v6';
 const CORE_ASSETS = [
     './',
     './index.html',
     './styles.css',
     './manifest.json',
+    './icon.svg',
     './src/01-core-bus.js',
     './src/02-pomo-core.js',
     './src/03-vault-rpg.js',
@@ -35,16 +36,23 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
     if (event.request.method !== 'GET') return;
-    event.respondWith(
-        caches.match(event.request).then((cachedResponse) => {
-            const networkFetch = fetch(event.request).then((networkResponse) => {
+    const isHeavyCdn = event.request.url.includes('cdnjs.cloudflare.com');
+
+    if (isHeavyCdn) {
+        // Cache-first for unchanging heavy libraries (PDF.js, pdf-lib, JSZip)
+        event.respondWith(
+            caches.match(event.request).then((cached) => cached || fetch(event.request))
+        );
+    } else {
+        // Network-first for your app files so GitHub updates apply immediately, with 100% offline fallback
+        event.respondWith(
+            fetch(event.request).then((networkResponse) => {
                 if (networkResponse && networkResponse.status === 200) {
                     const clone = networkResponse.clone();
                     caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
                 }
                 return networkResponse;
-            }).catch(() => cachedResponse);
-            return cachedResponse || networkFetch;
-        })
-    );
+            }).catch(() => caches.match(event.request))
+        );
+    }
 });

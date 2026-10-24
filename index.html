@@ -382,10 +382,25 @@
                         <button class="task-tab flex-1 min-w-[70px] bg-transparent text-slate-400 font-bold py-2 px-2 rounded-lg text-xs transition-all" data-tab="matrix">Matrix</button>
                     </div>
                     <div id="subject-filter-container" class="flex gap-2 mb-4 shrink-0"></div>
-                    <div id="task-add-form" class="flex flex-col gap-2 mb-4 shrink-0 bg-slate-900 p-3 rounded-xl border border-slate-800">
-                        <input type="text" id="task-title-input" placeholder="Chapter name or topic..." class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none">
-                        <button id="add-task-btn" class="w-full bg-purple-600 text-white font-bold px-4 py-2 rounded-lg text-sm active:scale-95 transition-all shadow-md">Add to Vault</button>
-                    </div>
+                    <div id="task-add-form" class="flex flex-col gap-2.5 mb-4 shrink-0 bg-slate-900 p-3.5 rounded-2xl border border-purple-500/40 shadow-lg">
+    <input type="text" id="task-title-input" placeholder="Chapter name or topic (e.g. Biology: Cell Cycle / Human Reproduction)..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500">
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <div class="flex items-center gap-1.5 bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-1.5">
+            <span class="text-[10px] font-bold text-emerald-400 shrink-0">📅 Due:</span>
+            <input type="date" id="vault-new-due-input" class="w-full bg-transparent text-xs font-mono text-white focus:outline-none">
+        </div>
+        <div class="flex items-center gap-1.5 bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-1.5">
+            <span class="text-[10px] font-bold text-blue-400 shrink-0">⏱️ Mins:</span>
+            <input type="number" id="vault-new-dur-input" value="45" min="5" max="360" class="w-full bg-transparent text-xs font-mono text-white text-center focus:outline-none">
+        </div>
+        <input type="text" id="vault-new-note-input" placeholder="📝 Add note (NCERT p.42 / PYQs)..." class="bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none">
+    </div>
+    <div class="flex gap-2">
+        <button type="button" id="add-task-btn" class="flex-1 bg-purple-600 hover:bg-purple-500 text-white font-bold px-4 py-2.5 rounded-xl text-xs sm:text-sm active:scale-95 transition-all shadow-md">➕ Add to Study Vault</button>
+        <button type="button" id="add-and-run-vault-btn" class="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold px-4 py-2.5 rounded-xl text-xs sm:text-sm active:scale-95 transition-all shadow-md flex items-center gap-1" title="Add to Vault and immediately open Live Protocol / Timer"><span>⚡</span><span>Add & Run / Protocol</span></button>
+    </div>
+</div>
+                    
                     <div id="mcq-add-form" class="hidden bg-slate-900 border border-slate-800 p-4 rounded-xl mb-4 shrink-0">
                         <div class="flex justify-between items-center mb-4">
                             <h3 class="text-xs text-blue-400 font-bold uppercase tracking-widest" id="mcq-subject-title">Daily Target</h3>
@@ -1210,3 +1225,4 @@
     </script>
 </body>
 </html>
+                   

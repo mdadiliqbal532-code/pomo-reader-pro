@@ -1,0 +1,25 @@
+{
+  "name": "DeenTimeR & Pomo Reader Pro",
+  "short_name": "DeenTimeR Pro",
+  "description": "Standalone Desktop Life OS, Pomodoro Cockpit, RPG Vault & 3D Wooden Bookshelf PDF/EPUB Studio",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#020617",
+  "theme_color": "#020617",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

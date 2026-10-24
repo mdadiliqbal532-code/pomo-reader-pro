@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <!-- Deep Obsidian 3D Squircle Background -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="50%" stop-color="#020617" />
+      <stop offset="100%" stop-color="#090d16" />
+    </linearGradient>
+
+    <!-- Outer Border Glow -->
+    <linearGradient id="borderGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="50%" stop-color="#10b981" />
+      <stop offset="100%" stop-color="#f59e0b" />
+    </linearGradient>
+
+    <!-- Timer Ring Gradient -->
+    <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#60a5fa" />
+      <stop offset="100%" stop-color="#2563eb" />
+    </linearGradient>
+
+    <!-- Open Book Gold/Emerald Gradient -->
+    <linearGradient id="bookGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fde047" />
+      <stop offset="100%" stop-color="#d97706" />
+    </linearGradient>
+
+    <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#3b82f6" flood-opacity="0.45" />
+    </filter>
+  </defs>
+
+  <!-- 1. 3D Squircle App Base -->
+  <rect x="16" y="16" width="480" height="480" rx="110" fill="url(#bgGrad)" stroke="url(#borderGrad)" stroke-width="12" />
+  <rect x="34" y="34" width="444" height="444" rx="96" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="4" />
+
+  <!-- 2. Top Stopwatch Crown -->
+  <rect x="216" y="48" width="80" height="24" rx="12" fill="url(#goldGrad)" />
+  <rect x="242" y="70" width="28" height="22" fill="#64748b" />
+
+  <!-- 3. Glowing Outer Timer Ring -->
+  <circle cx="256" cy="256" r="168" fill="#0b1120" stroke="#1e293b" stroke-width="26" />
+  <circle cx="256" cy="256" r="168" fill="none" stroke="url(#ringGrad)" stroke-width="26" stroke-dasharray="780 1060" stroke-linecap="round" transform="rotate(-90 256 256)" filter="url(#neonGlow)" />
+  <circle cx="256" cy="256" r="168" fill="none" stroke="#ff4757" stroke-width="26" stroke-dasharray="190 1060" stroke-dashoffset="-810" stroke-linecap="round" transform="rotate(-90 256 256)" />
+
+  <!-- 4. Timer Clock Hands -->
+  <line x1="256" y1="230" x2="256" y2="145" stroke="#ffffff" stroke-width="16" stroke-linecap="round" />
+  <line x1="256" y1="230" x2="320" y2="190" stroke="#ff4757" stroke-width="14" stroke-linecap="round" />
+  <circle cx="256" cy="230" r="14" fill="url(#goldGrad)" />
+
+  <!-- 5. Golden Deen Crescent Moon (Top-Left Inside Ring) -->
+  <path d="M185 142 A28 28 0 1 0 218 175 A22 22 0 1 1 185 142 Z" fill="url(#goldGrad)" />
+
+  <!-- 6. 3D Open Book (Reader Pro Emblem at Bottom Center) -->
+  <g transform="translate(0, 12)">
+    <!-- Left Page -->
+    <path d="M252 275 C215 260, 165 265, 136 280 L136 372 C165 357, 215 352, 252 368 Z" fill="url(#bookGrad)" />
+    <path d="M248 282 C215 268, 172 272, 146 285 L146 358 C172 345, 215 341, 248 355 Z" fill="#f8fafc" />
+    <!-- Right Page -->
+    <path d="M260 275 C297 260, 347 265, 376 280 L376 372 C347 357, 297 352, 260 368 Z" fill="url(#bookGrad)" />
+    <path d="M264 282 C297 268, 340 272, 366 285 L366 358 C340 345, 297 341, 264 355 Z" fill="#e2e8f0" />
+    <!-- Highlight Lines on Book Pages -->
+    <line x1="164" y1="302" x2="230" y2="296" stroke="#f59e0b" stroke-width="7" stroke-linecap="round" />
+    <line x1="164" y1="320" x2="230" y2="314" stroke="#3b82f6" stroke-width="7" stroke-linecap="round" />
+    <line x1="164" y1="338" x2="215" y2="333" stroke="#94a3b8" stroke-width="6" stroke-linecap="round" />
+    <line x1="282" y1="296" x2="348" y2="302" stroke="#10b981" stroke-width="7" stroke-linecap="round" />
+    <line x1="282" y1="314" x2="348" y2="320" stroke="#94a3b8" stroke-width="6" stroke-linecap="round" />
+    <line x1="282" y1="333" x2="332" y2="338" stroke="#ef4444" stroke-width="7" stroke-linecap="round" />
+    <!-- Golden Book Spine & Bookmark Ribbon -->
+    <rect x="249" y="272" width="14" height="98" rx="6" fill="url(#goldGrad)" />
+    <polygon points="249,365 263,365 263,395 256,386 249,395" fill="#ef4444" />
+  </g>
+</svg>

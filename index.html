@@ -1,0 +1,1212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#020617">
+    <title>DeenTimeR Pro — Balance Your Life & Reader OS</title>
+
+    <!-- Desktop PWA Manifest & App Icon -->
+    <link rel="manifest" href="./manifest.json">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Crect width='120' height='120' rx='28' fill='%23020617'/%3E%3Ccircle cx='60' cy='64' r='38' fill='none' stroke='%233b82f6' stroke-width='8'/%3E%3Cpath d='M60 42v22l14 10' fill='none' stroke='%23ff4757' stroke-width='8' stroke-linecap='round'/%3E%3Crect x='48' y='14' width='24' height='8' rx='4' fill='%233b82f6'/%3E%3C/svg%3E">
+
+    <!-- Master Stylesheet -->
+    <link rel="stylesheet" href="./styles.css">
+
+    <!-- Libraries (Cached 100% Offline by sw.js after first load) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Caveat:wght@700&family=Oswald:wght@500;700&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        if (typeof pdfjsLib !== 'undefined') {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+        if (typeof tailwind !== 'undefined') {
+            tailwind.config = {
+                theme: {
+                    extend: {
+                        fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'], stylish: ['Caveat', 'cursive'], phase: ['Oswald', 'sans-serif'] },
+                        colors: { tomato: '#ff4757', dark: '#0b0e14', accent: '#3b82f6' },
+                        animation: {
+                            'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                            'float': 'float 4s ease-in-out infinite',
+                            'glow': 'glow 3s ease-in-out infinite alternate',
+                        },
+                        keyframes: {
+                            'float': { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-6px)' } },
+                            'glow': { '0%': { filter: 'drop-shadow(0 0 8px rgba(255, 71, 87, 0.3))' }, '100%': { filter: 'drop-shadow(0 0 22px rgba(255, 71, 87, 0.8))' } }
+                        }
+                    }
+                }
+            };
+        }
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/11.1.1/marked.min.js"></script>
+</head>
+
+<body class="flex flex-col">
+
+    <!-- ========================================================================= -->
+    <!-- MAIN VIEWPORT CONTAINER (6 MODULAR PAGES)                                 -->
+    <!-- ========================================================================= -->
+    <div class="flex-1 relative w-full h-full overflow-hidden">
+
+        <!-- PAGE 1: TIMER & HOME COCKPIT -->
+        <div id="page-timer" class="app-page active-page native-scroll bg-gradient-to-b from-[#0a0f1d] to-[#020617]">
+            <div id="timer-container" class="w-full max-w-4xl flex flex-col items-center relative">
+
+                <!-- Top Header Bar -->
+                <div id="app-header-brand" class="w-full flex items-center justify-between mb-3 gap-2">
+                    <div class="flex items-center gap-1.5">
+                        <button id="dim-toggle-btn" class="bg-slate-800/80 hover:bg-slate-700 text-amber-300 px-3 py-2 rounded-xl border border-slate-700/70 text-xs font-bold flex items-center gap-1.5 active:scale-95 transition-all shadow-sm" title="Toggle Power-Saving OLED Dim Mode">
+                            <span>🌙</span><span class="hidden sm:inline">Dim Mode</span>
+                        </button>
+                        <button type="button" id="privacy-lock-top-btn" class="bg-slate-900/90 hover:bg-slate-800 text-emerald-400 border border-slate-700/80 px-2.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1 active:scale-95" title="Privacy PIN Lock">
+                            <span>🔒</span>
+                        </button>
+                    </div>
+
+                    <div class="text-center flex flex-col items-center">
+                        <h1 class="text-2xl sm:text-4xl font-stylish tracking-wide text-blue-400 drop-shadow-[0_0_12px_rgba(59,130,246,0.5)] m-0 leading-none">Pomo</h1>
+                        <div id="current-phase-display" class="mt-1.5 bg-blue-500/10 px-4 py-0.5 rounded-full text-[10px] font-bold text-blue-400 border border-blue-500/20 uppercase tracking-widest font-phase">Ready to Start</div>
+                    </div>
+
+                    <div class="flex items-center gap-1.5">
+                        <button type="button" id="top-rpg-quick-btn" class="bg-slate-900/90 hover:bg-slate-800 text-amber-400 border border-amber-500/40 px-2.5 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1 active:scale-95" title="Open Level & World Rank Arena">
+                            <span id="top-rpg-badge-icon">🪨</span> <span id="top-rpg-lv-text">Lv.0</span>
+                        </button>
+                        <button id="header-goal-pill" class="bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 px-2.5 py-1.5 rounded-xl flex flex-col items-end active:scale-95 transition-all" title="Open Life Compass & Goals">
+                            <span id="header-goal-name" class="text-[9px] font-bold uppercase tracking-wider text-slate-400 truncate max-w-[95px]">🎯 Primary Goal</span>
+                            <span id="header-goal-days" class="text-xs font-extrabold font-mono text-emerald-400">210d left</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- DRIFT / SALAH WARNING BANNER -->
+                <div id="drift-alert-banner" class="hidden w-full mb-3 bg-gradient-to-r from-red-950/95 via-amber-950/90 to-red-950/95 border border-red-500/60 rounded-2xl p-3 shadow-lg">
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="flex items-center gap-2.5">
+                            <span class="text-xl animate-bounce">⚠️</span>
+                            <div>
+                                <p id="drift-alert-title" class="text-xs font-extrabold uppercase tracking-wider text-red-300">You Are Drifting!</p>
+                                <p id="drift-alert-desc" class="text-[11px] text-amber-100/90 mt-0.5 leading-snug">Check your Salah & Deen balance immediately.</p>
+                            </div>
+                        </div>
+                        <button id="dismiss-drift-btn" class="text-[10px] font-bold bg-red-900/60 text-red-200 px-2.5 py-1 rounded-lg border border-red-700/50 shrink-0 active:scale-95">OK</button>
+                    </div>
+                </div>
+
+                <!-- DUAL-ORIENTATION COCKPIT GRID -->
+                <div class="timer-cockpit-grid">
+                    <!-- LEFT COLUMN: TIMER & TRANSPORT CONTROLS -->
+                    <div class="cockpit-left w-full flex flex-col items-center">
+                        <div id="timer-wrapper" class="relative w-full my-2 flex flex-col items-center justify-center">
+                            <div id="animation-container" class="min-h-[3.5rem] mb-1 flex items-center justify-center overflow-visible p-2 pointer-events-none">
+                                <div id="anim-study" class="hidden text-tomato animate-float">
+                                    <svg class="w-12 h-12 animate-glow overflow-visible" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.048 8.287 8.287 0 009 9.6a8.983 8.983 0 013.361-6.866 8.21 8.21 0 003 2.48z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 18a3.75 3.75 0 00.495-7.467 5.99 5.99 0 00-1.925 3.546 5.974 5.974 0 01-2.133-1A3.75 3.75 0 0012 18z"></path></svg>
+                                </div>
+                                <div id="anim-deen" class="hidden text-emerald-400 animate-float">
+                                    <span class="text-4xl">🕌</span>
+                                </div>
+                                <div id="anim-break" class="hidden text-blue-400 animate-float">
+                                    <svg class="w-12 h-12 animate-glow overflow-visible" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 4v10a4 4 0 004 4h8a4 4 0 004-4V4H4z M10 4v6m4-6v6"></path></svg>
+                                </div>
+                            </div>
+                            <span id="time-display" class="text-[22vw] sm:text-[6.5rem] leading-[0.88] font-extrabold font-sans tracking-tighter text-white tabular-nums transition-colors duration-300">00:00</span>
+                            <span id="session-type" class="text-xs sm:text-sm font-semibold text-slate-400 mt-3 uppercase tracking-[0.18em] text-center px-2">Select Session</span>
+                        </div>
+
+                        <div id="controls-container" class="flex justify-center items-center gap-3.5 w-full my-3">
+                            <button id="undo-btn" class="bg-slate-800/90 text-slate-300 p-3.5 rounded-full border border-slate-700/60 active:scale-95 transition-all" title="Previous Session">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
+                            </button>
+                            <button id="start-btn" class="bg-blue-600 text-white font-bold p-5 rounded-full active:scale-95 shadow-[0_0_25px_rgba(59,130,246,0.45)] transition-all flex items-center justify-center" title="Start Timer">
+                                <svg class="w-8 h-8 ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
+                            </button>
+                            <button id="pause-btn" class="hidden bg-slate-800 text-blue-400 font-bold p-5 rounded-full active:scale-95 border border-slate-700 transition-all flex items-center justify-center" title="Pause Timer">
+                                <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>
+                            </button>
+                            <button id="complete-main-btn" class="hidden bg-emerald-600 text-white font-bold p-4 rounded-full active:scale-95 shadow-[0_0_20px_rgba(16,185,129,0.45)] transition-all flex items-center justify-center" title="Complete Session">
+                                <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                            </button>
+                            <button id="skip-btn" class="bg-slate-800/90 text-slate-300 p-3.5 rounded-full border border-slate-700/60 active:scale-95 transition-all" title="Skip Session">
+                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414l2-2a1 1 0 000-1.414l-2-2z" clip-rule="evenodd"></path></svg>
+                            </button>
+                        </div>
+
+                        <div id="dim-controls-bar" class="flex-col items-center gap-4 mt-6">
+                            <div class="flex items-center gap-4">
+                                <button id="dim-stop-btn" class="bg-slate-900/90 text-slate-400 border border-slate-800 px-6 py-3 rounded-full text-xs font-bold uppercase tracking-widest active:scale-95">⏸️ Pause / Resume</button>
+                                <button id="dim-exit-btn" class="bg-slate-950 text-amber-500/70 border border-slate-800 px-4 py-3 rounded-full text-xs font-bold active:scale-95">☀️ Wake UI</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- RIGHT COLUMN: DAILY STUDY/DEEN TARGET HUD + SALAH TRACKER + AI COACH -->
+                    <div class="cockpit-right w-full flex flex-col gap-2.5">
+                        <div id="hud-balance-card" class="w-full bg-slate-900/90 border border-slate-800/90 p-3.5 rounded-2xl shadow-lg">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 flex items-center gap-1.5"><span>⚖️</span> Daily Balance Protocol</span>
+                                <div class="flex items-center gap-1.5">
+                                    <span id="balance-status-pill" class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">On Track</span>
+                                    <button id="open-targets-modal-btn" class="text-[10px] font-bold bg-slate-800 hover:bg-slate-700 text-blue-400 px-2 py-0.5 rounded-lg border border-slate-700 active:scale-95">✏️ Targets</button>
+                                </div>
+                            </div>
+                            <div class="mb-2.5">
+                                <div class="flex justify-between items-baseline text-xs mb-1">
+                                    <span class="font-bold text-slate-200 flex items-center gap-1">🧠 Study Hours</span>
+                                    <span id="hud-study-hours-text" class="font-mono font-extrabold text-blue-400">0.0h <span class="text-slate-500 font-normal">/</span> 8.0h</span>
+                                </div>
+                                <div class="w-full h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+                                    <div id="hud-study-bar" class="h-full bg-gradient-to-r from-blue-600 to-cyan-400 rounded-full transition-all duration-500" style="width: 0%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between items-baseline text-xs mb-1">
+                                    <span class="font-bold text-slate-200 flex items-center gap-1">🕌 Deen & Imaan</span>
+                                    <div class="flex items-center gap-1.5">
+                                        <button id="quick-add-deen-15-btn" class="text-[9px] font-bold bg-emerald-950/90 text-emerald-400 border border-emerald-700/50 px-1.5 py-0.5 rounded active:scale-95">+15m</button>
+                                        <span id="hud-deen-hours-text" class="font-mono font-extrabold text-emerald-400">0.0h <span class="text-slate-500 font-normal">/</span> 1.0h</span>
+                                    </div>
+                                </div>
+                                <div class="w-full h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+                                    <div id="hud-deen-bar" class="h-full bg-gradient-to-r from-emerald-600 to-teal-400 rounded-full transition-all duration-500" style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="home-salah-strip" class="w-full bg-slate-900/90 border border-slate-800/90 p-3 rounded-2xl shadow-lg">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="text-xs">🕋</span>
+                                    <span class="text-[10px] font-extrabold uppercase tracking-widest text-slate-300">Salah Progression</span>
+                                    <span id="salah-score-badge" class="text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/30">0/5</span>
+                                </div>
+                                <button id="home-masjid-Config-btn" class="text-[10px] font-bold text-slate-400 hover:text-white bg-slate-800 px-2 py-0.5 rounded-lg border border-slate-700 active:scale-95">🕌 Masjid Times</button>
+                            </div>
+                            <div id="home-salah-pills" class="grid grid-cols-5 gap-1.5"></div>
+                        </div>
+
+                        <div id="ai-coach-card" class="w-full bg-slate-800/45 border border-slate-700/80 p-3.5 rounded-2xl shadow-inner">
+                            <h3 id="guide-box-title" class="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-1 flex items-center gap-1.5">🤖 AI Coach Standby</h3>
+                            <p id="deep-guide-text" class="text-xs sm:text-sm text-slate-200 font-medium italic leading-relaxed">Waiting for protocol to begin...</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bottom-safe-spacer"></div>
+            </div>
+        </div>
+
+        <!-- PAGE 2: PLAN (LIVE PROTOCOL + DAILY TEMPLATE BUILDER) -->
+        <div id="page-schedule" class="app-page native-scroll bg-[#020617]">
+            <div class="w-full max-w-2xl flex flex-col">
+                <div class="flex justify-between items-center mb-2 border-b border-slate-800 pb-2 shrink-0">
+                    <div class="flex items-center gap-2">
+                        <h2 class="text-base sm:text-lg font-bold text-white">⚡ Live Protocol</h2>
+                        <span id="session-count-badge" class="text-[10px] font-bold text-blue-400 bg-blue-950/60 border border-blue-800/50 px-2 py-0.5 rounded-md uppercase tracking-wider">0 Remaining</span>
+                    </div>
+                    <button id="toggle-live-add-btn" class="bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 text-[11px] font-bold px-2.5 py-1 rounded-lg active:scale-95">➕ Insert Live Block</button>
+                </div>
+
+                <div id="live-insert-drawer" class="hidden bg-slate-900/95 border border-emerald-500/40 rounded-xl p-3 mb-3 flex-col gap-2">
+                    <p class="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Insert Directly Into Today's Live Queue</p>
+                    <div class="flex gap-2">
+                        <input type="text" id="live-new-title" placeholder="Block Title (e.g. Revision / Quran)" class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none">
+                        <input type="number" id="live-new-dur" placeholder="Mins" value="50" class="w-16 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white text-center focus:outline-none">
+                    </div>
+                    <div class="flex gap-2 items-center">
+                        <select id="live-new-cat" class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none">
+                            <option value="work">🧠 Study Block</option>
+                            <option value="deen">🕌 Deen Block (Counts to 1h Deen)</option>
+                            <option value="break">💧 Break Block</option>
+                        </select>
+                        <button id="confirm-live-insert-btn" class="bg-emerald-600 text-white text-xs font-bold px-4 py-1.5 rounded-lg active:scale-95">Insert Now</button>
+                    </div>
+                </div>
+
+                <div id="schedule-container" class="flex flex-col gap-2 mb-5 shrink-0"></div>
+
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col shrink-0 shadow-xl">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="text-xs font-bold text-white uppercase tracking-wider">🗓️ Build Daily Template</h3>
+                        <span class="text-[10px] text-slate-400">Tap 🧠/🕌/💧 icon to switch type</span>
+                    </div>
+                    <div class="flex gap-1 overflow-x-auto no-scrollbar mb-3 w-full pb-1" id="template-day-tabs">
+                        <button type="button" class="day-tab-btn flex-1 min-w-[40px] bg-slate-800 text-slate-300 text-[10px] px-2 py-2 rounded-lg font-bold" data-day="1">Mon</button>
+                        <button type="button" class="day-tab-btn flex-1 min-w-[40px] bg-slate-800 text-slate-300 text-[10px] px-2 py-2 rounded-lg font-bold" data-day="2">Tue</button>
+                        <button type="button" class="day-tab-btn flex-1 min-w-[40px] bg-slate-800 text-slate-300 text-[10px] px-2 py-2 rounded-lg font-bold" data-day="3">Wed</button>
+                        <button type="button" class="day-tab-btn flex-1 min-w-[40px] bg-slate-800 text-slate-300 text-[10px] px-2 py-2 rounded-lg font-bold" data-day="4">Thu</button>
+                        <button type="button" class="day-tab-btn flex-1 min-w-[40px] bg-slate-800 text-slate-300 text-[10px] px-2 py-2 rounded-lg font-bold" data-day="5">Fri</button>
+                        <button type="button" class="day-tab-btn flex-1 min-w-[40px] bg-slate-800 text-slate-300 text-[10px] px-2 py-2 rounded-lg font-bold" data-day="6">Sat</button>
+                        <button type="button" class="day-tab-btn flex-1 min-w-[40px] bg-slate-800 text-slate-300 text-[10px] px-2 py-2 rounded-lg font-bold" data-day="0">Sun</button>
+                    </div>
+                    <div class="flex flex-col gap-2 mb-4 p-3 bg-slate-950 border border-slate-800 rounded-xl">
+                        <input type="text" id="new-sess-title" placeholder="Session Title (e.g. Physics / Tafseer)" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none">
+                        <div class="flex gap-2">
+                            <input type="number" id="new-sess-dur" placeholder="Mins" class="w-20 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white text-center focus:outline-none">
+                            <div class="flex bg-slate-900 p-1 rounded-lg border border-slate-700 flex-1 gap-1">
+                                <input type="hidden" id="new-sess-type" value="work">
+                                <input type="hidden" id="new-sess-cat" value="study">
+                                <button type="button" class="type-toggle-btn flex-1 bg-blue-600 text-white text-[11px] py-1.5 px-2 rounded-md font-bold transition-all shadow-md" data-val="work" data-cat="study">🧠 Study</button>
+                                <button type="button" class="type-toggle-btn flex-1 bg-transparent text-slate-400 text-[11px] py-1.5 px-2 rounded-md font-bold transition-all" data-val="work" data-cat="deen">🕌 Deen</button>
+                                <button type="button" class="type-toggle-btn flex-1 bg-transparent text-slate-400 text-[11px] py-1.5 px-2 rounded-md font-bold transition-all" data-val="break" data-cat="break">💧 Break</button>
+                            </div>
+                        </div>
+                        <button id="add-sess-btn" class="w-full bg-emerald-600 text-white font-bold px-4 py-2.5 rounded-lg mt-1 active:scale-95 transition-all shadow-md">Add Block</button>
+                    </div>
+                    <div id="settings-list" class="flex flex-col gap-2 max-h-[38vh] native-scroll pr-0.5"></div>
+                    <button id="load-day-btn" class="w-full mt-4 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 rounded-xl shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2">
+                        <span>🌅</span> Overwrite Live Protocol With This Day
+                    </button>
+                </div>
+                <div class="bottom-safe-spacer"></div>
+            </div>
+        </div>
+
+        <!-- PAGE 3: MICROSOFT TO DO -->
+        <div id="page-todo" class="app-page native-scroll bg-[#020617]">
+            <div class="w-full max-w-2xl flex flex-col">
+                <div class="flex justify-between items-start mb-3 pb-2 border-b border-slate-800">
+                    <div>
+                        <h2 id="todo-header-title" class="text-xl font-extrabold text-white flex items-center gap-2">☀️ My Day</h2>
+                        <p id="todo-header-date" class="text-xs text-slate-400 mt-0.5">Today</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button id="todo-suggestions-btn" class="bg-amber-500/15 text-amber-300 border border-amber-500/30 text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 active:scale-95">
+                            <span>💡</span> Suggestions <span id="todo-sugg-badge" class="bg-amber-500 text-slate-950 text-[10px] font-extrabold px-1.5 rounded-full">0</span>
+                        </button>
+                        <button id="delete-custom-list-btn" class="hidden bg-red-900/30 text-red-400 border border-red-800/50 text-xs font-bold px-2.5 py-1.5 rounded-xl active:scale-95">🗑️</button>
+                    </div>
+                </div>
+                <div class="flex gap-1.5 overflow-x-auto no-scrollbar mb-3 pb-1 shrink-0" id="todo-lists-bar"></div>
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3 mb-4 shadow-lg">
+                    <div class="flex items-center gap-2">
+                        <span class="text-blue-400 text-lg font-bold pl-1">＋</span>
+                        <input type="text" id="todo-new-input" placeholder="Add a task..." class="flex-1 bg-transparent text-sm text-white placeholder-slate-500 focus:outline-none py-1">
+                        <button id="todo-add-submit-btn" class="bg-blue-600 text-white text-xs font-bold px-3.5 py-1.5 rounded-lg active:scale-95">Add</button>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-1.5 mt-2.5 pt-2 border-t border-slate-800/80">
+                        <button type="button" id="todo-pick-due-btn" class="text-[11px] font-semibold bg-slate-950 text-slate-300 border border-slate-800 px-2.5 py-1 rounded-lg flex items-center gap-1 active:scale-95"><span>📅</span> <span id="todo-new-due-label">Due Date</span></button>
+                        <button type="button" id="todo-pick-repeat-btn" class="text-[11px] font-semibold bg-slate-950 text-slate-300 border border-slate-800 px-2.5 py-1 rounded-lg flex items-center gap-1 active:scale-95"><span>🔁</span> <span id="todo-new-repeat-label">Repeat</span></button>
+                        <button type="button" id="todo-toggle-myday-btn" class="text-[11px] font-semibold bg-blue-600/20 text-blue-400 border border-blue-500/40 px-2.5 py-1 rounded-lg active:scale-95">☀️ My Day</button>
+                        <button type="button" id="todo-toggle-imp-btn" class="text-[11px] font-semibold bg-slate-950 text-slate-400 border border-slate-800 px-2.5 py-1 rounded-lg active:scale-95">☆ Important</button>
+                    </div>
+                </div>
+                <div id="todo-active-container" class="flex flex-col gap-2 mb-4"></div>
+                <div id="todo-completed-wrapper" class="hidden flex-col">
+                    <button id="todo-completed-toggle" class="flex items-center gap-2 text-xs font-bold text-slate-400 py-2 px-1">
+                        <span id="todo-completed-arrow">▼</span><span>Completed</span>
+                        <span id="todo-completed-count" class="bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full text-[10px]">0</span>
+                    </button>
+                    <div id="todo-completed-container" class="flex flex-col gap-2 mt-1"></div>
+                </div>
+                <div class="bottom-safe-spacer"></div>
+            </div>
+        </div>
+
+        <!-- PAGE 4: COMPASS, STUDY VAULT & RPG LEVELING ARENA -->
+        <div id="page-vault" class="app-page native-scroll bg-[#020617]">
+            <div class="w-full max-w-2xl flex flex-col">
+                <div class="flex gap-2 mb-3 bg-slate-900 p-1 rounded-xl border border-slate-800 shrink-0">
+                    <button id="mode-compass-btn" class="flex-1 bg-emerald-600 text-white font-bold py-2 rounded-lg text-xs shadow-md transition-all">🧭 Life Compass & Goals</button>
+                    <button id="mode-neet-vault-btn" class="flex-1 bg-transparent text-slate-400 font-bold py-2 rounded-lg text-xs transition-all">📚 Study Vault</button>
+                    <button id="mode-rpg-rank-btn" type="button" class="flex-1 bg-transparent text-amber-400 font-bold py-2 rounded-lg text-xs transition-all">⚔️ Level & World Rank</button>
+                </div>
+
+                <!-- SUB-VIEW A: 3-TIER LIFE COMPASS -->
+                <div id="compass-subview" class="flex flex-col gap-3">
+                    <div class="bg-gradient-to-br from-emerald-950/80 via-slate-900 to-slate-900 border border-emerald-500/40 rounded-2xl p-4 shadow-lg">
+                        <div class="flex justify-between items-start gap-2">
+                            <div>
+                                <span class="text-[10px] font-extrabold uppercase tracking-widest text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/25">Tier 1 • Purpose of Life (∞ Eternal)</span>
+                                <h3 id="deen-purpose-title" class="text-base font-extrabold text-white mt-2">🕌 Strengthen Deen & Imaan</h3>
+                                <p id="deen-purpose-desc" class="text-xs text-slate-300 mt-0.5">Follow the Islamic path for my entire life — Salah on time & daily Deen knowledge.</p>
+                            </div>
+                            <button id="edit-deen-purpose-btn" class="text-xs bg-slate-800/90 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700 shrink-0 active:scale-95">✏️</button>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-emerald-800/30 text-center">
+                            <div class="bg-slate-950/70 rounded-xl p-2 border border-slate-800"><p class="text-[9px] font-bold uppercase text-slate-400">Deen Today</p><p id="compass-deen-today" class="text-sm font-mono font-extrabold text-emerald-400 mt-0.5">0.0h / 1.0h</p></div>
+                            <div class="bg-slate-950/70 rounded-xl p-2 border border-slate-800"><p class="text-[9px] font-bold uppercase text-slate-400">Salah Today</p><p id="compass-salah-today" class="text-sm font-mono font-extrabold text-blue-400 mt-0.5">0 / 5</p></div>
+                            <div class="bg-slate-950/70 rounded-xl p-2 border border-slate-800"><p class="text-[9px] font-bold uppercase text-slate-400">Horizon</p><p class="text-sm font-extrabold text-amber-400 mt-0.5">∞ Lifelong</p></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-gradient-to-br from-blue-950/80 via-slate-900 to-slate-900 border border-blue-500/40 rounded-2xl p-4 shadow-lg">
+                        <div class="flex justify-between items-start gap-2">
+                            <div>
+                                <span class="text-[10px] font-extrabold uppercase tracking-widest text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/25">Tier 2 • Primary Main Goal</span>
+                                <h3 id="main-goal-card-title" class="text-lg font-extrabold text-white mt-2">🎯 Primary Life & Academic Goal</h3>
+                                <p id="main-goal-card-date" class="text-xs text-slate-400 font-mono mt-0.5">Target Date: --/--/----</p>
+                            </div>
+                            <div class="text-right">
+                                <div id="main-goal-card-days" class="text-2xl font-extrabold font-mono text-blue-400 leading-none">210</div>
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Days Left</span>
+                            </div>
+                        </div>
+                        <div class="mt-3 bg-slate-950/85 border border-slate-800 rounded-xl p-3">
+                            <p id="main-goal-effort-bank" class="text-xs font-bold text-emerald-400">⚡ Effort Bank: 1,680 Potential Study Hours left (@ 8h/day)</p>
+                            <p id="main-goal-suggestion" class="text-[11px] text-slate-300 mt-1 leading-relaxed">💡 Suggestion: Lock in your daily target before touching side goals.</p>
+                        </div>
+                        <div class="flex gap-2 mt-3">
+                            <button id="edit-main-goal-btn" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-2.5 rounded-xl shadow active:scale-95">✏️ Edit Main Goal / Date / Countdown Days</button>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg">
+                        <div class="flex justify-between items-center mb-3">
+                            <div>
+                                <span class="text-[10px] font-extrabold uppercase tracking-widest text-purple-400">Tier 3 • Alternative & Side Goals</span>
+                                <h3 class="text-sm font-bold text-white mt-0.5">🚀 Side Goals & Milestones (<span id="side-goals-count">0</span>)</h3>
+                            </div>
+                            <button id="add-side-goal-btn" class="bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold px-3 py-2 rounded-xl shadow active:scale-95">➕ Add Side Goal</button>
+                        </div>
+                        <div id="side-goals-list" class="flex flex-col gap-2.5"></div>
+                    </div>
+                </div>
+
+                <!-- SUB-VIEW B: CUSTOM-SUBJECT STUDY VAULT -->
+                <div id="neet-vault-subview" class="hidden flex-col">
+                    <div class="flex gap-2 mb-4 bg-slate-900 p-1 rounded-xl border border-slate-800 overflow-x-auto no-scrollbar shrink-0" id="task-tabs">
+                        <button class="task-tab flex-1 min-w-[70px] bg-purple-600 text-white font-bold py-2 px-2 rounded-lg text-xs shadow-md transition-all" data-tab="backlog">Backlog</button>
+                        <button class="task-tab flex-1 min-w-[70px] bg-transparent text-slate-400 font-bold py-2 px-2 rounded-lg text-xs transition-all" data-tab="revision">Revision</button>
+                        <button class="task-tab flex-1 min-w-[70px] bg-transparent text-slate-400 font-bold py-2 px-2 rounded-lg text-xs transition-all" data-tab="mcq">Daily MCQ</button>
+                        <button class="task-tab flex-1 min-w-[70px] bg-transparent text-slate-400 font-bold py-2 px-2 rounded-lg text-xs transition-all" data-tab="matrix">Matrix</button>
+                    </div>
+                    <div id="subject-filter-container" class="flex gap-2 mb-4 shrink-0"></div>
+                    <div id="task-add-form" class="flex flex-col gap-2 mb-4 shrink-0 bg-slate-900 p-3 rounded-xl border border-slate-800">
+                        <input type="text" id="task-title-input" placeholder="Chapter name or topic..." class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none">
+                        <button id="add-task-btn" class="w-full bg-purple-600 text-white font-bold px-4 py-2 rounded-lg text-sm active:scale-95 transition-all shadow-md">Add to Vault</button>
+                    </div>
+                    <div id="mcq-add-form" class="hidden bg-slate-900 border border-slate-800 p-4 rounded-xl mb-4 shrink-0">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-xs text-blue-400 font-bold uppercase tracking-widest" id="mcq-subject-title">Daily Target</h3>
+                            <button id="save-mcq-btn" class="bg-blue-600 text-white text-[10px] font-bold px-3 py-1.5 rounded-md active:scale-95 transition-all shadow-sm">Save Stats</button>
+                        </div>
+                        <div class="flex gap-2 mb-4">
+                            <div class="flex-1"><label class="text-[10px] text-slate-400 block mb-1 font-bold">Target</label><input type="number" id="mcq-target" class="w-full bg-slate-950 border border-slate-700 rounded-md p-2 text-sm text-white text-center font-mono focus:outline-none"></div>
+                            <div class="flex-1"><label class="text-[10px] text-slate-400 block mb-1 font-bold">Attempted</label><input type="number" id="mcq-attempted" class="w-full bg-slate-950 border border-slate-700 rounded-md p-2 text-sm text-white text-center font-mono focus:outline-none"></div>
+                            <div class="flex-1"><label class="text-[10px] text-slate-400 block mb-1 font-bold">Correct</label><input type="number" id="mcq-correct" class="w-full bg-slate-950 border border-slate-700 rounded-md p-2 text-sm text-white text-center font-mono focus:outline-none"></div>
+                        </div>
+                        <div class="flex justify-around bg-slate-950 rounded-lg p-3 border border-slate-800">
+                            <div class="text-center"><span class="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Incorrect</span><p id="mcq-display-incorrect" class="text-xl font-bold text-tomato font-mono mt-1">0</p></div>
+                            <div class="w-px bg-slate-800"></div>
+                            <div class="text-center"><span class="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Left</span><p id="mcq-display-left" class="text-xl font-bold text-amber-400 font-mono mt-1">0</p></div>
+                        </div>
+                    </div>
+                    <div id="vault-list-container" class="flex flex-col gap-2 shrink-0"></div>
+                </div>
+
+                <!-- SUB-VIEW C: PRO-GAMER RPG LEVELING & WORLD RANK ARENA -->
+                <div id="rpg-arena-subview" class="hidden flex-col gap-3"></div>
+
+                <div class="bottom-safe-spacer"></div>
+            </div>
+        </div>
+
+        <!-- PAGE 5: PROFILE & SETTINGS -->
+        <div id="page-settings" class="app-page native-scroll bg-[#020617]">
+            <div class="w-full max-w-2xl flex flex-col">
+                <h2 class="text-lg font-bold text-white mb-2 border-b border-slate-800 pb-2 shrink-0">⚙️ Profile & Control Center</h2>
+                <div class="flex gap-1.5 mb-4 bg-slate-900 p-1 rounded-xl border border-slate-800 shrink-0" id="prof-tabs">
+                    <button class="prof-tab flex-1 bg-blue-600 text-white font-bold py-2 rounded-lg text-xs shadow-md transition-all" data-tab="prof-stats">Stats</button>
+                    <button class="prof-tab flex-1 bg-transparent text-slate-400 font-bold py-2 rounded-lg text-xs transition-all" data-tab="prof-salah">🕌 Salah</button>
+                    <button class="prof-tab flex-1 bg-transparent text-slate-400 font-bold py-2 rounded-lg text-xs transition-all" data-tab="prof-sync">Cloud</button>
+                    <button class="prof-tab flex-1 bg-transparent text-slate-400 font-bold py-2 rounded-lg text-xs transition-all" data-tab="prof-coach">Coach</button>
+                </div>
+
+                <div id="prof-stats" class="prof-panel flex flex-col gap-3">
+                    <div class="grid grid-cols-2 gap-3 shrink-0">
+                        <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 text-center"><p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Study Today</p><p id="stat-today-mins" class="text-2xl font-mono font-bold text-emerald-400">0<span class="text-xs text-slate-500 ml-1">m</span></p></div>
+                        <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 text-center"><p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Sessions</p><p id="stat-today-sessions" class="text-2xl font-mono font-bold text-blue-400">0</p></div>
+                    </div>
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 flex justify-between items-center shrink-0">
+                        <span class="text-xs font-bold text-slate-300 uppercase tracking-wider">7-Day Study Total</span>
+                        <span id="stat-weekly-total" class="text-lg font-mono font-bold text-blue-400">0m</span>
+                    </div>
+                    <div class="bg-slate-900 p-3.5 rounded-xl border border-slate-800 flex flex-col gap-2.5 shrink-0">
+                        <h3 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">✈️ Telegram God-Mode</h3>
+                        <div class="flex gap-2">
+                            <input type="password" id="tg-token-input" placeholder="Bot Token" class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-2 text-xs text-white focus:outline-none">
+                            <input type="password" id="tg-chatid-input" placeholder="Chat ID" class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-2 text-xs text-white focus:outline-none">
+                        </div>
+                        <div class="flex gap-2">
+                            <button id="save-tg-btn" class="flex-1 bg-emerald-600/20 text-emerald-400 font-bold py-2 rounded-lg text-xs active:scale-95 border border-emerald-500/30">Save Keys</button>
+                            <button id="disconnect-tg-btn" class="flex-1 bg-red-600/20 text-red-400 font-bold py-2 rounded-lg text-xs active:scale-95 border border-red-500/30">Disconnect</button>
+                        </div>
+                        <button id="send-report-btn" class="w-full bg-blue-600 text-white font-bold py-2.5 rounded-lg text-xs active:scale-95 shadow-md">Send Daily Report Now</button>
+                    </div>
+                </div>
+
+                <div id="prof-salah" class="prof-panel hidden flex flex-col gap-3">
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <h3 class="text-xs font-bold text-white uppercase tracking-wider">🕌 Local Masjid Times & Alerts</h3>
+                                <p id="masjid-location-label" class="text-[10px] text-slate-400 mt-0.5">Tap any prayer time below to match your local Masjid</p>
+                            </div>
+                            <button id="sync-masjid-gps-btn" class="bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-xl active:scale-95 shadow">📍 Auto-Sync GPS</button>
+                        </div>
+                        <div class="flex items-center justify-between bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+                            <span class="text-xs font-bold text-slate-200">🔔 Automatic Missing Salah Alert</span>
+                            <button id="toggle-salah-alerts-btn" class="bg-emerald-600 text-white text-[11px] font-bold px-3 py-1 rounded-lg">Enabled</button>
+                        </div>
+                        <div id="settings-salah-list" class="flex flex-col gap-2"></div>
+                    </div>
+                </div>
+
+                <div id="prof-sync" class="prof-panel hidden flex flex-col gap-3">
+                    <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 flex flex-col gap-3 shrink-0">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">☁️ Omni-Cloud Sync (v8 Compatible)</h3>
+                            <span id="sync-status" class="hidden text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-900/40 text-emerald-400 border border-emerald-700/50">✅ Connected</span>
+                        </div>
+                        <input type="text" id="sync-email-input" placeholder="Room ID (e.g. adil123)" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none">
+                        <div class="relative w-full">
+                            <input type="password" id="sync-pass-input" placeholder="Security Key" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none pr-10">
+                            <button id="toggle-sync-pass-btn" type="button" class="absolute inset-y-0 right-1 px-3 text-slate-400 flex items-center">👁️</button>
+                        </div>
+                        <button id="login-sync-btn" class="w-full bg-blue-600 text-white font-bold py-2.5 rounded-lg text-sm active:scale-95 transition-all shadow-md">Connect System</button>
+                    </div>
+                    <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 flex flex-col gap-2.5">
+                        <h3 class="text-xs font-bold text-white uppercase tracking-wider">💾 Offline Backup & Restore</h3>
+                        <div class="flex gap-2">
+                            <button id="export-backup-btn" class="flex-1 bg-slate-800 text-blue-400 border border-slate-700 font-bold py-2 rounded-lg text-xs active:scale-95">📥 Copy Backup JSON</button>
+                            <button id="import-backup-btn" class="flex-1 bg-slate-800 text-emerald-400 border border-slate-700 font-bold py-2 rounded-lg text-xs active:scale-95">📤 Restore JSON</button>
+                        </div>
+                        <textarea id="backup-json-input" placeholder="Paste backup JSON here to restore offline..." class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-[11px] text-slate-300 h-16 resize-none focus:outline-none"></textarea>
+                    </div>
+                </div>
+
+                <div id="prof-coach" class="prof-panel hidden flex flex-col gap-3">
+                    <div class="bg-slate-900 p-3.5 rounded-xl border border-slate-800 flex flex-col gap-2 shrink-0">
+                        <h3 class="text-xs font-bold text-white uppercase tracking-wider">🔥 AI Coach Quotes</h3>
+                        <label class="text-[10px] text-slate-400 font-bold uppercase">Study Quotes (1 per line)</label>
+                        <textarea id="custom-study-quotes" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-2 text-xs text-white focus:outline-none h-16 resize-none"></textarea>
+                        <label class="text-[10px] text-slate-400 font-bold uppercase">Break Rules (1 per line)</label>
+                        <textarea id="custom-break-quotes" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-2 text-xs text-white focus:outline-none h-16 resize-none"></textarea>
+                        <button id="save-coach-btn" class="w-full bg-blue-600 text-white font-bold py-2 rounded-lg text-xs active:scale-95">Save Quotes</button>
+                    </div>
+                    <div class="bg-red-900/10 p-3.5 rounded-xl border border-red-900/30 flex flex-col gap-2 shrink-0">
+                        <h3 class="text-xs font-bold text-red-400 uppercase tracking-wider">Danger Zone</h3>
+                        <button id="factory-reset-btn" class="w-full bg-red-600/20 text-red-400 font-bold py-2.5 rounded-lg text-xs active:scale-95 border border-red-500/30">🗑️ Factory Reset App (Wipe Cloud & Local)</button>
+                    </div>
+                </div>
+                <div class="bottom-safe-spacer"></div>
+            </div>
+        </div>
+
+        <!-- PAGE 6: READER PRO & 3D WOODEN BOOKSHELF -->
+        <div id="page-reader" class="app-page native-scroll">
+            <div class="w-full max-w-4xl flex flex-col">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2.5 border-b border-slate-800 shrink-0">
+                    <div class="flex items-center gap-2.5">
+                        <span class="text-2xl">📖</span>
+                        <div>
+                            <h2 class="text-base sm:text-xl font-extrabold text-white tracking-tight flex items-center gap-2">
+                                Pomo Reader Pro
+                                <span id="reader-folder-sync-badge" class="text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full">🛡️ Standalone AppData Active</span>
+                            </h2>
+                            <p id="reader-main-folder-label" class="text-[11px] text-slate-400">Wooden Shelf • Manual Genre Priority • PDF, EPUB, DOCX, MD, TXT</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                        <button id="shelf-quick-import-btn" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-2 rounded-xl shadow flex items-center gap-1.5 active:scale-95"><span>➕</span> <span>Import Books</span></button>
+                        <button id="shelf-scan-folder-btn" class="bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 active:scale-95"><span>📂</span> <span class="hidden sm:inline">Main Folder</span></button>
+                        <button id="shelf-open-a1-hub-btn" class="bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 text-xs font-bold px-2.5 py-2 rounded-xl flex items-center gap-1 active:scale-95"><span>🔖</span> <span class="hidden sm:inline">Notes Hub</span></button>
+                        <button id="shelf-open-a9-stats-btn" class="bg-slate-800 hover:bg-slate-700 text-purple-300 border border-slate-700 text-xs font-bold px-2.5 py-2 rounded-xl flex items-center gap-1 active:scale-95"><span>📊</span> <span class="hidden sm:inline">6M Stats</span></button>
+                        <button id="shelf-open-a10-files-btn" class="bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 text-xs font-bold px-2.5 py-2 rounded-xl flex items-center gap-1 active:scale-95"><span>☁️</span> <span class="hidden sm:inline">My Files</span></button>
+                        <button id="reader-general-settings-btn" class="bg-slate-900 hover:bg-slate-800 text-white border border-slate-700 p-2 rounded-xl text-base active:scale-95 shadow" title="Reader General Settings (1 to 10)">⚙️</button>
+                    </div>
+                </div>
+
+                <!-- Shelf Filter, Search & Sort Bar -->
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-3 bg-slate-900/90 border border-slate-800 p-2.5 rounded-2xl shrink-0">
+                    <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                        <button class="shelf-filter-tab bg-amber-600 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow" data-filter="all">🪵 All Shelf (<span id="shelf-count-all">0</span>)</button>
+                        <button class="shelf-filter-tab bg-slate-950 text-slate-300 border border-slate-800 text-xs font-bold px-3 py-1.5 rounded-xl" data-filter="fav">❤️ Favorites (<span id="shelf-count-fav">0</span>)</button>
+                        <button class="shelf-filter-tab bg-slate-950 text-blue-400 border border-slate-800 text-xs font-bold px-3 py-1.5 rounded-xl" data-filter="study">🧠 Study</button>
+                        <button class="shelf-filter-tab bg-slate-950 text-emerald-400 border border-slate-800 text-xs font-bold px-3 py-1.5 rounded-xl" data-filter="deen">🕌 Deen</button>
+                        <button class="shelf-filter-tab bg-slate-950 text-purple-400 border border-slate-800 text-xs font-bold px-3 py-1.5 rounded-xl" data-filter="reading">📖 Reading</button>
+                        <button class="shelf-filter-tab bg-slate-950 text-teal-400 border border-slate-800 text-xs font-bold px-3 py-1.5 rounded-xl" data-filter="completed">✅ Completed</button>
+                    </div>
+                    <div class="flex items-center gap-2 flex-1 sm:flex-initial justify-end">
+                        <input type="text" id="shelf-search-input" placeholder="🔎 Search Book, Author, or Genre..." class="w-full sm:w-56 bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none">
+                        <select id="shelf-sort-select" class="bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 font-bold focus:outline-none">
+                            <option value="recent">Sort: Last Read</option>
+                            <option value="title">Sort: Book Title (A–Z)</option>
+                            <option value="author">Sort: Author (A–Z)</option>
+                            <option value="storage">Sort: Storage Source</option>
+                            <option value="progress">Sort: % Read Progress</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Custom Genres / Shelves Bar -->
+                <div id="custom-shelves-bar" class="flex flex-wrap items-center justify-between gap-2 mb-3 bg-slate-900/95 border border-amber-500/30 p-2.5 rounded-2xl shrink-0"></div>
+
+                <!-- Hidden File Inputs -->
+                <input type="file" id="reader-book-file-input" multiple accept=".pdf,.epub,.txt,.md,.docx,.html,.htm" class="hidden">
+                <input type="file" id="reader-folder-fallback-input" webkitdirectory directory multiple class="hidden">
+                <input type="file" id="book-cover-file-input" accept="image/*" class="hidden">
+                <input type="file" id="line-attach-file-input" accept="image/*,audio/*,.pdf,.txt,.md,.doc,.docx" class="hidden">
+                <input type="file" id="reader-restore-json-input" accept=".json" class="hidden">
+
+                <!-- 3D Wooden Bookshelf -->
+                <div id="wooden-bookshelf-wrapper" class="wood-shelf-container flex flex-col justify-between">
+                    <div id="wooden-bookshelf-rows" class="flex flex-col"></div>
+                </div>
+                <div class="bottom-safe-spacer"></div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- BOTTOM NAVIGATION BAR (6 TABS)                                            -->
+    <!-- ========================================================================= -->
+    <div class="bottom-nav">
+        <button class="nav-btn nav-item active flex flex-col items-center gap-0.5 w-16" data-target="page-timer">
+            <span class="nav-icon text-xl">⏱️</span><span class="text-[10px] font-bold">Timer</span>
+            <div class="nav-indicator w-1.5 h-1 rounded-full bg-blue-500 opacity-0 transform scale-0 transition-all"></div>
+        </button>
+        <button class="nav-btn nav-item flex flex-col items-center gap-0.5 w-16" data-target="page-schedule">
+            <span class="nav-icon text-xl">🗓️</span><span class="text-[10px] font-bold">Plan</span>
+            <div class="nav-indicator w-1.5 h-1 rounded-full bg-blue-500 opacity-0 transform scale-0 transition-all"></div>
+        </button>
+        <button class="nav-btn nav-item flex flex-col items-center gap-0.5 w-16" data-target="page-todo">
+            <span class="nav-icon text-xl">☑️</span><span class="text-[10px] font-bold">To Do</span>
+            <div class="nav-indicator w-1.5 h-1 rounded-full bg-blue-500 opacity-0 transform scale-0 transition-all"></div>
+        </button>
+        <button class="nav-btn nav-item flex flex-col items-center gap-0.5 w-16" data-target="page-vault">
+            <span class="nav-icon text-xl">🧭</span><span class="text-[10px] font-bold">Vault</span>
+            <div class="nav-indicator w-1.5 h-1 rounded-full bg-blue-500 opacity-0 transform scale-0 transition-all"></div>
+        </button>
+        <button class="nav-btn nav-item flex flex-col items-center gap-0.5 w-16" data-target="page-reader">
+            <span class="nav-icon text-xl">📖</span><span class="text-[10px] font-bold">Reader</span>
+            <div class="nav-indicator w-1.5 h-1 rounded-full bg-blue-500 opacity-0 transform scale-0 transition-all"></div>
+        </button>
+        <button class="nav-btn nav-item flex flex-col items-center gap-0.5 w-16" data-target="page-settings">
+            <span class="nav-icon text-xl">⚙️</span><span class="text-[10px] font-bold">Profile</span>
+            <div class="nav-indicator w-1.5 h-1 rounded-full bg-blue-500 opacity-0 transform scale-0 transition-all"></div>
+        </button>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- ALL IN-APP MODALS & FULL-SCREEN READER OVERLAY                            -->
+    <!-- ========================================================================= -->
+
+    <!-- 1. GOAL & DATE/COUNTDOWN MODAL -->
+    <div id="goal-date-modal" class="hidden fixed inset-0 modal-backdrop z-[300] flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-3xl p-4 w-full max-w-md shadow-2xl flex flex-col gap-3 max-h-[92dvh] native-scroll">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                <h3 id="goal-modal-heading" class="text-sm font-extrabold text-white uppercase tracking-wider">🎯 Configure Goal & Countdown</h3>
+                <button id="close-goal-modal-btn" class="text-slate-400 hover:text-white text-lg font-bold px-2">✕</button>
+            </div>
+            <div id="goal-title-wrapper" class="flex flex-col gap-1">
+                <label class="text-[10px] font-bold uppercase text-slate-400">Title</label>
+                <input type="text" id="modal-goal-title-input" placeholder="Goal Title" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white font-bold focus:outline-none">
+            </div>
+            <div id="goal-desc-wrapper" class="hidden flex flex-col gap-1">
+                <label class="text-[10px] font-bold uppercase text-slate-400">Lifelong Purpose Subtitle</label>
+                <textarea id="modal-goal-desc-input" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white h-16 resize-none focus:outline-none"></textarea>
+            </div>
+            <div id="goal-date-picker-section" class="bg-slate-950 border border-slate-800 rounded-2xl p-3 flex flex-col gap-2.5">
+                <div class="flex justify-between items-center">
+                    <span class="text-[10px] font-extrabold uppercase tracking-wider text-blue-400">📅 In-App Date Selector (DD / MM / YYYY)</span>
+                    <span id="modal-live-date-badge" class="text-xs font-mono font-bold text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-700/40">--/--/----</span>
+                </div>
+                <div class="grid grid-cols-3 gap-2 text-center">
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-2 flex flex-col items-center"><span class="text-[9px] font-bold uppercase text-slate-400">Day (DD)</span><div class="flex items-center justify-between w-full mt-1"><button type="button" id="dd-minus-btn" class="bg-slate-800 text-white w-7 h-7 rounded-lg font-bold">−</button><span id="picker-dd-val" class="text-base font-mono font-extrabold text-white">15</span><button type="button" id="dd-plus-btn" class="bg-slate-800 text-white w-7 h-7 rounded-lg font-bold">＋</button></div></div>
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-2 flex flex-col items-center"><span class="text-[9px] font-bold uppercase text-slate-400">Month (MM)</span><div class="flex items-center justify-between w-full mt-1"><button type="button" id="mm-minus-btn" class="bg-slate-800 text-white w-7 h-7 rounded-lg font-bold">−</button><span id="picker-mm-val" class="text-sm font-mono font-extrabold text-blue-400">05</span><button type="button" id="mm-plus-btn" class="bg-slate-800 text-white w-7 h-7 rounded-lg font-bold">＋</button></div></div>
+                    <div class="bg-slate-900 border border-slate-800 rounded-xl p-2 flex flex-col items-center"><span class="text-[9px] font-bold uppercase text-slate-400">Year (YYYY)</span><div class="flex items-center justify-between w-full mt-1"><button type="button" id="yy-minus-btn" class="bg-slate-800 text-white w-7 h-7 rounded-lg font-bold">−</button><span id="picker-yy-val" class="text-sm font-mono font-extrabold text-amber-400">2027</span><button type="button" id="yy-plus-btn" class="bg-slate-800 text-white w-7 h-7 rounded-lg font-bold">＋</button></div></div>
+                </div>
+                <div class="border-t border-slate-800 pt-2.5 flex flex-col gap-2">
+                    <div class="flex justify-between items-center">
+                        <span class="text-[10px] font-extrabold uppercase tracking-wider text-purple-400">⚡ Or Tap Countdown Days Directly:</span>
+                        <div class="flex items-center gap-1.5"><span id="picker-days-display" class="text-lg font-mono font-extrabold text-white bg-slate-900 border border-purple-500/50 px-3 py-0.5 rounded-lg">210</span><span class="text-[10px] font-bold text-slate-400">Days</span></div>
+                    </div>
+                    <div class="grid grid-cols-6 gap-1.5">
+                        <button type="button" class="days-numpad-btn bg-slate-800 text-white font-mono font-bold py-2 rounded-lg text-xs" data-key="1">1</button>
+                        <button type="button" class="days-numpad-btn bg-slate-800 text-white font-mono font-bold py-2 rounded-lg text-xs" data-key="2">2</button>
+                        <button type="button" class="days-numpad-btn bg-slate-800 text-white font-mono font-bold py-2 rounded-lg text-xs" data-key="3">3</button>
+                        <button type="button" class="days-numpad-btn bg-slate-800 text-white font-mono font-bold py-2 rounded-lg text-xs" data-key="4">4</button>
+                        <button type="button" class="days-numpad-btn bg-slate-800 text-white font-mono font-bold py-2 rounded-lg text-xs" data-key="5">5</button>
+                        <button type="button" class="days-numpad-btn bg-red-900/50 text-red-300 font-bold py-2 rounded-lg text-xs" data-key="CLR">C</button>
+                        <button type="button" class="days-numpad-btn bg-slate-800 text-white font-mono font-bold py-2 rounded-lg text-xs" data-key="6">6</button>
+                        <button type="button" class="days-numpad-btn bg-slate-800 text-white font-mono font-bold py-2 rounded-lg text-xs" data-key="7">7</button>
+                        <button type="button" class="days-numpad-btn bg-slate-800 text-white font-mono font-bold py-2 rounded-lg text-xs" data-key="8">8</button>
+                        <button type="button" class="days-numpad-btn bg-slate-800 text-white font-mono font-bold py-2 rounded-lg text-xs" data-key="9">9</button>
+                        <button type="button" class="days-numpad-btn bg-slate-800 text-white font-mono font-bold py-2 rounded-lg text-xs" data-key="0">0</button>
+                        <button type="button" class="days-numpad-btn bg-slate-700 text-amber-300 font-bold py-2 rounded-lg text-xs" data-key="BS">⌫</button>
+                    </div>
+                </div>
+                <div id="modal-goal-smart-suggestion" class="bg-blue-950/40 border border-blue-800/50 rounded-xl p-2.5 text-[11px] text-blue-200 leading-snug">💡 Stay consistent!</div>
+            </div>
+            <div class="flex gap-2">
+                <button id="clear-goal-date-btn" class="hidden bg-red-900/30 text-red-300 border border-red-800/50 font-bold px-3.5 py-3 rounded-xl text-xs">🗑️ Clear Date</button>
+                <button id="save-goal-modal-btn" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl shadow-lg text-sm">✅ Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. MASJID TIME MODAL -->
+    <div id="inapp-time-modal" class="hidden fixed inset-0 modal-backdrop z-[310] flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-3xl p-5 w-full max-w-xs shadow-2xl flex flex-col gap-4 text-center">
+            <h3 id="time-modal-title" class="text-sm font-extrabold text-white uppercase tracking-wider">🕌 Set Masjid Salah Time</h3>
+            <div class="flex items-center justify-center gap-3 bg-slate-950 p-4 rounded-2xl border border-slate-800">
+                <div class="flex flex-col items-center gap-1"><button type="button" id="time-hr-plus" class="bg-slate-800 text-white w-10 h-8 rounded-lg font-bold">▲</button><span id="time-hr-val" class="text-3xl font-mono font-extrabold text-white">05</span><button type="button" id="time-hr-minus" class="bg-slate-800 text-white w-10 h-8 rounded-lg font-bold">▼</button></div>
+                <span class="text-2xl font-bold text-slate-500">:</span>
+                <div class="flex flex-col items-center gap-1"><button type="button" id="time-min-plus" class="bg-slate-800 text-white w-10 h-8 rounded-lg font-bold">+5</button><span id="time-min-val" class="text-3xl font-mono font-extrabold text-blue-400">15</span><button type="button" id="time-min-minus" class="bg-slate-800 text-white w-10 h-8 rounded-lg font-bold">-1</button></div>
+            </div>
+            <div class="flex gap-2">
+                <button id="cancel-time-modal-btn" class="flex-1 bg-slate-800 text-slate-300 font-bold py-2.5 rounded-xl text-xs">Cancel</button>
+                <button id="save-time-modal-btn" class="flex-1 bg-emerald-600 text-white font-bold py-2.5 rounded-xl text-xs shadow">Save Time</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. DAILY TARGETS MODAL -->
+    <div id="targets-modal" class="hidden fixed inset-0 modal-backdrop z-[310] flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-3xl p-5 w-full max-w-sm shadow-2xl flex flex-col gap-4">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                <h3 class="text-sm font-extrabold text-white uppercase tracking-wider">⚖️ Customize Daily Targets</h3>
+                <button id="close-targets-modal-btn" class="text-slate-400 font-bold px-2">✕</button>
+            </div>
+            <div class="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between">
+                <div><p class="text-xs font-bold text-white">🧠 Daily Study Target</p><p class="text-[10px] text-slate-400">Recommended: 8.0 hours/day</p></div>
+                <div class="flex items-center gap-2"><button type="button" id="study-target-minus" class="bg-slate-800 text-white w-8 h-8 rounded-lg font-bold">−</button><span id="study-target-val" class="text-base font-mono font-extrabold text-blue-400 w-12 text-center">8.0h</span><button type="button" id="study-target-plus" class="bg-slate-800 text-white w-8 h-8 rounded-lg font-bold">＋</button></div>
+            </div>
+            <div class="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between">
+                <div><p class="text-xs font-bold text-white">🕌 Daily Deen Target</p><p class="text-[10px] text-slate-400">Imaan & Islamic Knowledge</p></div>
+                <div class="flex items-center gap-2"><button type="button" id="deen-target-minus" class="bg-slate-800 text-white w-8 h-8 rounded-lg font-bold">−</button><span id="deen-target-val" class="text-base font-mono font-extrabold text-emerald-400 w-12 text-center">1.0h</span><button type="button" id="deen-target-plus" class="bg-slate-800 text-white w-8 h-8 rounded-lg font-bold">＋</button></div>
+            </div>
+            <div class="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex flex-col gap-2">
+                <p class="text-[10px] font-bold uppercase text-slate-400">Manual Today Adjustment</p>
+                <div class="flex gap-2">
+                    <button type="button" id="manual-study-add30" class="flex-1 bg-blue-950/70 text-blue-300 border border-blue-700/40 py-1.5 rounded-lg text-xs font-bold">+30m Study</button>
+                    <button type="button" id="manual-deen-add15" class="flex-1 bg-emerald-950/70 text-emerald-300 border border-emerald-700/40 py-1.5 rounded-lg text-xs font-bold">+15m Deen</button>
+                    <button type="button" id="manual-deen-minus15" class="bg-slate-900 text-slate-400 border border-slate-700 px-2.5 py-1.5 rounded-lg text-xs font-bold">-15m</button>
+                </div>
+            </div>
+            <button id="save-targets-modal-btn" class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl text-xs uppercase tracking-wider shadow-lg">Save Targets</button>
+        </div>
+    </div>
+
+    <!-- 4. REPEAT MODAL -->
+    <div id="custom-repeat-modal" class="hidden fixed inset-0 modal-backdrop z-[320] flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-3xl p-4 w-full max-w-sm shadow-2xl flex flex-col gap-3">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                <h3 class="text-sm font-extrabold text-white uppercase tracking-wider">🔁 Repeat Schedule</h3>
+                <button id="close-repeat-modal-btn" class="text-slate-400 font-bold px-2">✕</button>
+            </div>
+            <div class="grid grid-cols-3 gap-1.5">
+                <button type="button" class="repeat-preset-btn bg-slate-950 border border-slate-800 text-xs font-bold py-2 rounded-xl text-slate-300" data-preset="none">Never</button>
+                <button type="button" class="repeat-preset-btn bg-slate-950 border border-slate-800 text-xs font-bold py-2 rounded-xl text-slate-300" data-preset="daily">Daily</button>
+                <button type="button" class="repeat-preset-btn bg-slate-950 border border-slate-800 text-xs font-bold py-2 rounded-xl text-slate-300" data-preset="weekdays">Mon–Fri</button>
+                <button type="button" class="repeat-preset-btn bg-slate-950 border border-slate-800 text-xs font-bold py-2 rounded-xl text-slate-300" data-preset="weekly">Weekly</button>
+                <button type="button" class="repeat-preset-btn bg-slate-950 border border-slate-800 text-xs font-bold py-2 rounded-xl text-slate-300" data-preset="monthly">Monthly</button>
+                <button type="button" class="repeat-preset-btn bg-slate-950 border border-slate-800 text-xs font-bold py-2 rounded-xl text-slate-300" data-preset="yearly">Yearly</button>
+            </div>
+            <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3 flex flex-col gap-2.5">
+                <span class="text-[10px] font-extrabold uppercase tracking-wider text-blue-400">⚙️ Custom Repeat Interval</span>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-bold text-slate-300">Every</span>
+                    <div class="flex items-center bg-slate-900 border border-slate-700 rounded-lg"><button type="button" id="rep-int-minus" class="px-2.5 py-1 text-white font-bold">−</button><span id="rep-int-val" class="px-2 font-mono font-bold text-sm text-blue-400">1</span><button type="button" id="rep-int-plus" class="px-2.5 py-1 text-white font-bold">＋</button></div>
+                    <select id="rep-unit-select" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-bold"><option value="days">Days</option><option value="weeks">Weeks</option><option value="months">Months</option><option value="years">Years</option></select>
+                </div>
+                <div id="rep-weekdays-box" class="hidden flex-col gap-1.5 pt-1">
+                    <span class="text-[10px] text-slate-400 font-bold">Repeat on days:</span>
+                    <div class="grid grid-cols-7 gap-1">
+                        <button type="button" class="rep-day-pill bg-slate-900 border border-slate-700 text-[10px] font-bold py-1.5 rounded-lg text-slate-400" data-d="0">Su</button>
+                        <button type="button" class="rep-day-pill bg-slate-900 border border-slate-700 text-[10px] font-bold py-1.5 rounded-lg text-slate-400" data-d="1">Mo</button>
+                        <button type="button" class="rep-day-pill bg-slate-900 border border-slate-700 text-[10px] font-bold py-1.5 rounded-lg text-slate-400" data-d="2">Tu</button>
+                        <button type="button" class="rep-day-pill bg-slate-900 border border-slate-700 text-[10px] font-bold py-1.5 rounded-lg text-slate-400" data-d="3">We</button>
+                        <button type="button" class="rep-day-pill bg-slate-900 border border-slate-700 text-[10px] font-bold py-1.5 rounded-lg text-slate-400" data-d="4">Th</button>
+                        <button type="button" class="rep-day-pill bg-slate-900 border border-slate-700 text-[10px] font-bold py-1.5 rounded-lg text-slate-400" data-d="5">Fr</button>
+                        <button type="button" class="rep-day-pill bg-slate-900 border border-slate-700 text-[10px] font-bold py-1.5 rounded-lg text-slate-400" data-d="6">Sa</button>
+                    </div>
+                </div>
+            </div>
+            <button id="apply-custom-repeat-btn" class="w-full bg-blue-600 text-white font-bold py-2.5 rounded-xl text-xs uppercase tracking-wider shadow">Apply Custom Repeat</button>
+        </div>
+    </div>
+
+    <!-- 5. TO-DO DETAIL DRAWER -->
+    <div id="todo-detail-modal" class="hidden fixed inset-0 modal-backdrop z-[290] flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-slate-900 border-t sm:border border-slate-700 rounded-t-3xl sm:rounded-3xl p-4 w-full max-w-lg shadow-2xl flex flex-col gap-3 max-h-[88dvh] native-scroll">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                <input type="text" id="detail-task-title" class="flex-1 bg-transparent text-base font-extrabold text-white focus:outline-none">
+                <button id="close-detail-modal-btn" class="text-slate-400 font-bold px-2.5 text-lg">✕</button>
+            </div>
+            <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 flex flex-col gap-2">
+                <div id="detail-steps-list" class="flex flex-col gap-1.5"></div>
+                <div class="flex items-center gap-2 pt-1">
+                    <span class="text-blue-400 font-bold">＋</span>
+                    <input type="text" id="detail-new-step-input" placeholder="Add step / subtask" class="flex-1 bg-transparent text-xs text-white focus:outline-none">
+                    <button id="detail-add-step-btn" class="text-xs font-bold text-blue-400 px-2 py-1">Add</button>
+                </div>
+            </div>
+            <div class="flex flex-col gap-2">
+                <button id="detail-myday-btn" class="w-full bg-slate-950 border border-slate-800 p-3 rounded-xl text-left text-xs font-bold text-slate-200 flex items-center justify-between"><span>☀️ Added to My Day</span><span id="detail-myday-status" class="text-blue-400">Yes</span></button>
+                <button id="detail-due-btn" class="w-full bg-slate-950 border border-slate-800 p-3 rounded-xl text-left text-xs font-bold text-slate-200 flex items-center justify-between"><span>📅 Due Date</span><span id="detail-due-status" class="text-emerald-400">Not Set</span></button>
+                <button id="detail-repeat-btn" class="w-full bg-slate-950 border border-slate-800 p-3 rounded-xl text-left text-xs font-bold text-slate-200 flex items-center justify-between"><span>🔁 Repeat Rule</span><span id="detail-repeat-status" class="text-purple-400">Never</span></button>
+            </div>
+            <textarea id="detail-note-input" placeholder="Add note..." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white h-20 resize-none focus:outline-none"></textarea>
+            <div class="flex gap-2">
+                <button id="detail-delete-btn" class="bg-red-900/30 text-red-400 border border-red-800/50 font-bold px-4 py-2.5 rounded-xl text-xs">🗑️ Delete</button>
+                <button id="detail-save-btn" class="flex-1 bg-blue-600 text-white font-bold py-2.5 rounded-xl text-xs">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 6. MY DAY SUGGESTIONS MODAL -->
+    <div id="todo-suggestions-modal" class="hidden fixed inset-0 modal-backdrop z-[295] flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-3xl p-4 w-full max-w-md shadow-2xl flex flex-col gap-3 max-h-[80dvh] native-scroll">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2"><h3 class="text-sm font-extrabold text-amber-300 uppercase tracking-wider">💡 Suggested for My Day</h3><button id="close-suggestions-modal-btn" class="text-slate-400 font-bold px-2">✕</button></div>
+            <div id="suggestions-list-container" class="flex flex-col gap-2"></div>
+        </div>
+    </div>
+
+    <!-- 7. NEW TO-DO LIST MODAL -->
+    <div id="new-todolist-modal" class="hidden fixed inset-0 modal-backdrop z-[325] flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-3xl p-5 w-full max-w-xs shadow-2xl flex flex-col gap-3">
+            <h3 class="text-sm font-extrabold text-white uppercase tracking-wider">📁 Create Custom List</h3>
+            <input type="text" id="new-todolist-name-input" placeholder="List Name" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none">
+            <div class="flex gap-2 mt-1"><button id="cancel-new-todolist-btn" class="flex-1 bg-slate-800 text-slate-300 font-bold py-2.5 rounded-xl text-xs">Cancel</button><button id="confirm-new-todolist-btn" class="flex-1 bg-emerald-600 text-white font-bold py-2.5 rounded-xl text-xs shadow">Create</button></div>
+        </div>
+    </div>
+
+    <!-- 8. BREAK OVERLAY & 9. FACTORY RESET MODAL -->
+    <div id="full-screen-guide-overlay" class="hidden fixed inset-0 bg-slate-950/95 backdrop-blur-xl z-[200] flex items-center justify-center p-6 text-center flex-col">
+        <h2 class="text-3xl font-phase text-blue-400 mb-6 uppercase tracking-widest">Break Protocol Active</h2>
+        <div class="bg-blue-900/20 border border-blue-800/50 p-6 rounded-3xl shadow-2xl w-full max-w-lg mb-8"><p id="full-screen-guide-text" class="text-xl text-slate-200 font-medium leading-relaxed"></p></div>
+        <button id="close-guide-btn" class="bg-slate-800 text-white font-bold py-3 px-8 rounded-full border border-slate-700">Dismiss</button>
+    </div>
+
+    <div id="confirm-reset-modal" class="hidden fixed inset-0 modal-backdrop z-[400] flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-red-500/50 rounded-3xl p-5 w-full max-w-xs text-center flex flex-col gap-4 shadow-2xl">
+            <span class="text-3xl">⚠️</span><h3 class="text-base font-extrabold text-white">Factory Reset Pomo?</h3>
+            <p class="text-xs text-slate-300">This will permanently wipe all local data AND your connected Cloud Room.</p>
+            <div class="flex gap-2"><button id="cancel-reset-btn" class="flex-1 bg-slate-800 text-slate-300 font-bold py-2.5 rounded-xl text-xs">Cancel</button><button id="confirm-wipe-btn" class="flex-1 bg-red-600 text-white font-bold py-2.5 rounded-xl text-xs">Wipe All</button></div>
+        </div>
+    </div>
+
+    <!-- 10. READER MASTER CONTROL CENTER (SETTINGS 1 TO 10) -->
+    <div id="reader-master-settings-modal" class="hidden fixed inset-0 modal-backdrop z-[330] flex items-center justify-center p-2 sm:p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-4xl h-[90dvh] shadow-2xl flex flex-col overflow-hidden">
+            <div class="flex items-center justify-between px-5 py-3.5 bg-slate-950 border-b border-slate-800 shrink-0">
+                <div class="flex items-center gap-2.5"><span class="text-xl">⚙️</span><div><h3 class="text-sm sm:text-base font-extrabold text-white uppercase tracking-wider">Reader Control Center (Settings 1 – 10)</h3><p class="text-[11px] text-slate-400">Bookmarks Hub • Wooden Shelf • Auto-Folder • Multi-Cloud PDF Sync • 6-Month Stats • My Files</p></div></div>
+                <button id="close-reader-master-settings-btn" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-3 py-1.5 rounded-xl text-sm">✕ Close</button>
+            </div>
+            <div class="flex-1 flex flex-col sm:flex-row overflow-hidden">
+                <div class="w-full sm:w-64 bg-slate-950/90 border-b sm:border-b-0 sm:border-r border-slate-800 p-2 flex sm:flex-col gap-1 overflow-x-auto sm:overflow-y-auto shrink-0 no-scrollbar" id="reader-a10-nav">
+                    <button class="a10-nav-btn bg-blue-600 text-white text-left px-3 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 shrink-0" data-panel="panel-a1"><span>1️⃣</span> <span>Bookmarks, Notes & Highlights</span></button>
+                    <button class="a10-nav-btn bg-transparent text-slate-300 hover:bg-slate-900 text-left px-3 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 shrink-0" data-panel="panel-a2"><span>2️⃣</span> <span>My Shelf & Favorites Setup</span></button>
+                    <button class="a10-nav-btn bg-transparent text-slate-300 hover:bg-slate-900 text-left px-3 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 shrink-0" data-panel="panel-a3-a4-a5"><span>3️⃣-5️⃣</span> <span>Import & Auto Main Folder</span></button>
+                    <button class="a10-nav-btn bg-transparent text-slate-300 hover:bg-slate-900 text-left px-3 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 shrink-0" data-panel="panel-a6"><span>6️⃣</span> <span>Cloud Sync (TG, GDrive, etc.)</span></button>
+                    <button class="a10-nav-btn bg-transparent text-slate-300 hover:bg-slate-900 text-left px-3 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 shrink-0" data-panel="panel-a7-a8"><span>7️⃣-8️⃣</span> <span>Backup/Restore & Sort Rules</span></button>
+                    <button class="a10-nav-btn bg-transparent text-slate-300 hover:bg-slate-900 text-left px-3 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 shrink-0" data-panel="panel-a9"><span>9️⃣</span> <span>6-Month Statistics & Clock</span></button>
+                    <button class="a10-nav-btn bg-transparent text-slate-300 hover:bg-slate-900 text-left px-3 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 shrink-0" data-panel="panel-a10"><span>🔟</span> <span>My Files (All Cloud & Local)</span></button>
+                </div>
+                <div class="flex-1 p-4 native-scroll bg-slate-900">
+                    <div id="panel-a1" class="a10-panel flex flex-col gap-3">
+                        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
+                            <div><h4 class="text-sm font-extrabold text-white">1. All Collected Bookmarks, Highlights, Notes & Attached Files</h4><p class="text-[11px] text-slate-400">Click any item to jump directly to that book & page, or delete/share it.</p></div>
+                            <div class="flex items-center gap-2 w-full sm:w-auto">
+                                <input type="text" id="a1-global-search-input" placeholder="🔎 Search all notes, highlights, books..." class="flex-1 sm:w-64 bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none">
+                                <select id="a1-global-type-filter" class="bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 font-bold">
+                                    <option value="all">All Types</option><option value="highlight">🖍️ Highlights</option><option value="note">📝 Notes</option><option value="bookmark">🔖 Bookmarks</option><option value="attachment">📎 Line Files</option><option value="drawing">✏️ Pencil Work</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="a1-global-annotations-list" class="flex flex-col gap-2 max-h-[62vh] native-scroll"></div>
+                    </div>
+
+                    <div id="panel-a2" class="a10-panel hidden flex flex-col gap-3">
+                        <h4 class="text-sm font-extrabold text-white border-b border-slate-800 pb-2">2. My Wooden Shelf & Favorites Configuration</h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 flex flex-col gap-2">
+                                <span class="text-xs font-bold text-amber-400">🪵 Wooden Shelf Finish</span>
+                                <select id="shelf-wood-style-select" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-bold">
+                                    <option value="walnut">Royal Dark Walnut (Default)</option><option value="oak">Classic Warm Oak</option><option value="mahogany">Deep Red Mahogany</option><option value="ebony">Midnight Slate Ebony</option>
+                                </select>
+                            </div>
+                            <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 flex flex-col gap-2">
+                                <span class="text-xs font-bold text-blue-400">🖼️ Auto Cover & Progress Display</span>
+                                <p class="text-[11px] text-slate-400">Every book automatically extracts Page 1 of the PDF as its cover and displays live % read progress.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="panel-a3-a4-a5" class="a10-panel hidden flex flex-col gap-3">
+                        <h4 class="text-sm font-extrabold text-white border-b border-slate-800 pb-2">3, 4 & 5. Import Books, Main Folder Selection & Auto-Import</h4>
+                        <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <div><p class="text-xs font-bold text-white">3. Manual Book Import (Priority Genre Lock)</p><p class="text-[11px] text-slate-400">Supports PDF, EPUB, TXT, Markdown (.md), Word (.docx), and HTML.</p></div>
+                                <button id="settings-import-books-btn" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow">📥 Select Files to Import</button>
+                            </div>
+                            <div class="border-t border-slate-800 pt-3 flex flex-wrap items-center justify-between gap-2">
+                                <div><p class="text-xs font-bold text-emerald-400">5. Main Desktop Folder Selection</p><p id="settings-main-folder-status" class="text-[11px] text-slate-400">Link a folder on your PC to enable real-PDF saving & auto-import.</p></div>
+                                <div class="flex gap-2">
+                                    <button id="settings-select-main-folder-btn" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow">📂 Choose Main Folder</button>
+                                    <button id="settings-rescan-main-folder-btn" class="bg-slate-800 text-slate-200 border border-slate-700 text-xs font-bold px-3 py-2.5 rounded-xl">🔄 Scan Now</button>
+                                </div>
+                            </div>
+                            <div class="border-t border-slate-800 pt-3 flex items-center justify-between">
+                                <div><p class="text-xs font-bold text-white">4. Auto-Import New Books From Selected Folder</p><p class="text-[11px] text-slate-400">Respects Manual Genre Locks automatically.</p></div>
+                                <button id="toggle-auto-folder-import-btn" class="bg-emerald-600 text-white text-xs font-bold px-4 py-1.5 rounded-xl">Enabled</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="panel-a6" class="a10-panel hidden flex flex-col gap-3">
+                        <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                            <div><h4 class="text-sm font-extrabold text-white">6. Multi-Cloud Sync & Anti-Overlap Ledger</h4><p class="text-[11px] text-slate-400">Syncs annotated PDFs across Local Storage, Telegram, Google Drive, Dropbox, Mega & OneDrive.</p></div>
+                            <button id="sync-all-clouds-now-btn" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow">🔄 Sync All Pending (<span id="pending-sync-count-badge">0</span>)</button>
+                        </div>
+                        <div id="cloud-providers-config-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
+                    </div>
+
+                    <div id="panel-a7-a8" class="a10-panel hidden flex flex-col gap-3">
+                        <h4 class="text-sm font-extrabold text-white border-b border-slate-800 pb-2">7 & 8. Reader Backup/Restore & Default Shelf Sorting</h4>
+                        <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3">
+                            <p class="text-xs font-bold text-white">7. Complete Reader Library Backup & Restore</p>
+                            <div class="flex flex-wrap gap-2">
+                                <button id="reader-export-backup-btn" class="bg-blue-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl">💾 Download Reader Backup (.json)</button>
+                                <button id="reader-import-backup-btn" class="bg-emerald-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl">📤 Restore Reader Backup (.json)</button>
+                            </div>
+                        </div>
+                        <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
+                            <div><p class="text-xs font-bold text-white">8. Default Shelf Sort Order</p><p class="text-[11px] text-slate-400">Sort books by Title, Author, Storage Source, or Progress.</p></div>
+                            <select id="settings-sort-by-select" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-bold">
+                                <option value="recent">Last Opened</option><option value="title">Book Title (A–Z)</option><option value="author">Author Name (A–Z)</option><option value="storage">Storage Source</option><option value="progress">Reading Progress (%)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="panel-a9" class="a10-panel hidden flex flex-col gap-3">
+                        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+                            <div><h4 class="text-sm font-extrabold text-white">9. 6-Month Reading Statistics, Live Clock & Calendar</h4><p class="text-[11px] text-slate-400">Tracks books on shelf, completed books, daily reading hours & 6-month history.</p></div>
+                            <div class="bg-slate-950 border border-blue-500/40 px-3.5 py-1.5 rounded-xl flex items-center gap-2"><span class="text-sm">🕒</span><span id="a9-live-clock-display" class="font-mono text-xs sm:text-sm font-extrabold text-blue-400">00:00:00</span><span id="a9-live-date-display" class="text-[10px] font-bold text-slate-400">--/--/----</span></div>
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center">
+                            <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3"><p class="text-[10px] font-bold uppercase text-slate-400">Books on Shelf</p><p id="stat-books-on-shelf" class="text-2xl font-mono font-extrabold text-blue-400 mt-1">0</p></div>
+                            <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3"><p class="text-[10px] font-bold uppercase text-slate-400">Read Books (100%)</p><p id="stat-books-completed" class="text-2xl font-mono font-extrabold text-emerald-400 mt-1">0</p></div>
+                            <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3"><p class="text-[10px] font-bold uppercase text-slate-400">Total Reading Hours</p><p id="stat-total-reading-hours" class="text-2xl font-mono font-extrabold text-amber-400 mt-1">0.0h</p></div>
+                            <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3"><p class="text-[10px] font-bold uppercase text-slate-400">6-Month Hours</p><p id="stat-6m-reading-hours" class="text-2xl font-mono font-extrabold text-purple-400 mt-1">0.0h</p></div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 flex flex-col justify-between"><span class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">📊 Last 6 Months Breakdown</span><div id="a9-6month-bars" class="grid grid-cols-6 gap-2 items-end h-36 pt-4 px-1"></div></div>
+                            <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 flex flex-col">
+                                <div class="flex items-center justify-between mb-2"><button id="cal-prev-month-btn" class="bg-slate-900 px-2.5 py-1 rounded-lg text-xs font-bold text-slate-300">◀</button><span id="cal-month-title" class="text-xs font-extrabold text-white uppercase tracking-wider">Month YYYY</span><button id="cal-next-month-btn" class="bg-slate-900 px-2.5 py-1 rounded-lg text-xs font-bold text-slate-300">▶</button></div>
+                                <div class="grid grid-cols-7 gap-1 text-center text-[9px] font-bold text-slate-500 mb-1"><span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span></div>
+                                <div id="a9-calendar-days-grid" class="grid grid-cols-7 gap-1 text-center"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="panel-a10" class="a10-panel hidden flex flex-col gap-3">
+                        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2"><div><h4 class="text-sm font-extrabold text-white">10. My Files — Storage & Cloud Folder Explorer</h4><p class="text-[11px] text-slate-400">Click any storage folder below to connect or browse synced books.</p></div></div>
+                        <div id="a10-storage-folders-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-2.5"></div>
+                        <div id="a10-selected-source-books" class="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 flex flex-col gap-2 min-h-[26vh]"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 11. BOOK 3-CORNER METADATA MODAL -->
+    <div id="book-corner-modal" class="hidden fixed inset-0 modal-backdrop z-[340] flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-3xl p-5 w-full max-w-lg shadow-2xl flex flex-col gap-3 max-h-[92dvh] native-scroll">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2.5">
+                <h3 class="text-sm font-extrabold text-white uppercase tracking-wider">📘 Book Details, Cover & Life Links</h3>
+                <button id="close-book-corner-modal-btn" class="text-slate-400 hover:text-white font-bold px-2">✕</button>
+            </div>
+            <div class="flex gap-4 items-start">
+                <div class="w-28 shrink-0 flex flex-col items-center gap-2">
+                    <div id="corner-modal-cover-preview" class="w-28 h-40 rounded-xl bg-slate-950 border border-slate-700 overflow-hidden flex items-center justify-center text-center p-2 text-xs font-bold text-slate-400 bg-cover bg-center">No Cover</div>
+                    <button id="corner-upload-cover-btn" class="w-full bg-slate-800 hover:bg-slate-700 text-blue-400 border border-slate-700 text-[10px] font-bold py-1.5 rounded-lg">🖼️ Choose Cover</button>
+                    <button id="corner-auto-cover-btn" class="w-full bg-slate-950 hover:bg-slate-800 text-emerald-400 border border-slate-800 text-[10px] font-bold py-1 rounded-lg">⚡ Auto Detect</button>
+                </div>
+                <div class="flex-1 flex flex-col gap-2">
+                    <div><label class="text-[10px] font-bold uppercase text-slate-400">Book Title</label><input type="text" id="corner-book-title-input" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs font-bold text-white focus:outline-none"></div>
+                    <div><label class="text-[10px] font-bold uppercase text-slate-400">Book Author</label><input type="text" id="corner-book-author-input" placeholder="Author Name" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none"></div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="text-[10px] font-bold uppercase text-slate-400">Protocol Category</label>
+                            <select id="corner-book-category-select" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-2 py-1.5 text-xs text-white font-bold">
+                                <option value="study">🧠 Study Hours</option><option value="deen">🕌 Deen & Imaan</option><option value="side">🚀 Side Goal</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold uppercase text-slate-400">Storage Source</label>
+                            <select id="corner-book-source-select" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-2 py-1.5 text-xs text-cyan-300 font-bold">
+                                <option value="local">💾 Local Storage</option><option value="gdrive">☁️ Google Drive</option><option value="telegram">✈️ Telegram Cloud</option><option value="dropbox">📦 Dropbox</option><option value="onedrive">☁️ OneDrive</option><option value="mega">Ⓜ️ Mega Storage</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold uppercase text-slate-400">Read Progress: <span id="corner-progress-label" class="text-emerald-400">0%</span></label>
+                        <div class="w-full h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800 mt-1"><div id="corner-progress-bar" class="h-full bg-emerald-500 rounded-full" style="width:0%"></div></div>
+                    </div>
+                </div>
+            </div>
+            <div><label class="text-[10px] font-bold uppercase text-slate-400">Book Description & Study Notes</label><textarea id="corner-book-desc-input" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white h-16 resize-none focus:outline-none mt-1"></textarea></div>
+            <div class="flex flex-wrap gap-2 pt-1 border-t border-slate-800">
+                <button id="corner-toggle-fav-btn" class="bg-slate-950 border border-slate-700 text-xs font-bold px-3 py-2 rounded-xl text-slate-200">🤍 Favorite</button>
+                <button id="corner-add-todo-btn" class="bg-blue-950/80 border border-blue-600/40 text-blue-300 text-xs font-bold px-3 py-2 rounded-xl">☑️ Add Book to To-Do</button>
+                <button id="corner-add-plan-btn" class="bg-emerald-950/80 border border-emerald-600/40 text-emerald-300 text-xs font-bold px-3 py-2 rounded-xl">⚡ Add Reading Block to Plan</button>
+                <button id="corner-delete-book-btn" class="bg-red-950/60 border border-red-700/40 text-red-300 text-xs font-bold px-3 py-2 rounded-xl ml-auto">🗑️</button>
+            </div>
+            <div class="flex gap-2 mt-1">
+                <button id="corner-open-book-now-btn" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl text-xs shadow">📖 Open & Read Now</button>
+                <button id="corner-save-meta-btn" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-xl text-xs shadow">✅ Save Details</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 12. FULL-SCREEN ACTIVE BOOK READER OVERLAY -->
+    <div id="reader-fullscreen-overlay" class="hidden theme-night">
+        <div id="reader-bluelight-shield"></div>
+
+        <!-- TOP READER BAR -->
+        <div id="reader-top-bar" class="w-full bg-slate-950/95 backdrop-blur-md border-b border-slate-800 px-3 py-2 flex items-center justify-between gap-2 z-40 transition-all duration-200">
+            <div class="flex items-center gap-2 min-w-0">
+                <button id="reader-back-to-shelf-btn" class="bg-slate-800 hover:bg-slate-700 text-white font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 shrink-0"><span>←</span> <span class="hidden sm:inline">Shelf</span></button>
+                <div class="min-w-0">
+                    <h3 id="active-book-title-bar" class="text-xs sm:text-sm font-extrabold text-white truncate">Book Title</h3>
+                    <p id="active-book-sub-bar" class="text-[10px] font-mono text-emerald-400">Page 1 of 1 • 0% • Today: 0m</p>
+                </div>
+            </div>
+
+            <div id="reader-mini-pomo-pill" class="hidden md:flex items-center gap-2 bg-slate-900 border border-slate-700 px-3 py-1 rounded-full">
+                <span class="text-xs">⏱️</span>
+                <span id="reader-mini-timer-text" class="font-mono text-xs font-extrabold text-blue-400">00:00</span>
+                <button id="reader-mini-timer-toggle" class="text-[10px] font-bold bg-blue-600 text-white px-2 py-0.5 rounded-full">Start/Pause</button>
+            </div>
+
+            <div class="flex items-center gap-1.5 shrink-0">
+                <button id="reader-pencil-toggle-btn" class="bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1"><span>✏️</span> <span class="hidden sm:inline">Pencil</span></button>
+                <button id="reader-quick-bookmark-btn" class="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-2.5 py-1.5 rounded-xl text-xs font-bold">🔖</button>
+                <button id="reader-zoom-out-btn" class="bg-slate-900 text-slate-300 border border-slate-800 px-2 py-1.5 rounded-lg text-xs font-bold">−</button>
+                <span id="reader-zoom-label" class="text-[10px] font-mono font-bold text-slate-300 w-10 text-center">100%</span>
+                <button id="reader-zoom-in-btn" class="bg-slate-900 text-slate-300 border border-slate-800 px-2 py-1.5 rounded-lg text-xs font-bold">＋</button>
+
+                <div class="relative">
+                    <button id="reader-more-dots-btn" class="bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 w-9 h-8 rounded-xl font-extrabold text-base flex items-center justify-center">⋮</button>
+                    <div id="reader-three-dots-menu" class="hidden absolute right-0 mt-2 w-64 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-2 flex-col gap-1 z-50">
+                        <button class="dots-menu-item w-full text-left px-3 py-2 rounded-xl text-xs font-bold text-slate-200 hover:bg-slate-800 flex items-center justify-between" data-sub="sub-pdf-options"><span>📄 i. PDF Options (View Mode)</span> <span>▸</span></button>
+                        <button class="dots-menu-item w-full text-left px-3 py-2 rounded-xl text-xs font-bold text-slate-200 hover:bg-slate-800 flex items-center justify-between" data-sub="sub-control-options"><span>📱 ii. Control Options (Orientation)</span> <span>▸</span></button>
+                        <button class="dots-menu-item w-full text-left px-3 py-2 rounded-xl text-xs font-bold text-slate-200 hover:bg-slate-800 flex items-center justify-between" data-sub="sub-misc-options"><span>🛠️ iii. Miscellaneous (1–11)</span> <span>▸</span></button>
+                        <button class="dots-menu-item w-full text-left px-3 py-2 rounded-xl text-xs font-bold text-slate-200 hover:bg-slate-800 flex items-center justify-between" data-sub="sub-themes-options"><span>🎨 Reading Themes</span> <span>▸</span></button>
+                        <button class="dots-menu-item w-full text-left px-3 py-2 rounded-xl text-xs font-bold text-slate-200 hover:bg-slate-800 flex items-center justify-between" data-sub="sub-book-info"><span>ℹ️ iv. Book Information</span> <span>▸</span></button>
+                        <button class="dots-menu-item w-full text-left px-3 py-2 rounded-xl text-xs font-bold text-emerald-400 hover:bg-slate-800 flex items-center justify-between" data-sub="sub-share-options"><span>📤 v. Share & Export PDF</span> <span>▸</span></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PENCIL & SHAPE STUDIO BAR -->
+        <div id="reader-pencil-toolbar" class="hidden w-full bg-slate-900/95 border-b border-amber-500/40 px-3 py-2 flex-wrap items-center justify-between gap-2 z-40"></div>
+
+        <!-- FLOATING ANNOTATION BAR -->
+        <div id="reader-floating-sel-bar" class="hidden fixed z-[280] bg-slate-900/98 border border-blue-500/60 rounded-2xl shadow-2xl p-2.5 flex-col gap-2 max-w-sm">
+            <div class="flex items-center justify-between gap-2 border-b border-slate-800 pb-1.5">
+                <span class="text-[10px] font-extrabold uppercase tracking-wider text-blue-400">🖍️ Highlight Colour</span>
+                <div class="flex items-center gap-1.5">
+                    <button class="hl-color-swatch w-5 h-5 rounded-full bg-yellow-400 border-2 border-white shadow" data-color="#facc15"></button>
+                    <button class="hl-color-swatch w-5 h-5 rounded-full bg-emerald-400 border border-slate-700" data-color="#34d399"></button>
+                    <button class="hl-color-swatch w-5 h-5 rounded-full bg-blue-400 border border-slate-700" data-color="#60a5fa"></button>
+                    <button class="hl-color-swatch w-5 h-5 rounded-full bg-pink-400 border border-slate-700" data-color="#f472b6"></button>
+                    <button class="hl-color-swatch w-5 h-5 rounded-full bg-orange-400 border border-slate-700" data-color="#fb923c"></button>
+                    <button class="hl-color-swatch w-5 h-5 rounded-full bg-purple-400 border border-slate-700" data-color="#c084fc"></button>
+                </div>
+                <button id="close-floating-sel-bar" class="text-slate-400 hover:text-white text-xs font-bold px-1">✕</button>
+            </div>
+            <div class="grid grid-cols-3 gap-1.5">
+                <button id="sel-action-highlight" class="bg-slate-800 hover:bg-slate-700 text-yellow-300 text-[11px] font-bold py-1.5 px-2 rounded-xl flex items-center justify-center gap-1">🖍️ Highlight</button>
+                <button id="sel-action-note" class="bg-slate-800 hover:bg-slate-700 text-blue-300 text-[11px] font-bold py-1.5 px-2 rounded-xl flex items-center justify-center gap-1">📝 Add Note</button>
+                <button id="sel-action-attach" class="bg-slate-800 hover:bg-slate-700 text-emerald-300 text-[11px] font-bold py-1.5 px-2 rounded-xl flex items-center justify-center gap-1">📎 Attach File</button>
+                <button id="sel-action-bookmark" class="bg-slate-800 hover:bg-slate-700 text-amber-300 text-[11px] font-bold py-1.5 px-2 rounded-xl flex items-center justify-center gap-1">🔖 Bookmark</button>
+                <button id="sel-action-todo" class="bg-blue-950/90 hover:bg-blue-900 text-blue-300 border border-blue-700/50 text-[11px] font-bold py-1.5 px-2 rounded-xl flex items-center justify-center gap-1">☑️ To-Do</button>
+                <button id="sel-action-vault" class="bg-purple-950/90 hover:bg-purple-900 text-purple-300 border border-purple-700/50 text-[11px] font-bold py-1.5 px-2 rounded-xl flex items-center justify-center gap-1">📌 To Vault</button>
+            </div>
+        </div>
+
+        <!-- MAIN BOOK PAGE RENDERING VIEWPORT -->
+        <div id="reader-viewport" class="native-scroll">
+            <div id="reader-pages-stage" class="w-full max-w-4xl px-2 sm:px-6 py-3 flex flex-col items-center"></div>
+        </div>
+
+        <!-- FLOATING TEXT-TO-SPEECH BAR -->
+        <div id="reader-tts-bar" class="hidden fixed bottom-16 left-1/2 -translate-x-1/2 z-40 bg-slate-900/95 border border-blue-500/50 rounded-2xl px-4 py-2 shadow-2xl items-center gap-3">
+            <span class="text-xs font-extrabold text-blue-400">🔊 Read Aloud</span>
+            <button id="tts-prev-btn" class="bg-slate-800 text-white px-2 py-1 rounded-lg text-xs">⏮</button>
+            <button id="tts-play-pause-btn" class="bg-blue-600 text-white px-3 py-1 rounded-lg text-xs font-bold">⏸ Pause</button>
+            <button id="tts-next-btn" class="bg-slate-800 text-white px-2 py-1 rounded-lg text-xs">⏭</button>
+            <select id="tts-rate-select" class="bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white font-mono">
+                <option value="0.85">0.85x</option><option value="1" selected>1.0x</option><option value="1.25">1.25x</option><option value="1.5">1.5x</option><option value="2">2.0x</option>
+            </select>
+            <button id="tts-stop-close-btn" class="text-red-400 font-bold text-xs px-1.5">✕</button>
+        </div>
+
+        <!-- BOTTOM READER BAR -->
+        <div id="reader-bottom-bar" class="w-full bg-slate-950/95 backdrop-blur-md border-t border-slate-800 px-4 py-2.5 flex items-center justify-between gap-3 z-40 transition-all duration-200">
+            <button id="reader-bottom-toc-btn" class="bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5"><span class="text-base leading-none">☰</span> <span class="hidden sm:inline">Chapters & Bookmarks</span></button>
+            <div class="flex items-center gap-2 flex-1 max-w-md">
+                <button id="reader-prev-page-btn" class="bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 px-2.5 py-1.5 rounded-lg text-xs font-bold">◀</button>
+                <input type="range" id="reader-page-slider" min="1" max="1" value="1" class="flex-1 accent-blue-500 cursor-pointer">
+                <div class="flex items-center gap-1 bg-slate-900 border border-slate-800 px-2 py-1 rounded-lg">
+                    <input type="number" id="reader-page-num-input" value="1" min="1" class="w-10 bg-transparent text-center font-mono text-xs font-bold text-white focus:outline-none">
+                    <span class="text-[10px] text-slate-500">/</span>
+                    <span id="reader-total-pages-label" class="text-[10px] font-mono text-slate-400">1</span>
+                </div>
+                <button id="reader-next-page-btn" class="bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 px-2.5 py-1.5 rounded-lg text-xs font-bold">▶</button>
+            </div>
+            <div class="flex items-center gap-2">
+                <button id="reader-bottom-tts-btn" class="bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5"><span>🔊</span> <span class="hidden sm:inline">Read Aloud</span></button>
+                <button id="reader-bottom-search-btn" class="bg-slate-800 hover:bg-slate-700 text-red-400 border border-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5"><span>🔎</span> <span class="hidden sm:inline">Search Book</span></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 13. READER SUB-MODALS & DRAWERS -->
+    <div id="reader-suboptions-modal" class="hidden fixed inset-0 modal-backdrop z-[9999] flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-3xl p-5 w-full max-w-lg shadow-2xl flex flex-col gap-3 max-h-[88dvh] native-scroll">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                <h3 id="suboptions-modal-title" class="text-sm font-extrabold text-white uppercase tracking-wider">Reader Options</h3>
+                <button id="close-suboptions-modal-btn" class="text-slate-400 hover:text-white font-bold px-2">✕</button>
+            </div>
+            <div id="suboptions-modal-body" class="flex flex-col gap-3"></div>
+        </div>
+    </div>
+
+    <div id="reader-toc-bookmarks-drawer" class="hidden fixed inset-0 modal-backdrop z-[345] flex justify-start">
+        <div class="bg-slate-900 border-r border-slate-700 w-full max-w-md h-full flex flex-col p-4 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-3">
+                <h3 class="text-sm font-extrabold text-white uppercase tracking-wider">☰ Book Contents & Bookmarks</h3>
+                <button id="close-toc-drawer-btn" class="bg-slate-800 text-slate-300 px-2.5 py-1 rounded-lg text-xs font-bold">✕</button>
+            </div>
+            <div class="flex gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800 mb-3">
+                <button class="toc-tab-btn flex-1 bg-blue-600 text-white text-xs font-bold py-2 rounded-lg" data-tab="chapters">📑 Chapters / Headlines</button>
+                <button class="toc-tab-btn flex-1 bg-transparent text-slate-400 text-xs font-bold py-2 rounded-lg" data-tab="bookmarks">🔖 Bookmarks & Notes</button>
+            </div>
+            <input type="text" id="book-toc-search-input" placeholder="🔎 Search chapters or bookmarks..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none mb-3">
+            <div id="book-toc-drawer-list" class="flex-1 native-scroll flex flex-col gap-2"></div>
+        </div>
+    </div>
+
+    <div id="reader-fullsearch-drawer" class="hidden fixed inset-0 modal-backdrop z-[345] flex justify-end">
+        <div class="bg-slate-900 border-l border-slate-700 w-full max-w-md h-full flex flex-col p-4 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-3">
+                <h3 class="text-sm font-extrabold text-white uppercase tracking-wider">🔎 Search Entire Book</h3>
+                <button id="close-fullsearch-drawer-btn" class="bg-slate-800 text-slate-300 px-2.5 py-1 rounded-lg text-xs font-bold">✕</button>
+            </div>
+            <div class="flex gap-2 mb-3">
+                <input type="text" id="fullbook-search-input" placeholder="Type word or phrase..." class="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none">
+                <button id="fullbook-search-run-btn" class="bg-red-600 hover:bg-red-500 text-white font-bold px-4 py-2 rounded-xl text-xs">Search</button>
+            </div>
+            <p id="fullbook-search-status" class="text-[11px] text-slate-400 mb-2">Matches will show Page Number & exact line with <span class="text-red-500 font-bold">red text</span>.</p>
+            <div id="fullbook-search-results" class="flex-1 native-scroll flex flex-col gap-2"></div>
+        </div>
+    </div>
+
+    <div id="line-item-viewer-modal" class="hidden fixed inset-0 modal-backdrop z-[360] flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-3xl p-5 w-full max-w-md shadow-2xl flex flex-col gap-3 max-h-[88dvh] native-scroll">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                <h3 id="line-viewer-title" class="text-sm font-extrabold text-white uppercase tracking-wider">📝 Line Annotation & File</h3>
+                <button id="close-line-viewer-btn" class="text-slate-400 hover:text-white font-bold px-2">✕</button>
+            </div>
+            <div id="line-viewer-quote" class="text-xs italic bg-slate-950 p-3 rounded-xl border border-slate-800 text-slate-300"></div>
+            <textarea id="line-viewer-note-input" placeholder="Write or edit your note for this line..." class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-white h-24 resize-none focus:outline-none"></textarea>
+            <div id="line-viewer-attachment-box" class="hidden flex-col gap-2 bg-slate-950 p-3 rounded-xl border border-slate-800"></div>
+            <div class="flex flex-wrap gap-2 pt-1">
+                <button id="line-viewer-attach-btn" class="bg-emerald-950 border border-emerald-600/40 text-emerald-300 text-xs font-bold px-3 py-2 rounded-xl">📎 Attach/Replace File</button>
+                <button id="line-viewer-delete-btn" class="bg-red-950/60 border border-red-700/40 text-red-300 text-xs font-bold px-3 py-2 rounded-xl">🗑️ Delete</button>
+                <button id="line-viewer-save-btn" class="flex-1 bg-blue-600 text-white text-xs font-bold py-2 rounded-xl">💾 Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 14. MANUAL BOOK IMPORT & GENRE PRIORITY MODAL -->
+    <div id="v45-manual-import-modal" class="hidden fixed inset-0 modal-backdrop z-[9998] flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-blue-500/50 rounded-3xl p-5 w-full max-w-md shadow-2xl flex flex-col gap-3.5">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2.5">
+                <div>
+                    <h3 class="text-sm font-extrabold text-white uppercase tracking-wider">📥 Manual Book Import (Priority Lock)</h3>
+                    <p class="text-[11px] text-slate-400">Manual genre assignment strictly overrides automatic folder categorization.</p>
+                </div>
+                <button type="button" id="v45-close-manual-import" class="text-slate-400 hover:text-white font-bold px-2">✕</button>
+            </div>
+            <div class="flex flex-col gap-1.5">
+                <label class="text-[10px] font-extrabold uppercase text-amber-400">1. Choose Target Genre / Shelf</label>
+                <select id="v45-import-genre-select" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-amber-500"></select>
+            </div>
+            <div class="flex flex-col gap-1.5">
+                <label class="text-[10px] font-extrabold uppercase text-emerald-400">Or Type a Brand-New Genre / Shelf Name:</label>
+                <div class="flex gap-2">
+                    <input type="text" id="v45-import-new-genre-inp" placeholder="e.g. Urdu Tafseer / Anatomy / Fiqh..." class="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none">
+                    <select id="v45-import-cat-select" class="bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-2 text-xs text-white font-bold">
+                        <option value="study">🧠 Study</option><option value="deen">🕌 Deen</option><option value="side">🚀 Life</option>
+                    </select>
+                </div>
+            </div>
+            <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3 flex items-center justify-between">
+                <div><p class="text-xs font-bold text-white">🔒 Lock Manual Genre Priority</p><p class="text-[10px] text-slate-400">Prevents Auto-Folder Scan from ever changing this book's shelf</p></div>
+                <span class="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-extrabold px-2.5 py-1 rounded-lg">ACTIVE ✓</span>
+            </div>
+            <button type="button" id="v45-proceed-file-pick-btn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-extrabold py-3 rounded-xl text-xs uppercase tracking-wider shadow-lg">📂 Select Book File(s) From Computer</button>
+        </div>
+    </div>
+
+    <!-- 15. IN-APP CANVAS TEXT MODAL & PRIVACY PIN OVERLAY -->
+    <div id="v4-canvas-text-modal" class="hidden fixed inset-0 modal-backdrop z-[9999] flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-amber-500/50 rounded-3xl p-5 w-full max-w-sm shadow-2xl flex flex-col gap-3">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                <h3 class="text-sm font-extrabold text-white uppercase tracking-wider">🔤 Place Text on Page</h3>
+                <button type="button" id="v4-close-text-modal" class="text-slate-400 hover:text-white font-bold px-2">✕</button>
+            </div>
+            <textarea id="v4-canvas-text-input" placeholder="Type English, Urdu, or Arabic text..." class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-sm text-white h-24 resize-none focus:outline-none focus:border-amber-500" dir="auto"></textarea>
+            <div class="flex items-center justify-between gap-2">
+                <span class="text-xs text-slate-400 font-bold">Font Size:</span>
+                <input type="number" id="v4-canvas-text-size" value="22" min="10" max="72" class="w-20 bg-slate-950 border border-slate-700 rounded-lg p-1.5 text-center font-mono text-xs text-white">
+            </div>
+            <button type="button" id="v4-confirm-text-btn" class="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-2.5 rounded-xl text-xs uppercase tracking-wider shadow">✅ Add Text to Page</button>
+        </div>
+    </div>
+
+    <div id="pomo-privacy-lock-overlay" class="hidden fixed inset-0 bg-slate-950/98 backdrop-blur-2xl z-[99999] flex flex-col items-center justify-center p-4 text-center">
+        <div class="bg-slate-900 border border-blue-500/40 rounded-3xl p-6 w-full max-w-xs shadow-2xl flex flex-col items-center gap-3">
+            <span class="text-4xl">🛡️</span>
+            <h3 class="text-base font-extrabold text-white uppercase tracking-wider">Steel Privacy Shield</h3>
+            <p class="text-xs text-slate-400">Enter your Desktop Passcode to unlock your workspace.</p>
+            <input type="password" id="privacy-unlock-pin-input" placeholder="Enter PIN / Passcode" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-center font-mono text-sm text-white focus:outline-none focus:border-blue-500">
+            <button type="button" id="privacy-unlock-submit-btn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-xl text-xs uppercase tracking-wider shadow">🔓 Unlock Workspace</button>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION -->
+    <div id="custom-toast" class="hidden fixed top-5 right-5 left-5 sm:left-auto bg-slate-800/95 backdrop-blur-md border border-slate-700 text-white font-bold py-3 px-5 rounded-xl shadow-2xl z-[999] text-xs sm:text-sm text-center transition-opacity"></div>
+
+    <!-- ========================================================================= -->
+    <!-- MODULAR FEATURE-SLICED SCRIPTS (LOADED IN STRICT ORDER)                   -->
+    <!-- ========================================================================= -->
+    <script src="./src/01-core-bus.js"></script>
+    <script src="./src/02-pomo-core.js"></script>
+    <script src="./src/03-vault-rpg.js"></script>
+    <script src="./src/04-reader-pro.js"></script>
+    <script>
+        if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+            navigator.serviceWorker.register('./sw.js').catch(() => {});
+        }
+    </script>
+</body>
+</html>

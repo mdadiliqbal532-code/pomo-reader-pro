@@ -1,5 +1,5 @@
 /* =========================================================================
-   03-VAULT-RPG.JS (v7.2) — 3-TIER COMPASS, INTEGRATED STUDY VAULT & PRO RPG ARENA
+   03-VAULT-RPG.JS (v8.0) — 3-TIER COMPASS, INTEGRATED STUDY VAULT & PRO RPG ARENA
    ========================================================================= */
 
 window.showCompletedVaultItems = true;
@@ -193,7 +193,7 @@ window.openGoalModal = function(mode, idx = -1) {
         heading.textContent = "📅 Select Task Due Date";
         titleWrap.classList.add('hidden');
         clearDateBtn.classList.remove('hidden');
-        const t = todos.find(x => x.id === activeDetailTodoId);
+        const t = todos.find(x => String(x.id) === String(activeDetailTodoId));
         syncPickerFromISO(t?.dueDate || getLocalTodayString());
     }
     document.getElementById('goal-date-modal').classList.remove('hidden');
@@ -208,7 +208,7 @@ document.getElementById('clear-goal-date-btn')?.addEventListener('click', () => 
         window.newTodoDue = '';
         document.getElementById('todo-new-due-label').textContent = 'Due Date';
     } else if (modalContextMode === 'todo-detail-due') {
-        const t = todos.find(x => x.id === activeDetailTodoId);
+        const t = todos.find(x => String(x.id) === String(activeDetailTodoId));
         if (t) { t.dueDate = ''; document.getElementById('detail-due-status').textContent = 'Not Set'; saveTodos(); renderTodos(); }
     }
     document.getElementById('goal-date-modal').classList.add('hidden');
@@ -258,7 +258,7 @@ document.getElementById('save-goal-modal-btn')?.addEventListener('click', () => 
         window.newTodoDue = iso;
         document.getElementById('todo-new-due-label').textContent = formatDDMMYYYY(iso);
     } else if (modalContextMode === 'todo-detail-due') {
-        const t = todos.find(x => x.id === activeDetailTodoId);
+        const t = todos.find(x => String(x.id) === String(activeDetailTodoId));
         if (t) { t.dueDate = iso; document.getElementById('detail-due-status').textContent = formatDDMMYYYY(iso); saveTodos(); renderTodos(); }
     }
     numpadFreshOpen = true;
@@ -269,6 +269,10 @@ document.getElementById('save-goal-modal-btn')?.addEventListener('click', () => 
    2. INTEGRATED STUDY VAULT (DUE DATES, NOTES, ⚡ PROTOCOL/RUN & COMPLETED SECTION)
    ========================================================================= */
 function upgradeVaultAddFormUI() {
+    const dueInp = document.getElementById('vault-new-due-input');
+    if (dueInp && !dueInp.value) {
+        dueInp.value = getLocalTodayString();
+    }
     const form = document.getElementById('task-add-form');
     if (!form || document.getElementById('vault-new-due-input')) return;
     const today = getLocalTodayString();
@@ -387,40 +391,63 @@ document.querySelectorAll('.task-tab').forEach(tab => {
     });
 });
 
-document.getElementById('add-task-btn')?.addEventListener('click', () => {
+function createNewVaultTaskObject() {
     upgradeVaultAddFormUI();
     const titleInput = document.getElementById('task-title-input');
     const dueInput = document.getElementById('vault-new-due-input');
     const durInput = document.getElementById('vault-new-dur-input');
     const noteInput = document.getElementById('vault-new-note-input');
-    const title = titleInput.value.trim();
-    if (!title) return;
+    const title = (titleInput?.value || '').trim();
+    if (!title) {
+        showToast("Type a chapter or topic name first!", true);
+        return null;
+    }
     const today = getLocalTodayString();
     const tasks = JSON.parse(safeGet('pages_pomodoro_tasks_v8', '[]'));
-    tasks.unshift({
+    const newItem = {
         id: Date.now(),
         title,
         subject: activeTaskSubj,
-        type: activeTaskTab,
+        type: activeTaskTab === 'revision' ? 'revision' : 'backlog',
         completed: false,
         createdDate: today,
         dueDate: dueInput?.value || today,
-        durationMins: parseInt(durInput?.value) || 45,
-        note: noteInput?.value.trim() || ''
-    });
+        durationMins: Math.max(5, parseInt(durInput?.value) || 45),
+        note: (noteInput?.value || '').trim()
+    };
+    tasks.unshift(newItem);
     safeSet('pages_pomodoro_tasks_v8', JSON.stringify(tasks));
-    titleInput.value = '';
+    if (titleInput) titleInput.value = '';
     if (noteInput) noteInput.value = '';
     renderTasks(activeTaskTab);
     broadcastToCloud();
     PomoEventBus.emit('vault:updated');
-    showToast(`📚 Added "${title}" to ${activeTaskSubj} ${activeTaskTab.toUpperCase()}!`);
+    return newItem;
+}
+
+document.getElementById('add-task-btn')?.addEventListener('click', () => {
+    const created = createNewVaultTaskObject();
+    if (created) showToast(`📚 Added "${created.title}" to ${created.subject} ${created.type.toUpperCase()}!`);
+});
+
+document.getElementById('add-and-run-vault-btn')?.addEventListener('click', () => {
+    const created = createNewVaultTaskObject();
+    if (created && window.openProtocolRunModal) {
+        window.openProtocolRunModal('vault', created.id);
+    }
+});
+
+document.getElementById('task-title-input')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        const created = createNewVaultTaskObject();
+        if (created) showToast(`📚 Added "${created.title}" to ${created.subject} ${created.type.toUpperCase()}!`);
+    }
 });
 
 window.toggleTask = function(id) {
     haptic(20);
     const tasks = JSON.parse(safeGet('pages_pomodoro_tasks_v8', '[]'));
-    const t = tasks.find(x => x.id === id);
+    const t = tasks.find(x => String(x.id) === String(id));
     if (t) {
         t.completed = !t.completed;
         if (t.completed) {
@@ -438,7 +465,7 @@ window.toggleTask = function(id) {
 
 window.deleteTask = function(id) {
     let tasks = JSON.parse(safeGet('pages_pomodoro_tasks_v8', '[]'));
-    tasks = tasks.filter(x => x.id !== id);
+    tasks = tasks.filter(x => String(x.id) !== String(id));
     safeSet('pages_pomodoro_tasks_v8', JSON.stringify(tasks));
     renderTasks(activeTaskTab);
     broadcastToCloud();
@@ -488,7 +515,7 @@ function createVaultItemCard(task) {
 
     div.innerHTML = `
         <div class="flex items-center gap-3 min-w-0 flex-1 pr-2">
-            <button onclick="event.stopPropagation(); toggleTask(${task.id})" class="todo-check-circle ${task.completed ? 'checked' : ''}">${task.completed ? '✓' : ''}</button>
+            <button type="button" onclick="event.stopPropagation(); toggleTask('${task.id}')" class="todo-check-circle ${task.completed ? 'checked' : ''}">${task.completed ? '✓' : ''}</button>
             <div class="min-w-0 flex-1">
                 <p class="text-xs sm:text-sm font-bold truncate ${task.completed ? 'line-through text-slate-500' : 'text-slate-100'}">${escapeHtml(task.title)}</p>
                 <div class="flex flex-wrap items-center gap-2 mt-0.5">
@@ -501,10 +528,10 @@ function createVaultItemCard(task) {
             </div>
         </div>
         <div class="flex items-center gap-1.5 shrink-0">
-            <button onclick="event.stopPropagation(); window.openProtocolRunModal && window.openProtocolRunModal('vault', '${task.id}')" class="bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/40 px-2.5 py-1.5 rounded-lg text-[10px] font-extrabold transition-all flex items-center gap-1 shadow" title="Add Duration to Live Protocol or Run Timer Now">
+            <button type="button" onclick="event.stopPropagation(); window.openProtocolRunModal && window.openProtocolRunModal('vault', '${task.id}')" class="bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/40 px-2.5 py-1.5 rounded-lg text-[10px] font-extrabold transition-all flex items-center gap-1 shadow" title="Add Duration to Live Protocol or Run Timer Now">
                 <span>⚡</span><span>Protocol / Run</span>
             </button>
-            <button onclick="event.stopPropagation(); deleteTask(${task.id})" class="text-red-400 hover:text-red-300 px-1.5 py-1 text-xs">🗑️</button>
+            <button type="button" onclick="event.stopPropagation(); deleteTask('${task.id}')" class="text-red-400 hover:text-red-300 px-1.5 py-1 text-xs" title="Delete Vault Item">🗑️</button>
         </div>
     `;
     return div;
@@ -592,17 +619,19 @@ const RPG_RANKS = [
     { minLv: 100, title: 'Apex Sovereign (∞)', badge: '🌌', color: 'text-amber-300' }
 ];
 
-function getDayMetrics(isoDate) {
-    const stats = JSON.parse(safeGet('pages_pomodoro_stats_v8', '{"history":{}}'));
+// High-speed O(1) day metrics calculator (pre-parsed caches prevent 300x JSON.parse lag)
+function getDayMetrics(isoDate, preStats = null, preRLog = null, preVault = null) {
+    const stats = preStats || JSON.parse(safeGet('pages_pomodoro_stats_v8', '{"history":{}}'));
+    const rLog = preRLog || JSON.parse(safeGet('pages_pomodoro_reader_log_v1', '{}'));
+    const vaultTasks = preVault || JSON.parse(safeGet('pages_pomodoro_tasks_v8', '[]'));
+
     const studyMins = stats.history?.[isoDate]?.mins || 0;
     const sessions = stats.history?.[isoDate]?.sessions || 0;
     const deenMins = deenHistory[isoDate] || 0;
     const sMap = salahHistory[isoDate] || {};
     const salahCount = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'].filter(p => sMap[p]).length;
-    const rLog = JSON.parse(safeGet('pages_pomodoro_reader_log_v1', '{}'));
     const readMins = rLog[isoDate]?.totalMins || 0;
 
-    const vaultTasks = JSON.parse(safeGet('pages_pomodoro_tasks_v8', '[]'));
     const dayTodosDone = todos.filter(t => t.completed && (t.completedDate === isoDate || (!t.completedDate && t.myDayDate === isoDate))).length;
     const dayVaultDone = vaultTasks.filter(vt => vt.completed && vt.completedDate === isoDate).length;
 
@@ -627,7 +656,7 @@ window.calculateLifetimeRPGStats = function() {
 
     let lifetimeXP = 0, activeDaysCount = 0;
     allDates.forEach(d => {
-        const m = getDayMetrics(d);
+        const m = getDayMetrics(d, stats, rLog, vaultTasks);
         if (m.totalXP > 0) activeDaysCount++;
         lifetimeXP += m.totalXP;
     });
@@ -658,8 +687,8 @@ window.calculateLifetimeRPGStats = function() {
     yestDate.setDate(yestDate.getDate() - 1);
     const yestIso = getLocalTodayString(yestDate);
 
-    const todayM = getDayMetrics(todayIso);
-    const yestM = getDayMetrics(yestIso);
+    const todayM = getDayMetrics(todayIso, stats, rLog, vaultTasks);
+    const yestM = getDayMetrics(yestIso, stats, rLog, vaultTasks);
     const xpDelta = todayM.totalXP - yestM.totalXP;
     const pctBetter = yestM.totalXP > 0
         ? Math.round(((todayM.totalXP - yestM.totalXP) / yestM.totalXP) * 100)
@@ -744,12 +773,16 @@ window.renderRpgArena = function() {
     const prog = window.computeTodoAndVaultProgression ? window.computeTodoAndVaultProgression() : null;
     const tacticalTips = generateProDeveloperTacticalSuggestions(rpg);
 
+    const stats = JSON.parse(safeGet('pages_pomodoro_stats_v8', '{"history":{}}'));
+    const rLog = JSON.parse(safeGet('pages_pomodoro_reader_log_v1', '{}'));
+    const vaultTasks = JSON.parse(safeGet('pages_pomodoro_tasks_v8', '[]'));
+
     const last7Days = [];
     for (let i = 6; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
         const iso = getLocalTodayString(d);
-        const m = getDayMetrics(iso);
+        const m = getDayMetrics(iso, stats, rLog, vaultTasks);
         last7Days.push({
             label: i === 0 ? 'Today' : (i === 1 ? 'Yest' : d.toLocaleDateString('en-US', { weekday: 'short' })),
             xp: m.totalXP

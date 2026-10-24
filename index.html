@@ -1215,14 +1215,17 @@
     <!-- ========================================================================= -->
     <!-- MODULAR FEATURE-SLICED SCRIPTS (LOADED IN STRICT ORDER)                   -->
     <!-- ========================================================================= -->
-    <script src="./src/01-core-bus.js?v=7.2"></script>
-    <script src="./src/02-pomo-core.js?v=7.2"></script>
-    <script src="./src/03-vault-rpg.js?v=7.2"></script>
-    <script src="./src/04-reader-pro.js?v=7.2"></script>
-        if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
-            navigator.serviceWorker.register('./sw.js').catch(() => {});
-        }
-    </script>
+    <script src="./src/01-core-bus.js?v=8.0"></script>
+<script src="./src/02-pomo-core.js?v=8.0"></script>
+<script src="./src/03-vault-rpg.js?v=8.0"></script>
+<script src="./src/04-reader-pro.js?v=8.0"></script>
+<script>
+    if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+        navigator.serviceWorker.register('./sw.js?v=8.0').then(reg => {
+            reg.update();
+        }).catch(() => {});
+    }
+</script>
 </body>
 </html>
                    

@@ -830,19 +830,22 @@
         wrap.style.background = styles[readerSettings.woodStyle] || styles.walnut;
     }
 
-    function renderCustomShelvesBar() {
+function renderCustomShelvesBar() {
         const bar = document.getElementById('custom-shelves-bar');
         if (!bar) return;
 
-        const pills = customShelves.map(sh => {
+        const pills = customShelves.map((sh, idx) => {
             const cnt = readerBooks.filter(b => b.shelfName === sh.name).length;
             const act = activeCustomShelfFilter === sh.name;
             return `
                 <div class="inline-flex items-center rounded-xl overflow-hidden border ${act ? 'bg-amber-600 border-amber-400 text-white shadow' : 'bg-slate-950 border-slate-800 text-amber-200/90'}">
                     <button type="button" onclick="window.selectCustomShelfFilter('${escapeHtml(sh.name)}')" class="px-2.5 py-1.5 text-xs font-bold whitespace-nowrap flex items-center gap-1.5">
+                        <span class="text-[10px] font-mono font-extrabold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">#${idx + 1}</span>
                         <span>🪵 ${escapeHtml(sh.name)}</span>
                         <span class="text-[10px] font-mono px-1.5 rounded-full bg-black/30">${cnt}</span>
                     </button>
+                    <button type="button" onclick="event.stopPropagation(); window.moveCustomShelfOrder(${idx}, -1)" class="px-1 py-1.5 text-[10px] hover:bg-slate-800 text-amber-300" title="Move Shelf Left / Up">◀</button>
+                    <button type="button" onclick="event.stopPropagation(); window.moveCustomShelfOrder(${idx}, 1)" class="px-1 py-1.5 text-[10px] hover:bg-slate-800 text-amber-300" title="Move Shelf Right / Down">▶</button>
                     <button type="button" onclick="event.stopPropagation(); window.deleteGenreShelfByName('${escapeHtml(sh.name)}')" class="px-1.5 py-1.5 text-[10px] hover:bg-red-600 hover:text-white transition-all" title="Delete this Genre Shelf">✕</button>
                 </div>
             `;
@@ -854,9 +857,52 @@
                 <button type="button" onclick="window.selectCustomShelfFilter('all')" class="px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeCustomShelfFilter === 'all' ? 'bg-blue-600 text-white shadow' : 'bg-slate-950 text-slate-400 border border-slate-800'}">All (${readerBooks.length})</button>
                 ${pills}
             </div>
-            <button type="button" onclick="window.openManageShelvesModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow shrink-0">➕ Manage Genres / Shelves</button>
+            <button type="button" onclick="window.openManageShelvesModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow shrink-0">🔢 Sequence / Manage Shelves</button>
         `;
     }
+
+    window.moveCustomShelfOrder = function(idx, dir) {
+        const targetIdx = idx + dir;
+        if (targetIdx < 0 || targetIdx >= customShelves.length) return;
+        const temp = customShelves[idx];
+        customShelves[idx] = customShelves[targetIdx];
+        customShelves[targetIdx] = temp;
+        saveReaderMeta();
+        renderWoodenShelf();
+    };
+
+    window.setCustomShelfExactPosition = function(oldIdx, newPos1Based) {
+        const targetIdx = Math.max(0, Math.min(customShelves.length - 1, (parseInt(newPos1Based) || 1) - 1));
+        if (targetIdx === oldIdx) return;
+        const [moved] = customShelves.splice(oldIdx, 1);
+        customShelves.splice(targetIdx, 0, moved);
+        saveReaderMeta();
+        renderWoodenShelf();
+        window.openManageShelvesModal();
+        showToast(`🔢 "${moved.name}" set to Shelf #${targetIdx + 1}!`);
+    };
+
+    window.moveShelfByName = function(shelfName, dir) {
+        let idx = customShelves.findIndex(s => s.name === shelfName);
+        if (idx === -1) {
+            customShelves.push({ id: 'sh_' + Date.now(), name: shelfName, category: 'study' });
+            idx = customShelves.length - 1;
+        }
+        window.moveCustomShelfOrder(idx, dir);
+    };
+
+    window.pinShelfToTopByName = function(shelfName) {
+        let idx = customShelves.findIndex(s => s.name === shelfName);
+        if (idx === -1) {
+            customShelves.unshift({ id: 'sh_' + Date.now(), name: shelfName, category: 'study' });
+        } else if (idx > 0) {
+            const [moved] = customShelves.splice(idx, 1);
+            customShelves.unshift(moved);
+        }
+        saveReaderMeta();
+        renderWoodenShelf();
+        showToast(`🔝 "${shelfName}" pinned to #1 Top of Wooden Shelf!`);
+    };
 
     window.selectCustomShelfFilter = function(name) { activeCustomShelfFilter = name; renderWoodenShelf(); };
     window.toggleShelfLayoutMode = function() { shelfDisplayLayout = shelfDisplayLayout === 'sections' ? 'grid' : 'sections'; activeCustomShelfFilter = 'all'; renderWoodenShelf(); };
@@ -922,18 +968,33 @@
                 if (!groups[s]) groups[s] = [];
                 groups[s].push(b);
             });
-            Object.entries(groups).forEach(([shelfName, gBooks]) => {
+
+            // Sort Genre Sections STRICTLY by your customShelves sequence (#1, #2, #3...)!
+            const orderedGroupEntries = Object.entries(groups).sort(([nameA], [nameB]) => {
+                const idxA = customShelves.findIndex(s => s.name === nameA);
+                const idxB = customShelves.findIndex(s => s.name === nameB);
+                const posA = idxA === -1 ? 9999 : idxA;
+                const posB = idxB === -1 ? 9999 : idxB;
+                return posA - posB;
+            });
+
+            orderedGroupEntries.forEach(([shelfName, gBooks], sectionIdx) => {
+                const shelfSeqNum = customShelves.findIndex(s => s.name === shelfName);
+                const displayNum = shelfSeqNum !== -1 ? shelfSeqNum + 1 : sectionIdx + 1;
                 const sec = document.createElement('div');
                 sec.className = "mb-4";
                 sec.innerHTML = `
                     <div class="shelf-genre-header">
                         <div class="flex items-center gap-2">
-                            <span>🏷️</span>
+                            <span class="bg-amber-500 text-slate-950 font-mono font-extrabold text-xs px-2 py-0.5 rounded-lg shadow">#${displayNum}</span>
                             <span class="text-xs sm:text-sm font-extrabold uppercase tracking-wider text-amber-200">${escapeHtml(shelfName)}</span>
                             <span class="text-[10px] font-mono font-bold bg-black/40 text-amber-300 px-2 py-0.5 rounded-full">${gBooks.length}</span>
                         </div>
                         <div class="flex items-center gap-1.5 flex-wrap">
-                            <button type="button" onclick="window.addBookDirectlyToGenre('${escapeHtml(shelfName)}')" class="bg-amber-600/30 hover:bg-amber-600 text-amber-200 hover:text-white border border-amber-500/40 text-[10px] font-bold px-2.5 py-1 rounded-lg">➕ Add Book Here</button>
+                            ${displayNum > 1 ? `<button type="button" onclick="window.pinShelfToTopByName('${escapeHtml(shelfName)}')" class="bg-amber-500/25 hover:bg-amber-500 text-amber-200 hover:text-slate-950 border border-amber-400/50 text-[10px] font-extrabold px-2 py-1 rounded-lg" title="Pin this Shelf to #1 Top">🔝 #1 Top</button>` : `<span class="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[9px] font-extrabold px-2 py-1 rounded-lg">⭐ TOP SHELF</span>`}
+                            <button type="button" onclick="window.moveShelfByName('${escapeHtml(shelfName)}', -1)" class="bg-slate-950/80 hover:bg-slate-800 text-amber-300 border border-amber-500/30 text-[10px] font-bold px-2 py-1 rounded-lg" title="Move Shelf Up">⬆️</button>
+                            <button type="button" onclick="window.moveShelfByName('${escapeHtml(shelfName)}', 1)" class="bg-slate-950/80 hover:bg-slate-800 text-amber-300 border border-amber-500/30 text-[10px] font-bold px-2 py-1 rounded-lg" title="Move Shelf Down">⬇️</button>
+                            <button type="button" onclick="window.addBookDirectlyToGenre('${escapeHtml(shelfName)}')" class="bg-amber-600/30 hover:bg-amber-600 text-amber-200 hover:text-white border border-amber-500/40 text-[10px] font-bold px-2.5 py-1 rounded-lg">➕ Add Book</button>
                             <button type="button" onclick="window.syncShelfToTodo('${escapeHtml(shelfName)}')" class="bg-blue-950/90 hover:bg-blue-800 text-blue-200 border border-blue-500/40 text-[10px] font-bold px-2.5 py-1 rounded-lg">☑️ To-Do</button>
                             <button type="button" onclick="window.startBookFocusSession('${gBooks[0].id}')" class="bg-emerald-950/90 hover:bg-emerald-800 text-emerald-200 border border-emerald-500/40 text-[10px] font-bold px-2.5 py-1 rounded-lg">⏱️ Focus</button>
                             <button type="button" onclick="window.deleteGenreShelfByName('${escapeHtml(shelfName)}')" class="bg-red-950/80 hover:bg-red-700 text-red-300 hover:text-white border border-red-600/40 text-[10px] font-bold px-2 py-1 rounded-lg" title="Delete Genre Shelf">🗑️</button>
@@ -1023,8 +1084,9 @@
         const modal = document.getElementById('reader-suboptions-modal');
         const titleEl = document.getElementById('suboptions-modal-title');
         const bodyEl = document.getElementById('suboptions-modal-body');
-        titleEl.textContent = "🪵 Create, Rename or Delete Genres / Shelves";
+        titleEl.textContent = "🔢 Sequence & Manage Genres / Shelves";
         bodyEl.innerHTML = `
+            <p class="text-[11px] text-slate-400">Type a sequence number (<b class="text-amber-300">1, 2, 3...</b>) or click <b class="text-amber-300">🔝 #1</b> to keep your daily reading shelf at the top!</p>
             <div class="flex gap-2">
                 <input type="text" id="new-shelf-inp" placeholder="New Genre / Shelf Name..." class="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white">
                 <select id="new-shelf-cat" class="bg-slate-950 border border-slate-700 rounded-xl px-2 py-2 text-xs text-white font-bold">
@@ -1032,16 +1094,22 @@
                 </select>
                 <button type="button" id="create-shelf-btn" class="bg-emerald-600 text-white font-bold px-4 py-2 rounded-xl text-xs">＋ Create</button>
             </div>
-            <div class="flex flex-col gap-1.5 max-h-60 native-scroll mt-2">
+            <div class="flex flex-col gap-1.5 max-h-64 native-scroll mt-2">
                 ${customShelves.map((sh, i) => `
-                    <div class="flex items-center justify-between bg-slate-950 px-3 py-2 rounded-xl border border-slate-800">
-                        <div>
-                            <span class="text-xs font-bold text-amber-300">🪵 ${escapeHtml(sh.name)}</span>
-                            <span class="text-[10px] text-slate-500 ml-1">(${readerBooks.filter(b => b.shelfName === sh.name).length} books)</span>
+                    <div class="flex items-center justify-between bg-slate-950 px-3 py-2 rounded-xl border ${i === 0 ? 'border-amber-500/60 bg-amber-950/15' : 'border-slate-800'} gap-2">
+                        <div class="flex items-center gap-2 min-w-0 flex-1">
+                            <input type="number" min="1" max="${customShelves.length}" value="${i + 1}" onchange="window.setCustomShelfExactPosition(${i}, this.value)" class="w-11 bg-slate-900 border border-amber-500/50 rounded-lg py-1 text-center font-mono text-xs font-extrabold text-amber-300" title="Type sequence number (1 = Top)">
+                            <div class="truncate">
+                                <span class="text-xs font-bold text-amber-300">🪵 ${escapeHtml(sh.name)}</span>
+                                <span class="text-[10px] text-slate-500 ml-1">(${readerBooks.filter(b => b.shelfName === sh.name).length})</span>
+                            </div>
                         </div>
-                        <div class="flex items-center gap-1.5">
-                            <button type="button" onclick="document.getElementById('reader-suboptions-modal').classList.add('hidden'); window.addBookDirectlyToGenre('${escapeHtml(sh.name)}', '${sh.category}')" class="text-[10px] bg-blue-950 text-blue-300 border border-blue-700/50 px-2 py-1 rounded font-bold">➕ Add Book</button>
-                            <button type="button" onclick="window.deleteCustomShelf(${i})" class="text-red-400 hover:text-red-300 text-xs font-bold px-2 py-1 rounded bg-slate-900 border border-slate-800">🗑️ Delete</button>
+                        <div class="flex items-center gap-1 shrink-0">
+                            ${i > 0 ? `<button type="button" onclick="window.setCustomShelfExactPosition(${i}, 1)" class="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-1 rounded font-extrabold" title="Move to #1 Top">🔝 #1</button>` : `<span class="text-[9px] font-mono font-extrabold text-emerald-400 px-1.5">TOP</span>`}
+                            <button type="button" onclick="window.moveCustomShelfOrder(${i}, -1); window.openManageShelvesModal();" class="text-xs bg-slate-900 border border-slate-800 px-1.5 py-1 rounded">⬆️</button>
+                            <button type="button" onclick="window.moveCustomShelfOrder(${i}, 1); window.openManageShelvesModal();" class="text-xs bg-slate-900 border border-slate-800 px-1.5 py-1 rounded">⬇️</button>
+                            <button type="button" onclick="document.getElementById('reader-suboptions-modal').classList.add('hidden'); window.addBookDirectlyToGenre('${escapeHtml(sh.name)}', '${sh.category}')" class="text-[10px] bg-blue-950 text-blue-300 border border-blue-700/50 px-2 py-1 rounded font-bold">➕ Book</button>
+                            <button type="button" onclick="window.deleteCustomShelf(${i})" class="text-red-400 hover:text-red-300 text-xs font-bold px-2 py-1 rounded bg-slate-900 border border-slate-800">🗑️</button>
                         </div>
                     </div>
                 `).join('')}
@@ -2966,36 +3034,35 @@
 
     window.selectA10Source = function(key) { selectedA10Source = key; renderA10MyFiles(); };
 
-    window.connectOrConfigureCloud = async function(cloudKey) {
-        if (cloudKey === 'local') { await pickAndScanMainFolder(); renderA6CloudConfig(); renderA10MyFiles(); return; }
-        const cfg = readerSettings.clouds[cloudKey];
-        if (window.showDirectoryPicker && cloudKey !== 'telegram') {
-            try {
-                const dh = await window.showDirectoryPicker({ mode: 'readwrite' });
-                cloudDirectoryHandles[cloudKey] = dh;
-                cfg.connected = true;
-                cfg.folderName = dh.name;
-                cfg.status = `Synced Folder: ${dh.name}`;
-                await idbPut('handles', { key: 'cloud_' + cloudKey, handle: dh, name: dh.name });
-                saveReaderMeta();
-                await scanDirectoryForBooks(dh, cloudKey);
-                renderA6CloudConfig();
-                renderA10MyFiles();
-                return;
-            } catch (e) {}
-        }
-        const inp = document.getElementById('reader-book-file-input');
-        inp.onchange = (ev) => {
+   window.connectOrConfigureCloud = async function(cloudKey) {
+    if (cloudKey === 'local') { await pickAndScanMainFolder(); renderA6CloudConfig(); renderA10MyFiles(); return; }
+    const cfg = readerSettings.clouds[cloudKey];
+    if (window.showDirectoryPicker && cloudKey !== 'telegram') {
+        try {
+            const dh = await window.showDirectoryPicker({ mode: 'readwrite' });
+            cloudDirectoryHandles[cloudKey] = dh;
             cfg.connected = true;
-            cfg.status = 'Connected (Files Imported)';
+            cfg.folderName = dh.name;
+            cfg.status = `Synced Folder: ${dh.name}`;
+            await idbPut('handles', { key: 'cloud_' + cloudKey, handle: dh, name: dh.name });
             saveReaderMeta();
-            handleMultipleBookImport(ev.target.files, cloudKey, null);
+            await scanDirectoryForBooks(dh, cloudKey);
             renderA6CloudConfig();
             renderA10MyFiles();
-        };
-        inp.click();
+            return;
+        } catch (e) { if (e.name === 'AbortError') return; }
+    }
+    const inp = document.getElementById('reader-book-file-input');
+    inp.onchange = (ev) => {
+        cfg.connected = true;
+        cfg.status = 'Connected (Files Imported)';
+        saveReaderMeta();
+        handleMultipleBookImport(ev.target.files, cloudKey, null);
+        renderA6CloudConfig();
+        renderA10MyFiles();
     };
-
+    inp.click();
+};
     // Full 3-Dots Menu (i. PDF Options, ii. Controls, iii. Misc 1-11, Themes, iv. Book Info, v. Share)
     function applyReaderAppearanceAndLocks() {
         const ov = document.getElementById('reader-fullscreen-overlay');

@@ -1,5 +1,5 @@
 /* =========================================================================
-   02-POMO-CORE.JS — TIMER, PLAN, SALAH, TO-DO, CLOUD & TELEGRAM ENGINE
+   02-POMO-CORE.JS — TIMER, PLAN, SALAH, TO-DO GRID, PROTOCOL RUNNER & 6M ANALYTICS
    ========================================================================= */
 
 const PRAYERS = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
@@ -66,6 +66,7 @@ window.accumulatedDeenTime = 0;
 window.isOvertime = false;
 window.activeTaskTab = 'backlog';
 window.activeTaskSubj = extConfig.customSubjects[0] || 'Physics';
+window.todoLayoutMode = safeGet('pages_pomodoro_todo_layout_v1', 'list'); // 'list' | 'grid'
 
 let lastRenderedTime = -1, guidePopupTimeout = null, lastPopupStep = -1;
 
@@ -309,6 +310,7 @@ document.getElementById('home-masjid-Config-btn')?.addEventListener('click', () 
 
 window.handleAndroidBack = function() {
     const openModals = [
+        'protocol-run-modal', 'todo-analytics-modal',
         'v4-canvas-text-modal', 'v45-manual-import-modal', 'line-item-viewer-modal',
         'reader-suboptions-modal', 'reader-toc-bookmarks-drawer', 'reader-fullsearch-drawer',
         'book-corner-modal', 'reader-master-settings-modal', 'goal-date-modal',
@@ -399,12 +401,38 @@ window.isDeenBlock = function(item) {
     return t.includes('deen') || t.includes('quran') || t.includes('salah') || t.includes('namaz') || t.includes('tafseer') || t.includes('hadith') || t.includes('imaan');
 };
 
+// Auto-mark linked To-Do or Study Vault items complete when their Live Protocol session is completed
+function syncLinkedProtocolCompletion(item) {
+    if (!item) return;
+    const today = getLocalTodayString();
+    if (item.linkedTodoId) {
+        const t = todos.find(x => String(x.id) === String(item.linkedTodoId));
+        if (t && !t.completed) {
+            t.completed = true;
+            t.completedDate = today;
+            saveTodos();
+            renderTodos();
+        }
+    }
+    if (item.linkedVaultId) {
+        const tasks = JSON.parse(safeGet('pages_pomodoro_tasks_v8', '[]'));
+        const vt = tasks.find(x => String(x.id) === String(item.linkedVaultId));
+        if (vt && !vt.completed) {
+            vt.completed = true;
+            vt.completedDate = today;
+            safeSet('pages_pomodoro_tasks_v8', JSON.stringify(tasks));
+            if (window.renderTasks) window.renderTasks(activeTaskTab);
+            PomoEventBus.emit('vault:updated');
+        }
+    }
+}
+
 window.renderSchedule = function() {
     const cont = document.getElementById('schedule-container');
     if (!cont) return;
     cont.innerHTML = '';
     if (schedule.length === 0) {
-        cont.innerHTML = `<p class="text-slate-500 italic p-4 text-xs text-center bg-slate-900/50 rounded-xl border border-slate-800/60">Live Protocol empty. Insert a block above or load your daily template below.</p>`;
+        cont.innerHTML = `<p class="text-slate-500 italic p-4 text-xs text-center bg-slate-900/50 rounded-xl border border-slate-800/60">Live Protocol empty. Insert a block above, or click ⚡ on any To-Do or Study Vault item!</p>`;
         document.getElementById('session-count-badge').textContent = `0 Remaining`;
         return;
     }
@@ -427,13 +455,16 @@ window.renderSchedule = function() {
         const mins = Math.max(1, Math.round(item.duration / 60));
         const deenFlag = isDeenBlock(item);
         const icon = item.type === 'break' ? '💧' : (deenFlag ? '🕌' : '🧠');
+        const linkBadge = item.linkedVaultId
+            ? `<span class="text-[9px] bg-purple-950 text-purple-300 border border-purple-700/50 px-1.5 py-0.5 rounded ml-1">📚 Vault</span>`
+            : (item.linkedTodoId ? `<span class="text-[9px] bg-blue-950 text-blue-300 border border-blue-700/50 px-1.5 py-0.5 rounded ml-1">☑️ To-Do</span>` : '');
 
         div.innerHTML = `
             <div class="flex items-center gap-2.5 min-w-0 flex-1 pr-2">
                 <span class="text-base shrink-0">${icon}</span>
                 <div class="min-w-0 flex-1">
-                    <p class="text-xs sm:text-sm font-bold truncate ${index === currentStepIndex ? 'text-blue-400' : 'text-slate-200'}">${escapeHtml(item.title)}</p>
-                    <span class="text-[10px] font-mono text-slate-400">${mins} mins • ${item.type === 'break' ? 'Break' : (deenFlag ? 'Deen' : 'Study')}</span>
+                    <p class="text-xs sm:text-sm font-bold truncate ${index === currentStepIndex ? 'text-blue-400' : 'text-slate-200'}">${escapeHtml(item.title)} ${linkBadge}</p>
+                    <span class="text-[10px] font-mono text-slate-400">${mins} mins • ${item.type === 'break' ? 'Break' : (deenFlag ? 'Deen' : 'Study')}${item.dueDate ? ` • 📅 Due ${formatDDMMYYYY(item.dueDate)}` : ''}</span>
                 </div>
             </div>
             <div class="flex items-center gap-1 shrink-0">
@@ -498,6 +529,7 @@ window.quickComplete = function(index) {
         const item = schedule[index];
         if (item.status !== 'completed') {
             item.status = 'completed';
+            syncLinkedProtocolCompletion(item);
             if (item.type === 'work' && !item._credited) {
                 item._credited = true;
                 const mins = Math.max(1, Math.round(item.duration / 60));
@@ -516,6 +548,7 @@ window.quickComplete = function(index) {
                 renderHomeHUD();
                 if (window.renderCompassView) window.renderCompassView();
                 evaluateDriftAndAlerts();
+                PomoEventBus.emit('stats:updated');
                 showToast(`✅ +${mins}m credited to ${isDeenBlock(item) ? 'Deen' : 'Study'}!`);
             }
             safeSet('pages_pomodoro_schedule_v8', JSON.stringify(schedule));
@@ -577,7 +610,7 @@ window.loadStep = function(index, preserveState = false) {
         document.getElementById('anim-deen')?.classList.add('hidden');
         document.getElementById('anim-break')?.classList.add('hidden');
         document.getElementById('guide-box-title').textContent = schedule.length === 0 ? "🤖 System Ready" : "🎉 Day Complete";
-        document.getElementById('deep-guide-text').textContent = schedule.length === 0 ? "Open the Plan tab to load or build your daily schedule." : "Alhamdulillah! Incredible work today.";
+        document.getElementById('deep-guide-text').textContent = schedule.length === 0 ? "Open the Plan tab or click ⚡ on any To-Do / Study Vault item to launch a session." : "Alhamdulillah! Incredible work today.";
         stopTimer(true, true);
         document.getElementById('start-btn').classList.add('hidden');
         document.getElementById('pause-btn').classList.add('hidden');
@@ -602,9 +635,9 @@ window.loadStep = function(index, preserveState = false) {
             ? "mt-1.5 bg-emerald-500/15 px-4 py-0.5 rounded-full text-[10px] font-bold text-emerald-400 border border-emerald-500/30 uppercase tracking-widest font-phase"
             : "mt-1.5 bg-tomato/15 px-4 py-0.5 rounded-full text-[10px] font-bold text-tomato border border-tomato/30 uppercase tracking-widest font-phase";
         document.getElementById('guide-box-title').textContent = deenBlock ? "🕌 Deen Focus Protocol" : "🔥 Coach: Focus Protocol";
-        document.getElementById('deep-guide-text').textContent = deenBlock
-            ? "Strengthening your Imaan brings Barakah to your entire day."
-            : studyQuotes[Math.floor(Math.random() * studyQuotes.length)];
+        document.getElementById('deep-guide-text').textContent = currentSession.note
+            ? `📝 Session Note: ${currentSession.note}`
+            : (deenBlock ? "Strengthening your Imaan brings Barakah to your entire day." : studyQuotes[Math.floor(Math.random() * studyQuotes.length)]);
         document.getElementById('anim-study')?.classList.toggle('hidden', deenBlock);
         document.getElementById('anim-deen')?.classList.toggle('hidden', !deenBlock);
         document.getElementById('anim-break')?.classList.add('hidden');
@@ -649,6 +682,9 @@ function timerCoreTick() {
             }
             window.isOvertime = true;
             playAlarmSound();
+            if (window.sendDesktopNotification && curSess) {
+                window.sendDesktopNotification(`✅ Session Complete: ${curSess.title}`, `Click ✓ Complete in DeenTimeR Pro to log your time & advance!`, 'timer-done');
+            }
             timeDisplay.classList.add('overtime-glow');
             document.getElementById('pause-btn').classList.add('hidden');
             document.getElementById('complete-main-btn').classList.remove('hidden');
@@ -821,6 +857,7 @@ window.completeSession = function() {
     if (cur) {
         cur.status = 'completed';
         cur._credited = true;
+        syncLinkedProtocolCompletion(cur);
     }
     safeSet('pages_pomodoro_schedule_v8', JSON.stringify(schedule));
     flushSessionStats(cur?.type === 'work');
@@ -867,6 +904,197 @@ document.getElementById('close-guide-btn')?.addEventListener('click', () => {
     document.getElementById('full-screen-guide-overlay').classList.add('hidden');
     clearTimeout(guidePopupTimeout);
 });
+
+/* =========================================================================
+   UNIFIED "ADD TO LIVE PROTOCOL & RUN NOW" LAUNCHER MODAL (FOR TO-DO & VAULT)
+   ========================================================================= */
+let activeProtoLauncherCtx = null; // { sourceType: 'todo'|'vault', id, title, category, dueDate, createdDate, note }
+
+function ensureProtocolRunModalExists() {
+    if (document.getElementById('protocol-run-modal')) return;
+    const modal = document.createElement('div');
+    modal.id = 'protocol-run-modal';
+    modal.className = "hidden fixed inset-0 modal-backdrop z-[380] flex items-center justify-center p-4";
+    modal.innerHTML = `
+        <div class="bg-slate-900 border border-blue-500/50 rounded-3xl p-5 w-full max-w-md shadow-2xl flex flex-col gap-3.5 max-h-[92dvh] native-scroll">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2.5">
+                <div>
+                    <span id="proto-run-badge" class="text-[9px] font-extrabold uppercase tracking-widest bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full border border-blue-500/30">⚡ Live Protocol & Timer Launcher</span>
+                    <h3 class="text-sm font-extrabold text-white mt-1">Configure Session & Schedule</h3>
+                </div>
+                <button type="button" id="close-proto-run-modal-btn" class="text-slate-400 hover:text-white font-bold px-2 text-lg">✕</button>
+            </div>
+
+            <div class="flex flex-col gap-1">
+                <label class="text-[10px] font-bold uppercase text-slate-400">Session / Task Title</label>
+                <input type="text" id="proto-run-title-inp" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-blue-500">
+            </div>
+
+            <div class="grid grid-cols-2 gap-2.5">
+                <div class="flex flex-col gap-1">
+                    <label class="text-[10px] font-bold uppercase text-blue-400">⏱️ Duration (Minutes)</label>
+                    <input type="number" id="proto-run-dur-inp" value="45" min="1" max="360" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm font-mono font-extrabold text-white text-center focus:outline-none">
+                    <div class="grid grid-cols-4 gap-1 mt-1">
+                        <button type="button" onclick="document.getElementById('proto-run-dur-inp').value=25" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-mono font-bold py-1 rounded">25m</button>
+                        <button type="button" onclick="document.getElementById('proto-run-dur-inp').value=45" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-mono font-bold py-1 rounded">45m</button>
+                        <button type="button" onclick="document.getElementById('proto-run-dur-inp').value=60" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-mono font-bold py-1 rounded">60m</button>
+                        <button type="button" onclick="document.getElementById('proto-run-dur-inp').value=90" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-mono font-bold py-1 rounded">90m</button>
+                    </div>
+                </div>
+                <div class="flex flex-col gap-1">
+                    <label class="text-[10px] font-bold uppercase text-emerald-400">⚖️ Protocol Category</label>
+                    <select id="proto-run-cat-sel" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-extrabold text-white focus:outline-none">
+                        <option value="study">🧠 Deep Study (8h Goal)</option>
+                        <option value="deen">🕌 Deen & Imaan (1h Goal)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2.5 bg-slate-950 p-3 rounded-2xl border border-slate-800">
+                <div class="flex flex-col gap-1">
+                    <label class="text-[10px] font-bold uppercase text-slate-400">📆 Start / Log Date</label>
+                    <input type="date" id="proto-run-date-inp" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs font-mono text-white">
+                </div>
+                <div class="flex flex-col gap-1">
+                    <label class="text-[10px] font-bold uppercase text-amber-400">📅 Due Date (Target)</label>
+                    <input type="date" id="proto-run-due-inp" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs font-mono text-emerald-400">
+                </div>
+                <div class="col-span-2 flex gap-1.5 pt-1">
+                    <button type="button" onclick="window.setProtoDueOffset(0)" class="flex-1 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-[10px] font-bold py-1 rounded-lg">Due Today</button>
+                    <button type="button" onclick="window.setProtoDueOffset(1)" class="flex-1 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-[10px] font-bold py-1 rounded-lg">Tomorrow</button>
+                    <button type="button" onclick="window.setProtoDueOffset(3)" class="flex-1 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-[10px] font-bold py-1 rounded-lg">+3 Days</button>
+                    <button type="button" onclick="window.setProtoDueOffset(7)" class="flex-1 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-[10px] font-bold py-1 rounded-lg">+7 Days</button>
+                </div>
+            </div>
+
+            <div class="flex flex-col gap-1">
+                <label class="text-[10px] font-bold uppercase text-slate-400">📝 Session Note / Checklist</label>
+                <textarea id="proto-run-note-inp" placeholder="Add study notes, page numbers, or key concepts to focus on..." class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white h-16 resize-none focus:outline-none"></textarea>
+            </div>
+
+            <div class="flex gap-2.5 pt-1">
+                <button type="button" id="proto-save-queue-btn" class="flex-1 bg-slate-800 hover:bg-slate-700 text-blue-300 border border-blue-500/40 font-extrabold py-3 rounded-xl text-xs shadow active:scale-95">
+                    ➕ Save to Live Protocol
+                </button>
+                <button type="button" id="proto-run-now-btn" class="flex-1 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-extrabold py-3 rounded-xl text-xs shadow-lg active:scale-95 flex items-center justify-center gap-1.5">
+                    <span>▶️</span> <span>RUN NOW (Start Timer)</span>
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    window.setProtoDueOffset = function(days) {
+        document.getElementById('proto-run-due-inp').value = addDaysToTodayISO(days);
+    };
+
+    document.getElementById('close-proto-run-modal-btn').onclick = () => modal.classList.add('hidden');
+    document.getElementById('proto-save-queue-btn').onclick = () => commitProtocolLauncherAction(false);
+    document.getElementById('proto-run-now-btn').onclick = () => commitProtocolLauncherAction(true);
+}
+
+window.openProtocolRunModal = function(sourceType, itemId) {
+    ensureProtocolRunModalExists();
+    const today = getLocalTodayString();
+    let item = null;
+    if (sourceType === 'todo') {
+        item = todos.find(x => String(x.id) === String(itemId));
+    } else if (sourceType === 'vault') {
+        const tasks = JSON.parse(safeGet('pages_pomodoro_tasks_v8', '[]'));
+        item = tasks.find(x => String(x.id) === String(itemId));
+    }
+    if (!item) return;
+
+    const isDeenGuess = isDeenBlock(item) || /deen|quran|tafseer|hadith|salah|fiqh|seerah/i.test(`${item.title} ${item.subject || ''}`);
+    const displayTitle = sourceType === 'vault'
+        ? `📚 [${item.subject || 'Vault'} • ${(item.type || 'backlog').toUpperCase()}] ${item.title}`
+        : item.title;
+
+    activeProtoLauncherCtx = { sourceType, id: item.id };
+
+    document.getElementById('proto-run-badge').textContent = sourceType === 'vault'
+        ? `📚 Study Vault (${item.subject} • ${item.type.toUpperCase()}) ➔ Live Protocol`
+        : `☑️ To-Do Task ➔ Live Protocol & Timer`;
+    document.getElementById('proto-run-title-inp').value = displayTitle;
+    document.getElementById('proto-run-dur-inp').value = item.durationMins || 45;
+    document.getElementById('proto-run-cat-sel').value = item.category || (isDeenGuess ? 'deen' : 'study');
+    document.getElementById('proto-run-date-inp').value = item.createdDate || today;
+    document.getElementById('proto-run-due-inp').value = item.dueDate || today;
+    document.getElementById('proto-run-note-inp').value = item.note || '';
+
+    document.getElementById('protocol-run-modal').classList.remove('hidden');
+};
+
+function commitProtocolLauncherAction(runImmediately = false) {
+    if (!activeProtoLauncherCtx) return;
+    const titleVal = document.getElementById('proto-run-title-inp').value.trim() || 'Focus Session';
+    const mins = Math.max(1, parseInt(document.getElementById('proto-run-dur-inp').value) || 45);
+    const cat = document.getElementById('proto-run-cat-sel').value || 'study';
+    const createdDate = document.getElementById('proto-run-date-inp').value || getLocalTodayString();
+    const dueDate = document.getElementById('proto-run-due-inp').value || '';
+    const note = document.getElementById('proto-run-note-inp').value.trim();
+
+    if (activeProtoLauncherCtx.sourceType === 'todo') {
+        const t = todos.find(x => String(x.id) === String(activeProtoLauncherCtx.id));
+        if (t) {
+            t.createdDate = createdDate;
+            t.dueDate = dueDate;
+            t.note = note;
+            t.durationMins = mins;
+            t.category = cat;
+            saveTodos();
+            renderTodos();
+        }
+    } else if (activeProtoLauncherCtx.sourceType === 'vault') {
+        const tasks = JSON.parse(safeGet('pages_pomodoro_tasks_v8', '[]'));
+        const vt = tasks.find(x => String(x.id) === String(activeProtoLauncherCtx.id));
+        if (vt) {
+            vt.createdDate = createdDate;
+            vt.dueDate = dueDate;
+            vt.note = note;
+            vt.durationMins = mins;
+            vt.category = cat;
+            safeSet('pages_pomodoro_tasks_v8', JSON.stringify(tasks));
+            if (window.renderTasks) window.renderTasks(activeTaskTab);
+            PomoEventBus.emit('vault:updated');
+        }
+    }
+
+    const newBlock = {
+        id: Date.now(),
+        type: 'work',
+        category: cat,
+        title: titleVal,
+        duration: mins * 60,
+        createdDate,
+        dueDate,
+        note,
+        linkedTodoId: activeProtoLauncherCtx.sourceType === 'todo' ? activeProtoLauncherCtx.id : null,
+        linkedVaultId: activeProtoLauncherCtx.sourceType === 'vault' ? activeProtoLauncherCtx.id : null
+    };
+
+    document.getElementById('protocol-run-modal').classList.add('hidden');
+
+    if (runImmediately) {
+        stopTimer(true, true);
+        killActiveAlarms();
+        const insertAt = Math.min(currentStepIndex, schedule.length);
+        schedule.splice(insertAt, 0, newBlock);
+        safeSet('pages_pomodoro_schedule_v8', JSON.stringify(schedule));
+        loadStep(insertAt, false);
+        switchPage('page-timer');
+        startTimer();
+        showToast(`▶️ Running "${titleVal}" (${mins}m)!`);
+    } else {
+        const wasEmpty = schedule.length === 0;
+        schedule.push(newBlock);
+        safeSet('pages_pomodoro_schedule_v8', JSON.stringify(schedule));
+        if (wasEmpty) loadStep(0, false);
+        renderSchedule();
+        broadcastToCloud();
+        showToast(`⚡ Saved "${titleVal}" (${mins}m) to Live Protocol!`);
+    }
+}
 
 /* =========================================================================
    DAILY TEMPLATE BUILDER
@@ -1151,6 +1379,7 @@ window.renderSalahStrip = function() {
             if (window.renderCompassView) window.renderCompassView();
             evaluateDriftAndAlerts();
             broadcastToCloud();
+            PomoEventBus.emit('stats:updated');
         };
         cont.appendChild(btn);
     });
@@ -1268,7 +1497,6 @@ window.evaluateDriftAndAlerts = function() {
     const studyH = getTodayStudyMinutes() / 60;
     const deenH = getTodayDeenMinutes() / 60;
     const studyTarget = extConfig.studyTargetHours || 8.0;
-    const deenTarget = extConfig.deenTargetHours || 1.0;
 
     let alertTitle = '', alertDesc = '', alertKey = '';
     if (extConfig.salahAlertsEnabled) {
@@ -1301,7 +1529,11 @@ window.evaluateDriftAndAlerts = function() {
         document.getElementById('drift-alert-desc').textContent = alertDesc;
         banner?.classList.remove('hidden');
         if (statusPill) { statusPill.textContent = "⚠️ Drifting"; statusPill.className = "text-[9px] font-bold px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/40"; }
-        if (lastSalahChimeKey !== alertKey) { lastSalahChimeKey = alertKey; playChime('salah'); }
+        if (lastSalahChimeKey !== alertKey) {
+            lastSalahChimeKey = alertKey;
+            playChime('salah');
+            if (window.sendDesktopNotification) window.sendDesktopNotification(alertTitle, alertDesc, 'salah-alert');
+        }
     } else {
         banner?.classList.add('hidden');
         if (statusPill) { statusPill.textContent = "Balanced ✓"; statusPill.className = "text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"; }
@@ -1314,7 +1546,7 @@ document.getElementById('dismiss-drift-btn')?.addEventListener('click', () => {
 });
 
 /* =========================================================================
-   MICROSOFT TO DO + DEEP-LINKED BOOK BUTTONS
+   MICROSOFT TO DO + GRID VIEW + ⚡ PROTOCOL/RUN BUTTON + 6M ANALYTICS STUDIO
    ========================================================================= */
 window.activeTodoList = 'myday';
 window.newTodoDue = '';
@@ -1331,6 +1563,37 @@ window.saveTodos = function() {
     broadcastToCloud();
     PomoEventBus.emit('todos:updated');
 };
+
+// Mount Grid Toggle & 6-Month Progression Analytics Button in To-Do Top Bar
+function mountTodoTopBarUpgrades() {
+    const suggBtn = document.getElementById('todo-suggestions-btn');
+    const rightGrp = suggBtn?.parentElement;
+    if (!rightGrp || document.getElementById('todo-grid-toggle-btn')) return;
+
+    const gridBtn = document.createElement('button');
+    gridBtn.type = 'button';
+    gridBtn.id = 'todo-grid-toggle-btn';
+    gridBtn.className = "bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-slate-700 text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1 active:scale-95";
+    gridBtn.innerHTML = todoLayoutMode === 'grid' ? `<span>⊞</span> <span>Grid</span>` : `<span>☰</span> <span>List</span>`;
+    gridBtn.title = "Switch To-Do between 2-Column Desktop Grid and List View";
+    gridBtn.onclick = () => {
+        window.todoLayoutMode = todoLayoutMode === 'grid' ? 'list' : 'grid';
+        safeSet('pages_pomodoro_todo_layout_v1', todoLayoutMode);
+        gridBtn.innerHTML = todoLayoutMode === 'grid' ? `<span>⊞</span> <span>Grid</span>` : `<span>☰</span> <span>List</span>`;
+        renderTodos();
+    };
+
+    const analyticsBtn = document.createElement('button');
+    analyticsBtn.type = 'button';
+    analyticsBtn.id = 'todo-analytics-open-btn';
+    analyticsBtn.className = "bg-purple-600/20 hover:bg-purple-600 text-purple-300 hover:text-white border border-purple-500/40 text-xs font-extrabold px-3 py-1.5 rounded-xl flex items-center gap-1 active:scale-95 shadow";
+    analyticsBtn.innerHTML = `<span>📊</span> <span>Progression</span>`;
+    analyticsBtn.title = "Open 1W / 4W / Earlier 4W / 6M To-Do & Vault Line Graph Analytics";
+    analyticsBtn.onclick = () => window.openTodoAnalyticsModal();
+
+    rightGrp.insertBefore(gridBtn, suggBtn);
+    rightGrp.insertBefore(analyticsBtn, suggBtn);
+}
 
 window.formatRepeatBadge = function(rep) {
     if (!rep || rep.type === 'none') return '';
@@ -1364,6 +1627,7 @@ function computeNextDueDate(baseIso, rep) {
 }
 
 window.renderTodoListsBar = function() {
+    mountTodoTopBarUpgrades();
     const bar = document.getElementById('todo-lists-bar');
     if (!bar) return;
     const smart = [
@@ -1413,6 +1677,7 @@ document.getElementById('confirm-new-todolist-btn')?.addEventListener('click', (
 });
 
 window.renderTodos = function() {
+    mountTodoTopBarUpgrades();
     const today = getLocalTodayString();
     document.getElementById('todo-header-date').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
     const titles = { myday: '☀️ My Day', important: '⭐ Important', planned: '📅 Planned', tasks: '🏠 Tasks' };
@@ -1433,8 +1698,12 @@ window.renderTodos = function() {
     const completedTasks = filtered.filter(t => t.completed);
 
     const actCont = document.getElementById('todo-active-container');
+    actCont.className = todoLayoutMode === 'grid'
+        ? "grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-4"
+        : "flex flex-col gap-2 mb-4";
     actCont.innerHTML = '';
     if (!activeTasks.length) {
+        actCont.className = "flex flex-col gap-2 mb-4";
         actCont.innerHTML = `<p class="text-xs text-slate-500 italic text-center p-4 bg-slate-900/40 rounded-xl border border-slate-800/50">No active tasks in this view. Add one above!</p>`;
     } else {
         activeTasks.forEach(t => actCont.appendChild(createTodoRow(t)));
@@ -1442,6 +1711,9 @@ window.renderTodos = function() {
 
     const compWrap = document.getElementById('todo-completed-wrapper');
     const compCont = document.getElementById('todo-completed-container');
+    compCont.className = todoLayoutMode === 'grid'
+        ? "grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-1"
+        : "flex flex-col gap-2 mt-1";
     compCont.innerHTML = '';
     if (!completedTasks.length) {
         compWrap.classList.add('hidden');
@@ -1471,11 +1743,17 @@ window.createTodoRow = function(t) {
                     ${t.dueDate ? `<span class="text-[10px] text-emerald-400 font-mono">📅 ${formatDDMMYYYY(t.dueDate)}</span>` : ''}
                     ${repText ? `<span class="text-[10px] text-purple-400 font-semibold">${escapeHtml(repText)}</span>` : ''}
                     ${stepsTot > 0 ? `<span class="text-[10px] text-slate-400 font-mono">☑️ ${stepsDone}/${stepsTot}</span>` : ''}
+                    ${t.note ? `<span class="text-[10px] text-slate-400 truncate max-w-[140px]">📝 ${escapeHtml(t.note)}</span>` : ''}
                     ${t.bookId ? `<button onclick="event.stopPropagation(); window.openBookAtPage && window.openBookAtPage('${t.bookId}', ${t.bookPage || 1})" class="text-[10px] bg-emerald-600/25 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-md font-bold hover:bg-emerald-600 hover:text-white">📖 Open p.${t.bookPage || 1}</button>` : ''}
                 </div>
             </div>
         </div>
-        <button onclick="event.stopPropagation(); toggleTodoImportant(${t.id})" class="text-base px-1.5 ${t.important ? 'text-amber-400' : 'text-slate-600'}">${t.important ? '★' : '☆'}</button>
+        <div class="flex items-center gap-1.5 shrink-0">
+            <button onclick="event.stopPropagation(); window.openProtocolRunModal('todo', '${t.id}')" class="bg-blue-600/20 hover:bg-emerald-600 text-blue-300 hover:text-white border border-blue-500/40 px-2.5 py-1 rounded-lg text-[10px] font-extrabold transition-all flex items-center gap-1" title="Add to Live Protocol or Run Timer Now">
+                <span>⚡</span><span class="hidden sm:inline">Run</span>
+            </button>
+            <button onclick="event.stopPropagation(); toggleTodoImportant(${t.id})" class="text-base px-1.5 ${t.important ? 'text-amber-400' : 'text-slate-600'}" title="Mark Important">${t.important ? '★' : '☆'}</button>
+        </div>
     `;
     return div;
 };
@@ -1485,21 +1763,26 @@ window.toggleTodoComplete = function(id) {
     const t = todos.find(x => x.id === id);
     if (!t) return;
     t.completed = !t.completed;
+    const today = getLocalTodayString();
     if (t.completed) {
+        t.completedDate = today;
         playChime('todo');
         if (t.repeat && t.repeat.type && t.repeat.type !== 'none' && !t._spawnedNext) {
             t._spawnedNext = true;
-            const nextDue = computeNextDueDate(t.dueDate || getLocalTodayString(), t.repeat);
+            const nextDue = computeNextDueDate(t.dueDate || today, t.repeat);
             todos.unshift({
                 id: Date.now() + Math.floor(Math.random() * 100),
                 title: t.title, completed: false, important: t.important,
-                myDayDate: nextDue === getLocalTodayString() ? nextDue : '',
+                myDayDate: nextDue === today ? nextDue : '',
+                createdDate: today,
                 dueDate: nextDue, repeat: JSON.parse(JSON.stringify(t.repeat)),
                 steps: (t.steps || []).map(s => ({ ...s, done: false })),
                 note: t.note || '', listId: t.listId || 'tasks',
                 bookId: t.bookId, bookPage: t.bookPage
             });
         }
+    } else {
+        delete t.completedDate;
     }
     saveTodos();
     renderTodos();
@@ -1535,6 +1818,7 @@ function submitNewTodo() {
         id: Date.now(), title, completed: false,
         important: newTodoImportant || activeTodoList === 'important',
         myDayDate: (newTodoMyDay || activeTodoList === 'myday') ? today : '',
+        createdDate: today,
         dueDate: newTodoDue || (newTodoRepeat ? today : ''),
         repeat: newTodoRepeat ? JSON.parse(JSON.stringify(newTodoRepeat)) : { type: 'none' },
         steps: [], note: '',
@@ -1680,6 +1964,233 @@ window.addSuggestedToMyDay = function(id) {
     if (t) { t.myDayDate = getLocalTodayString(); saveTodos(); renderTodos(); document.getElementById('todo-suggestions-btn').click(); }
 };
 document.getElementById('close-suggestions-modal-btn')?.addEventListener('click', () => document.getElementById('todo-suggestions-modal').classList.add('hidden'));
+
+/* =========================================================================
+   TO-DO & STUDY VAULT PROGRESSION ANALYTICS (1W, 4W, EARLIER 4W, 6M + SVG LINE GRAPH)
+   ========================================================================= */
+let activeAnalyticsRange = '4w'; // '1w' | '4w' | '6m'
+
+window.computeTodoAndVaultProgression = function() {
+    const today = new Date();
+    const vaultTasks = JSON.parse(safeGet('pages_pomodoro_tasks_v8', '[]'));
+    const stats = JSON.parse(safeGet('pages_pomodoro_stats_v8', '{"history":{}}'));
+
+    const dayMap = {};
+    for (let i = 0; i < 185; i++) {
+        const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
+        const iso = getLocalTodayString(d);
+        dayMap[iso] = { todoDone: 0, vaultDone: 0, studyMins: stats.history?.[iso]?.mins || 0 };
+    }
+
+    const todayIso = getLocalTodayString(today);
+    todos.forEach(t => {
+        if (t.completed) {
+            const cDate = t.completedDate || t.dueDate || t.myDayDate || todayIso;
+            if (!dayMap[cDate]) dayMap[cDate] = { todoDone: 0, vaultDone: 0, studyMins: 0 };
+            dayMap[cDate].todoDone += 1;
+        }
+    });
+    vaultTasks.forEach(vt => {
+        if (vt.completed) {
+            const cDate = vt.completedDate || vt.dueDate || todayIso;
+            if (!dayMap[cDate]) dayMap[cDate] = { todoDone: 0, vaultDone: 0, studyMins: 0 };
+            dayMap[cDate].vaultDone += 1;
+        }
+    });
+
+    function sumRange(startOffset, endOffset) {
+        let todoSum = 0, vaultSum = 0, minsSum = 0;
+        for (let i = startOffset; i <= endOffset; i++) {
+            const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
+            const iso = getLocalTodayString(d);
+            const rec = dayMap[iso] || { todoDone: 0, vaultDone: 0, studyMins: 0 };
+            todoSum += rec.todoDone;
+            vaultSum += rec.vaultDone;
+            minsSum += rec.studyMins;
+        }
+        return { todoSum, vaultSum, totalItems: todoSum + vaultSum, hours: +(minsSum / 60).toFixed(1) };
+    }
+
+    const week1 = sumRange(0, 6);
+    const week4 = sumRange(0, 27);
+    const earlierWeek4 = sumRange(28, 55);
+    const month6 = sumRange(0, 179);
+
+    const delta4W = week4.totalItems - earlierWeek4.totalItems;
+    const pctGrowth4W = earlierWeek4.totalItems > 0
+        ? Math.round(((week4.totalItems - earlierWeek4.totalItems) / earlierWeek4.totalItems) * 100)
+        : (week4.totalItems > 0 ? 100 : 0);
+
+    return { dayMap, week1, week4, earlierWeek4, month6, delta4W, pctGrowth4W };
+};
+
+window.openTodoAnalyticsModal = function(rangeOverride = null) {
+    if (rangeOverride) activeAnalyticsRange = rangeOverride;
+    let modal = document.getElementById('todo-analytics-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'todo-analytics-modal';
+        modal.className = "hidden fixed inset-0 modal-backdrop z-[385] flex items-center justify-center p-3 sm:p-5";
+        document.body.appendChild(modal);
+    }
+
+    const data = window.computeTodoAndVaultProgression();
+    const today = new Date();
+
+    // Build Line Graph Points based on activeAnalyticsRange
+    let seriesA = [], seriesB = [], labels = [];
+    if (activeAnalyticsRange === '1w') {
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
+            const iso = getLocalTodayString(d);
+            const rec = data.dayMap[iso] || { todoDone: 0, vaultDone: 0 };
+            seriesA.push(rec.todoDone + rec.vaultDone);
+            labels.push(i === 0 ? 'Today' : d.toLocaleDateString('en-US', { weekday: 'short' }));
+        }
+    } else if (activeAnalyticsRange === '4w') {
+        // 4 Weekly buckets: Current 4 Weeks (Blue/Emerald) vs Earlier 4 Weeks (Purple dashed)
+        for (let w = 3; w >= 0; w--) {
+            let curW = 0, prevW = 0;
+            for (let d = 0; d < 7; d++) {
+                const curOff = w * 7 + d;
+                const prevOff = 28 + w * 7 + d;
+                const cIso = getLocalTodayString(new Date(today.getFullYear(), today.getMonth(), today.getDate() - curOff));
+                const pIso = getLocalTodayString(new Date(today.getFullYear(), today.getMonth(), today.getDate() - prevOff));
+                curW += (data.dayMap[cIso]?.todoDone || 0) + (data.dayMap[cIso]?.vaultDone || 0);
+                prevW += (data.dayMap[pIso]?.todoDone || 0) + (data.dayMap[pIso]?.vaultDone || 0);
+            }
+            seriesA.push(curW);
+            seriesB.push(prevW);
+            labels.push(w === 0 ? 'This Wk' : `Wk -${w}`);
+        }
+    } else {
+        // 6 Months breakdown (6 monthly points)
+        for (let m = 5; m >= 0; m--) {
+            const d = new Date(today.getFullYear(), today.getMonth() - m, 1);
+            const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            let tot = 0;
+            Object.entries(data.dayMap).forEach(([k, v]) => {
+                if (k.startsWith(ym)) tot += (v.todoDone + v.vaultDone);
+            });
+            seriesA.push(tot);
+            labels.push(d.toLocaleDateString('en-US', { month: 'short' }));
+        }
+    }
+
+    const maxVal = Math.max(5, ...seriesA, ...(seriesB.length ? seriesB : [0]));
+    const svgW = 680, svgH = 210, padL = 42, padR = 24, padT = 22, padB = 34;
+    const plotW = svgW - padL - padR;
+    const plotH = svgH - padT - padB;
+
+    const toPoint = (val, idx, count) => {
+        const x = padL + (count <= 1 ? plotW / 2 : (idx / (count - 1)) * plotW);
+        const y = padT + plotH - (Math.min(maxVal, val) / maxVal) * plotH;
+        return { x: +x.toFixed(1), y: +y.toFixed(1), val };
+    };
+
+    const ptsA = seriesA.map((v, i) => toPoint(v, i, seriesA.length));
+    const ptsB = seriesB.map((v, i) => toPoint(v, i, seriesB.length));
+
+    const polyA = ptsA.map(p => `${p.x},${p.y}`).join(' ');
+    const areaA = `${ptsA[0].x},${padT + plotH} ${polyA} ${ptsA[ptsA.length - 1].x},${padT + plotH}`;
+    const polyB = ptsB.length ? ptsB.map(p => `${p.x},${p.y}`).join(' ') : '';
+
+    modal.innerHTML = `
+        <div class="bg-slate-900 border border-slate-700 rounded-3xl p-5 w-full max-w-3xl shadow-2xl flex flex-col gap-4 max-h-[92dvh] native-scroll">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                <div>
+                    <span class="text-[10px] font-extrabold uppercase tracking-widest text-purple-400">📊 Data Analysis & Progression Studio</span>
+                    <h3 class="text-base sm:text-lg font-extrabold text-white">To-Do & Study Vault Progression History (Up to 6 Months)</h3>
+                </div>
+                <button type="button" onclick="document.getElementById('todo-analytics-modal').classList.add('hidden')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-3 py-1.5 rounded-xl text-xs">✕ Close</button>
+            </div>
+
+            <!-- 4 Progression Horizon Cards -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <div class="bg-slate-950 border border-blue-500/40 rounded-2xl p-3">
+                    <p class="text-[10px] font-extrabold uppercase text-blue-400">1-Week Progress</p>
+                    <p class="text-2xl font-mono font-extrabold text-white mt-1">${data.week1.totalItems}</p>
+                    <p class="text-[10px] text-slate-400 font-mono mt-0.5">☑️ ${data.week1.todoSum} To-Do • 📚 ${data.week1.vaultSum} Vault</p>
+                </div>
+                <div class="bg-slate-950 border border-emerald-500/40 rounded-2xl p-3">
+                    <p class="text-[10px] font-extrabold uppercase text-emerald-400">4-Week Progress</p>
+                    <p class="text-2xl font-mono font-extrabold text-emerald-400 mt-1">${data.week4.totalItems}</p>
+                    <p class="text-[10px] text-slate-400 font-mono mt-0.5">⏱️ ${data.week4.hours}h Study Logged</p>
+                </div>
+                <div class="bg-slate-950 border border-purple-500/40 rounded-2xl p-3">
+                    <p class="text-[10px] font-extrabold uppercase text-purple-400">Earlier 4-Week (d29–56)</p>
+                    <p class="text-2xl font-mono font-extrabold text-purple-300 mt-1">${data.earlierWeek4.totalItems}</p>
+                    <p class="text-[10px] font-mono ${data.delta4W >= 0 ? 'text-emerald-400' : 'text-amber-400'} font-bold mt-0.5">
+                        ${data.delta4W >= 0 ? `▲ +${data.pctGrowth4W}% vs Earlier 4W` : `▼ ${data.pctGrowth4W}% vs Earlier 4W`}
+                    </p>
+                </div>
+                <div class="bg-slate-950 border border-amber-500/40 rounded-2xl p-3">
+                    <p class="text-[10px] font-extrabold uppercase text-amber-400">6-Month Total</p>
+                    <p class="text-2xl font-mono font-extrabold text-amber-300 mt-1">${data.month6.totalItems}</p>
+                    <p class="text-[10px] text-slate-400 font-mono mt-0.5">⏱️ ${data.month6.hours}h Total Focus</p>
+                </div>
+            </div>
+
+            <!-- Interactive SVG Line Graph Box -->
+            <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <h4 class="text-xs font-extrabold text-white uppercase tracking-wider">📈 Progression Line Graph</h4>
+                        <p class="text-[10px] text-slate-400">Tracks completed To-Do tasks + Study Vault Backlog/Revision chapters</p>
+                    </div>
+                    <div class="flex gap-1.5 bg-slate-900 p-1 rounded-xl border border-slate-800">
+                        <button type="button" onclick="window.openTodoAnalyticsModal('1w')" class="px-3 py-1 rounded-lg text-[11px] font-bold ${activeAnalyticsRange === '1w' ? 'bg-blue-600 text-white shadow' : 'text-slate-400'}">1 Week (7D)</button>
+                        <button type="button" onclick="window.openTodoAnalyticsModal('4w')" class="px-3 py-1 rounded-lg text-[11px] font-bold ${activeAnalyticsRange === '4w' ? 'bg-emerald-600 text-white shadow' : 'text-slate-400'}">4W vs Earlier 4W</button>
+                        <button type="button" onclick="window.openTodoAnalyticsModal('6m')" class="px-3 py-1 rounded-lg text-[11px] font-bold ${activeAnalyticsRange === '6m' ? 'bg-purple-600 text-white shadow' : 'text-slate-400'}">6 Months (6M)</button>
+                    </div>
+                </div>
+
+                <div class="w-full overflow-x-auto">
+                    <svg viewBox="0 0 ${svgW} ${svgH}" class="w-full h-52 overflow-visible">
+                        <defs>
+                            <linearGradient id="lineAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stop-color="#10b981" stop-opacity="0.38"/>
+                                <stop offset="100%" stop-color="#10b981" stop-opacity="0.0"/>
+                            </linearGradient>
+                        </defs>
+                        <!-- Horizontal Grid Lines -->
+                        ${[0, 0.25, 0.5, 0.75, 1].map(r => {
+                            const y = padT + plotH * (1 - r);
+                            const v = Math.round(maxVal * r);
+                            return `<line x1="${padL}" y1="${y}" x2="${svgW - padR}" y2="${y}" stroke="#1e293b" stroke-dasharray="4 4" stroke-width="1"/>
+                                    <text x="${padL - 8}" y="${y + 4}" text-anchor="end" fill="#64748b" font-size="10" font-family="monospace">${v}</text>`;
+                        }).join('')}
+
+                        <!-- Area Fill -->
+                        <polygon points="${areaA}" fill="url(#lineAreaGrad)" />
+
+                        <!-- Earlier 4W Comparison Line (when 4w active) -->
+                        ${polyB ? `<polyline fill="none" stroke="#a855f7" stroke-width="2.5" stroke-dasharray="6 4" points="${polyB}" />` : ''}
+
+                        <!-- Main Progression Line -->
+                        <polyline fill="none" stroke="#10b981" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" points="${polyA}" />
+
+                        <!-- Data Points & Labels -->
+                        ${ptsB.map(p => `<circle cx="${p.x}" cy="${p.y}" r="4" fill="#a855f7" stroke="#020617" stroke-width="2"><title>Earlier 4W: ${p.val}</title></circle>`).join('')}
+                        ${ptsA.map((p, i) => `
+                            <circle cx="${p.x}" cy="${p.y}" r="5.5" fill="#10b981" stroke="#ffffff" stroke-width="2"></circle>
+                            <text x="${p.x}" y="${p.y - 10}" text-anchor="middle" fill="#34d399" font-size="11" font-weight="bold" font-family="monospace">${p.val}</text>
+                            <text x="${p.x}" y="${svgH - 8}" text-anchor="middle" fill="#94a3b8" font-size="11" font-weight="bold">${labels[i]}</text>
+                        `).join('')}
+                    </svg>
+                </div>
+
+                ${activeAnalyticsRange === '4w' ? `
+                    <div class="flex items-center justify-center gap-6 text-[11px] font-bold pt-1 border-t border-slate-900">
+                        <span class="flex items-center gap-1.5 text-emerald-400"><span class="w-3 h-1 bg-emerald-400 inline-block rounded"></span> Current 4 Weeks (${data.week4.totalItems} completed)</span>
+                        <span class="flex items-center gap-1.5 text-purple-400"><span class="w-3 h-1 bg-purple-400 inline-block rounded"></span> Earlier 4 Weeks (${data.earlierWeek4.totalItems} completed)</span>
+                    </div>
+                ` : ''}
+            </div>
+        </div>
+    `;
+    modal.classList.remove('hidden');
+};
 
 /* =========================================================================
    STATS, TELEGRAM REPORT & BOOTSTRAP

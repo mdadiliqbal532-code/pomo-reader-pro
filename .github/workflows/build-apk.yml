@@ -1,0 +1,453 @@
+name: Build Official Android APK
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-android-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 1. Checkout Repository Code
+        uses: actions/checkout@v4
+
+      - name: 2. Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: 3. Set up Gradle 8.5
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.5'
+
+      - name: 4. Generate Native Android Project & Bundle Web Assets
+        run: |
+          sudo apt-get update && sudo apt-get install -y librsvg2-bin curl
+
+          mkdir -p android-project/app/src/main/assets/src
+          mkdir -p android-project/app/src/main/assets/lib
+          mkdir -p android-project/app/src/main/java/com/deentimer/pro
+          mkdir -p android-project/app/src/main/res/layout
+          mkdir -p android-project/app/src/main/res/xml
+          mkdir -p android-project/app/src/main/res/values
+          mkdir -p android-project/app/src/main/res/drawable
+          mkdir -p android-project/app/src/main/res/mipmap-hdpi
+          mkdir -p android-project/app/src/main/res/mipmap-mdpi
+          mkdir -p android-project/app/src/main/res/mipmap-xhdpi
+          mkdir -p android-project/app/src/main/res/mipmap-xxhdpi
+          mkdir -p android-project/app/src/main/res/mipmap-xxxhdpi
+
+          # Copy user web app files into Android native assets
+          cp index.html android-project/app/src/main/assets/
+          [ -f styles.css ] && cp styles.css android-project/app/src/main/assets/
+          [ -f manifest.json ] && cp manifest.json android-project/app/src/main/assets/
+          [ -f sw.js ] && cp sw.js android-project/app/src/main/assets/
+          [ -d src ] && cp -r src/* android-project/app/src/main/assets/src/
+
+          # Pre-bundle PDF.js, pdf-lib, JSZip, Marked & Tailwind inside the APK for 100% offline use
+          curl -sL "https://cdn.tailwindcss.com" -o android-project/app/src/main/assets/lib/tailwind.js
+          curl -sL "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" -o android-project/app/src/main/assets/lib/pdf.min.js
+          curl -sL "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js" -o android-project/app/src/main/assets/lib/pdf.worker.min.js
+          curl -sL "https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js" -o android-project/app/src/main/assets/lib/pdf-lib.min.js
+          curl -sL "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" -o android-project/app/src/main/assets/lib/jszip.min.js
+          curl -sL "https://cdnjs.cloudflare.com/ajax/libs/marked/11.1.1/marked.min.js" -o android-project/app/src/main/assets/lib/marked.min.js
+
+          # Point index.html inside APK to local offline libraries
+          sed -i 's|https://cdn.tailwindcss.com|./lib/tailwind.js|g' android-project/app/src/main/assets/index.html
+          sed -i 's|https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js|./lib/pdf.min.js|g' android-project/app/src/main/assets/index.html
+          sed -i 's|https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js|./lib/pdf.worker.min.js|g' android-project/app/src/main/assets/index.html
+          sed -i 's|https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js|./lib/pdf-lib.min.js|g' android-project/app/src/main/assets/index.html
+          sed -i 's|https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js|./lib/jszip.min.js|g' android-project/app/src/main/assets/index.html
+          sed -i 's|https://cdnjs.cloudflare.com/ajax/libs/marked/11.1.1/marked.min.js|./lib/marked.min.js|g' android-project/app/src/main/assets/index.html
+
+          # Generate 3D App Icon if icon.svg does not exist yet
+          if [ ! -f icon.svg ]; then
+          cat << 'EOF' > icon.svg
+          <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+            <rect x="16" y="16" width="480" height="480" rx="110" fill="#020617" stroke="#3b82f6" stroke-width="16"/>
+            <circle cx="256" cy="240" r="160" fill="#0f172a" stroke="#2563eb" stroke-width="24"/>
+            <line x1="256" y1="220" x2="256" y2="130" stroke="#ffffff" stroke-width="16" stroke-linecap="round"/>
+            <line x1="256" y1="220" x2="325" y2="180" stroke="#ff4757" stroke-width="14" stroke-linecap="round"/>
+            <path d="M252 275 C215 260, 165 265, 136 280 L136 372 C165 357, 215 352, 252 368 Z" fill="#10b981"/>
+            <path d="M260 275 C297 260, 347 265, 376 280 L376 372 C347 357, 297 352, 260 368 Z" fill="#059669"/>
+            <rect x="249" y="272" width="14" height="98" rx="6" fill="#f59e0b"/>
+          </svg>
+          EOF
+          fi
+
+          rsvg-convert -w 48 -h 48 icon.svg -o android-project/app/src/main/res/mipmap-mdpi/ic_launcher.png
+          rsvg-convert -w 72 -h 72 icon.svg -o android-project/app/src/main/res/mipmap-hdpi/ic_launcher.png
+          rsvg-convert -w 96 -h 96 icon.svg -o android-project/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+          rsvg-convert -w 144 -h 144 icon.svg -o android-project/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+          rsvg-convert -w 192 -h 192 icon.svg -o android-project/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+
+      - name: 5. Create Gradle & Android Manifest Files
+        run: |
+          cat << 'EOF' > android-project/settings.gradle
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.name = "DeenTimeRPro"
+          include ':app'
+          EOF
+
+          cat << 'EOF' > android-project/app/build.gradle
+          plugins {
+              id 'com.android.application' version '8.2.2'
+          }
+          android {
+              namespace 'com.deentimer.pro'
+              compileSdk 34
+              defaultConfig {
+                  applicationId "com.deentimer.pro"
+                  minSdk 24
+                  targetSdk 34
+                  versionCode 2
+                  versionName "4.5.0"
+              }
+              buildTypes {
+                  debug {
+                      minifyEnabled false
+                  }
+              }
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+          }
+          EOF
+
+          cat << 'EOF' > android-project/app/src/main/AndroidManifest.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+              package="com.deentimer.pro">
+
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+              <uses-permission android:name="android.permission.WAKE_LOCK" />
+              <uses-permission android:name="android.permission.VIBRATE" />
+              <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+              <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+              <application
+                  android:allowBackup="true"
+                  android:icon="@mipmap/ic_launcher"
+                  android:label="DeenTimeR Pro"
+                  android:usesCleartextTraffic="true"
+                  android:hardwareAccelerated="true"
+                  android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"
+                      android:windowSoftInputMode="adjustResize">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+
+                  <!-- Native Home Screen Cockpit Widget -->
+                  <receiver android:name=".PomoWidgetProvider" android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                      </intent-filter>
+                      <meta-data
+                          android:name="android.appwidget.provider"
+                          android:resource="@xml/pomo_widget_info" />
+                  </receiver>
+              </application>
+          </manifest>
+          EOF
+
+      - name: 6. Create Native Java Engine & Home Screen Widget
+        run: |
+          cat << 'EOF' > android-project/app/src/main/res/drawable/widget_bg.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+              <solid android:color="#E6020617" />
+              <stroke android:width="1.5dp" android:color="#3B82F6" />
+              <corners android:radius="20dp" />
+          </shape>
+          EOF
+
+          cat << 'EOF' > android-project/app/src/main/res/layout/pomo_widget.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:id="@+id/widget_root"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:background="@drawable/widget_bg"
+              android:orientation="vertical"
+              android:padding="14dp">
+
+              <TextView
+                  android:id="@+id/widget_header"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:text="⚡ DEENTIMER &amp; READER PRO"
+                  android:textColor="#60A5FA"
+                  android:textSize="11sp"
+                  android:textStyle="bold" />
+
+              <TextView
+                  android:id="@+id/widget_stats"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:layout_marginTop="6dp"
+                  android:text="🧠 Study: 0.0h  •  🕌 Deen: 0.0h  •  🕋 Salah: 0/5"
+                  android:textColor="#34D399"
+                  android:textSize="13sp"
+                  android:textStyle="bold" />
+
+              <TextView
+                  android:id="@+id/widget_book"
+                  android:layout_width="wrap_content"
+                  android:layout_height="wrap_content"
+                  android:layout_marginTop="4dp"
+                  android:text="📖 Tap to Open Wooden Shelf &amp; Timer"
+                  android:textColor="#FBBF24"
+                  android:textSize="12sp"
+                  android:singleLine="true" />
+          </LinearLayout>
+          EOF
+
+          cat << 'EOF' > android-project/app/src/main/res/xml/pomo_widget_info.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+              android:minWidth="250dp"
+              android:minHeight="80dp"
+              android:updatePeriodMillis="1800000"
+              android:initialLayout="@layout/pomo_widget"
+              android:resizeMode="horizontal|vertical"
+              android:widgetCategory="home_screen" />
+          EOF
+
+          cat << 'EOF' > android-project/app/src/main/java/com/deentimer/pro/PomoWidgetProvider.java
+          package com.deentimer.pro;
+
+          import android.app.PendingIntent;
+          import android.appwidget.AppWidgetManager;
+          import android.appwidget.AppWidgetProvider;
+          import android.content.ComponentName;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.content.SharedPreferences;
+          import android.widget.RemoteViews;
+          import org.json.JSONObject;
+
+          public class PomoWidgetProvider extends AppWidgetProvider {
+              @Override
+              public void onUpdate(Context context, AppWidgetManager appWidgetManager, int[] appWidgetIds) {
+                  for (int appWidgetId : appWidgetIds) {
+                      updateWidget(context, appWidgetManager, appWidgetId);
+                  }
+              }
+
+              public static void updateWidget(Context context, AppWidgetManager mgr, int appWidgetId) {
+                  RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.pomo_widget);
+                  SharedPreferences prefs = context.getSharedPreferences("PomoWidgetPrefs", Context.MODE_PRIVATE);
+                  String raw = prefs.getString("payload", "{}");
+                  try {
+                      JSONObject obj = new JSONObject(raw);
+                      String study = obj.optString("studyHours", "0.0");
+                      String deen = obj.optString("deenHours", "0.0");
+                      String salah = obj.optString("salahScore", "0/5");
+                      int lv = obj.optInt("rpgLevel", 0);
+                      String book = obj.optString("activeBookTitle", "Open Wooden Shelf");
+                      String page = obj.optString("activeBookPage", "");
+
+                      views.setTextViewText(R.id.widget_header, "⚡ DEENTIMER PRO  •  ⚔️ LV." + lv);
+                      views.setTextViewText(R.id.widget_stats, "🧠 Study: " + study + "h   🕌 Deen: " + deen + "h   🕋 Salah: " + salah);
+                      views.setTextViewText(R.id.widget_book, "📖 " + book + (page.isEmpty() ? "" : " (p." + page + ")"));
+                  } catch (Exception ignored) {}
+
+                  Intent intent = new Intent(context, MainActivity.class);
+                  PendingIntent pi = PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+                  views.setOnClickPendingIntent(R.id.widget_root, pi);
+                  mgr.updateAppWidget(appWidgetId, views);
+              }
+
+              public static void pushUpdateAll(Context context) {
+                  AppWidgetManager mgr = AppWidgetManager.getInstance(context);
+                  int[] ids = mgr.getAppWidgetIds(new ComponentName(context, PomoWidgetProvider.class));
+                  for (int id : ids) updateWidget(context, mgr, id);
+              }
+          }
+          EOF
+
+          cat << 'EOF' > android-project/app/src/main/java/com/deentimer/pro/MainActivity.java
+          package com.deentimer.pro;
+
+          import android.app.Activity;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.content.SharedPreferences;
+          import android.graphics.Color;
+          import android.net.Uri;
+          import android.os.Bundle;
+          import android.view.View;
+          import android.view.Window;
+          import android.view.WindowManager;
+          import android.webkit.GeolocationPermissions;
+          import android.webkit.JavascriptInterface;
+          import android.webkit.ValueCallback;
+          import android.webkit.WebChromeClient;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+
+          public class MainActivity extends Activity {
+              private WebView webView;
+              private ValueCallback<Uri[]> filePathCallback;
+              private static final int FILE_CHOOSER_REQ = 1001;
+
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  Window window = getWindow();
+                  window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                  window.setStatusBarColor(Color.parseColor("#020617"));
+                  window.setNavigationBarColor(Color.parseColor("#020617"));
+
+                  webView = new WebView(this);
+                  webView.setBackgroundColor(Color.parseColor("#020617"));
+                  setContentView(webView);
+
+                  WebSettings ws = webView.getSettings();
+                  ws.setJavaScriptEnabled(true);
+                  ws.setDomStorageEnabled(true);
+                  ws.setDatabaseEnabled(true);
+                  ws.setAllowFileAccess(true);
+                  ws.setAllowContentAccess(true);
+                  ws.setAllowFileAccessFromFileURLs(true);
+                  ws.setAllowUniversalAccessFromFileURLs(true);
+                  ws.setMediaPlaybackRequiresUserGesture(false);
+                  ws.setCacheMode(WebSettings.LOAD_DEFAULT);
+
+                  webView.addJavascriptInterface(new AndroidBridge(this), "AndroidBridge");
+                  webView.setWebViewClient(new WebViewClient());
+
+                  webView.setWebChromeClient(new WebChromeClient() {
+                      @Override
+                      public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
+                          callback.invoke(origin, true, false);
+                      }
+
+                      @Override
+                      public boolean onShowFileChooser(WebView wv, ValueCallback<Uri[]> callback, FileChooserParams params) {
+                          if (filePathCallback != null) filePathCallback.onReceiveValue(null);
+                          filePathCallback = callback;
+                          Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                          intent.addCategory(Intent.CATEGORY_OPENABLE);
+                          intent.setType("*/*");
+                          intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+                          try {
+                              startActivityForResult(Intent.createChooser(intent, "Select Book or File"), FILE_CHOOSER_REQ);
+                          } catch (Exception e) {
+                              filePathCallback = null;
+                              return false;
+                          }
+                          return true;
+                      }
+                  });
+
+                  webView.loadUrl("file:///android_asset/index.html");
+              }
+
+              @Override
+              protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+                  if (requestCode == FILE_CHOOSER_REQ && filePathCallback != null) {
+                      Uri[] results = null;
+                      if (resultCode == Activity.RESULT_OK && data != null) {
+                          if (data.getClipData() != null) {
+                              int count = data.getClipData().getItemCount();
+                              results = new Uri[count];
+                              for (int i = 0; i < count; i++) {
+                                  results[i] = data.getClipData().getItemAt(i).getUri();
+                              }
+                          } else if (data.getData() != null) {
+                              results = new Uri[]{ data.getData() };
+                          }
+                      }
+                      filePathCallback.onReceiveValue(results);
+                      filePathCallback = null;
+                  }
+              }
+
+              @Override
+              public void onBackPressed() {
+                  if (webView != null) {
+                      webView.evaluateJavascript("(typeof window.handleAndroidBack === 'function' ? window.handleAndroidBack() : false)", value -> {
+                          if (!"true".equals(value)) {
+                              runOnUiThread(MainActivity.super::onBackPressed);
+                          }
+                      });
+                  } else {
+                      super.onBackPressed();
+                  }
+              }
+
+              public class AndroidBridge {
+                  private final Context ctx;
+                  AndroidBridge(Context c) { this.ctx = c; }
+
+                  @JavascriptInterface
+                  public void setKeepScreenOn(boolean on) {
+                      runOnUiThread(() -> {
+                          if (on) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                      });
+                  }
+
+                  @JavascriptInterface
+                  public void updateHomeWidgets(String jsonPayload) {
+                      SharedPreferences prefs = ctx.getSharedPreferences("PomoWidgetPrefs", Context.MODE_PRIVATE);
+                      prefs.edit().putString("payload", jsonPayload).apply();
+                      PomoWidgetProvider.pushUpdateAll(ctx);
+                  }
+              }
+          }
+          EOF
+
+      - name: 7. Compile Official Android APK
+        working-directory: android-project
+        run: gradle assembleDebug --no-daemon
+
+      - name: 8. Prepare Installable DeenTimeR-Pro.apk
+        run: cp android-project/app/build/outputs/apk/debug/app-debug.apk ./DeenTimeR-Pro.apk
+
+      - name: 9. Upload APK to GitHub Actions Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: DeenTimeR-Pro-APK
+          path: ./DeenTimeR-Pro.apk
+
+      - name: 10. Publish APK to GitHub Releases (1-Click Download)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v4.5-latest
+          name: "DeenTimeR & Pomo Reader Pro — Official Android APK"
+          body: "Download **DeenTimeR-Pro.apk** below to install on your Android Tablet or Phone (includes 100% Offline Reader, CRDT Wireless Cloud Sync, Keep-Screen-On Lock & Native Home Screen Widget)."
+          files: ./DeenTimeR-Pro.apk
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

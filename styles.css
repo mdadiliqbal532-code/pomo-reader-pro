@@ -161,7 +161,8 @@ body.dim-mode #ai-coach-card,
 body.dim-mode #drift-alert-banner,
 body.dim-mode #animation-container,
 body.dim-mode #app-header-brand,
-body.dim-mode #controls-container { display: none !important; }
+body.dim-mode #controls-container,
+body.dim-mode #home-reader-widget-card { display: none !important; }
 body.dim-mode #page-timer { justify-content: center !important; padding-bottom: 1rem !important; }
 body.dim-mode #time-display { color: #475569 !important; text-shadow: none !important; font-size: 18vw !important; }
 body.dim-mode #session-type { color: #334155 !important; }

@@ -668,8 +668,7 @@ window.updateDisplay = function() {
     }
 };
 
-let lastPersistedTickSec = -1;
-let lastPersistedTickSec = -1;
+window.lastPersistedTickSec = -1;
 function timerCoreTick() {
     if (!isRunning) return;
     const now = Date.now();

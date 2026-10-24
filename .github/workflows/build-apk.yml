@@ -44,14 +44,12 @@ jobs:
           mkdir -p android-project/app/src/main/res/mipmap-xxhdpi
           mkdir -p android-project/app/src/main/res/mipmap-xxxhdpi
 
-          # Copy user web app files into Android native assets
           cp index.html android-project/app/src/main/assets/
           [ -f styles.css ] && cp styles.css android-project/app/src/main/assets/
           [ -f manifest.json ] && cp manifest.json android-project/app/src/main/assets/
           [ -f sw.js ] && cp sw.js android-project/app/src/main/assets/
           [ -d src ] && cp -r src/* android-project/app/src/main/assets/src/
 
-          # Pre-bundle PDF.js, pdf-lib, JSZip, Marked & Tailwind inside the APK for 100% offline use
           curl -sL "https://cdn.tailwindcss.com" -o android-project/app/src/main/assets/lib/tailwind.js
           curl -sL "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" -o android-project/app/src/main/assets/lib/pdf.min.js
           curl -sL "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js" -o android-project/app/src/main/assets/lib/pdf.worker.min.js
@@ -59,7 +57,6 @@ jobs:
           curl -sL "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" -o android-project/app/src/main/assets/lib/jszip.min.js
           curl -sL "https://cdnjs.cloudflare.com/ajax/libs/marked/11.1.1/marked.min.js" -o android-project/app/src/main/assets/lib/marked.min.js
 
-          # Point index.html inside APK to local offline libraries
           sed -i 's|https://cdn.tailwindcss.com|./lib/tailwind.js|g' android-project/app/src/main/assets/index.html
           sed -i 's|https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js|./lib/pdf.min.js|g' android-project/app/src/main/assets/index.html
           sed -i 's|https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js|./lib/pdf.worker.min.js|g' android-project/app/src/main/assets/index.html
@@ -67,7 +64,6 @@ jobs:
           sed -i 's|https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js|./lib/jszip.min.js|g' android-project/app/src/main/assets/index.html
           sed -i 's|https://cdnjs.cloudflare.com/ajax/libs/marked/11.1.1/marked.min.js|./lib/marked.min.js|g' android-project/app/src/main/assets/index.html
 
-          # Generate 3D App Icon if icon.svg does not exist yet
           if [ ! -f icon.svg ]; then
           cat << 'EOF' > icon.svg
           <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
@@ -90,6 +86,11 @@ jobs:
 
       - name: 5. Create Gradle & Android Manifest Files
         run: |
+          cat << 'EOF' > android-project/gradle.properties
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          android.useAndroidX=true
+          EOF
+
           cat << 'EOF' > android-project/settings.gradle
           pluginManagement {
               repositories {
@@ -120,8 +121,8 @@ jobs:
                   applicationId "com.deentimer.pro"
                   minSdk 24
                   targetSdk 34
-                  versionCode 2
-                  versionName "4.5.0"
+                  versionCode 5
+                  versionName "5.1.0"
               }
               buildTypes {
                   debug {
@@ -137,8 +138,7 @@ jobs:
 
           cat << 'EOF' > android-project/app/src/main/AndroidManifest.xml
           <?xml version="1.0" encoding="utf-8"?>
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-              package="com.deentimer.pro">
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
               <uses-permission android:name="android.permission.INTERNET" />
               <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -166,7 +166,6 @@ jobs:
                       </intent-filter>
                   </activity>
 
-                  <!-- Native Home Screen Cockpit Widget -->
                   <receiver android:name=".PomoWidgetProvider" android:exported="true">
                       <intent-filter>
                           <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -299,13 +298,17 @@ jobs:
           package com.deentimer.pro;
 
           import android.app.Activity;
+          import android.content.ContentValues;
           import android.content.Context;
           import android.content.Intent;
           import android.content.SharedPreferences;
           import android.graphics.Color;
           import android.net.Uri;
+          import android.os.Build;
           import android.os.Bundle;
-          import android.view.View;
+          import android.os.Environment;
+          import android.provider.MediaStore;
+          import android.util.Base64;
           import android.view.Window;
           import android.view.WindowManager;
           import android.webkit.GeolocationPermissions;
@@ -315,6 +318,8 @@ jobs:
           import android.webkit.WebSettings;
           import android.webkit.WebView;
           import android.webkit.WebViewClient;
+          import android.widget.Toast;
+          import java.io.OutputStream;
 
           public class MainActivity extends Activity {
               private WebView webView;
@@ -424,6 +429,27 @@ jobs:
                       prefs.edit().putString("payload", jsonPayload).apply();
                       PomoWidgetProvider.pushUpdateAll(ctx);
                   }
+
+                  @JavascriptInterface
+                  public void saveBase64File(String base64Data, String fileName, String mimeType) {
+                      try {
+                          byte[] bytes = Base64.decode(base64Data, Base64.DEFAULT);
+                          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                              ContentValues values = new ContentValues();
+                              values.put(MediaStore.Downloads.DISPLAY_NAME, fileName);
+                              values.put(MediaStore.Downloads.MIME_TYPE, mimeType);
+                              values.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
+                              Uri uri = ctx.getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+                              if (uri != null) {
+                                  OutputStream os = ctx.getContentResolver().openOutputStream(uri);
+                                  if (os != null) { os.write(bytes); os.close(); }
+                              }
+                          }
+                          runOnUiThread(() -> Toast.makeText(ctx, "Saved to Downloads: " + fileName, Toast.LENGTH_LONG).show());
+                      } catch (Exception e) {
+                          runOnUiThread(() -> Toast.makeText(ctx, "Export failed: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+                      }
+                  }
               }
           }
           EOF
@@ -444,9 +470,9 @@ jobs:
       - name: 10. Publish APK to GitHub Releases (1-Click Download)
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v4.5-latest
-          name: "DeenTimeR & Pomo Reader Pro — Official Android APK"
-          body: "Download **DeenTimeR-Pro.apk** below to install on your Android Tablet or Phone (includes 100% Offline Reader, CRDT Wireless Cloud Sync, Keep-Screen-On Lock & Native Home Screen Widget)."
+          tag_name: v5.1-latest
+          name: "DeenTimeR & Pomo Reader Pro v5.1 — Official Android APK"
+          body: "Download **DeenTimeR-Pro.apk** below to install on your Android Tablet or Phone."
           files: ./DeenTimeR-Pro.apk
           prerelease: false
         env:

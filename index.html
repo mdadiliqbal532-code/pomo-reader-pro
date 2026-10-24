@@ -11,7 +11,7 @@
 
     <!-- Desktop PWA Manifest & App Icon -->
     <link rel="manifest" href="./manifest.json">
-<link rel="icon" type="image/svg+xml" href="./icon.svg">
+    <link rel="icon" type="image/svg+xml" href="./icon.svg">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Crect width='120' height='120' rx='28' fill='%23020617'/%3E%3Ccircle cx='60' cy='64' r='38' fill='none' stroke='%233b82f6' stroke-width='8'/%3E%3Cpath d='M60 42v22l14 10' fill='none' stroke='%23ff4757' stroke-width='8' stroke-linecap='round'/%3E%3Crect x='48' y='14' width='24' height='8' rx='4' fill='%233b82f6'/%3E%3C/svg%3E">
 
     <!-- Master Stylesheet -->
@@ -1200,11 +1200,10 @@
     <!-- ========================================================================= -->
     <!-- MODULAR FEATURE-SLICED SCRIPTS (LOADED IN STRICT ORDER)                   -->
     <!-- ========================================================================= -->
-    <script src="./src/01-core-bus.js"></script>
-    <script src="./src/02-pomo-core.js"></script>
-    <script src="./src/03-vault-rpg.js"></script>
-    <script src="./src/04-reader-pro.js"></script>
-    <script>
+    <script src="./src/01-core-bus.js?v=7.2"></script>
+    <script src="./src/02-pomo-core.js?v=7.2"></script>
+    <script src="./src/03-vault-rpg.js?v=7.2"></script>
+    <script src="./src/04-reader-pro.js?v=7.2"></script>
         if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
             navigator.serviceWorker.register('./sw.js').catch(() => {});
         }

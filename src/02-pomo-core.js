@@ -1867,6 +1867,24 @@ document.querySelectorAll('.repeat-preset-btn').forEach(btn => {
 });
 document.getElementById('rep-int-minus')?.addEventListener('click', () => { customRepInterval = Math.max(1, customRepInterval - 1); document.getElementById('rep-int-val').textContent = customRepInterval; });
 document.getElementById('rep-int-plus')?.addEventListener('click', () => { customRepInterval = Math.min(99, customRepInterval + 1); document.getElementById('rep-int-val').textContent = customRepInterval; });
+document.getElementById('rep-unit-select')?.addEventListener('change', (e) => {
+    const box = document.getElementById('rep-weekdays-box');
+    if (box) {
+        box.classList.toggle('hidden', e.target.value !== 'weeks');
+        box.classList.toggle('flex', e.target.value === 'weeks');
+    }
+});
+document.querySelectorAll('.rep-day-pill').forEach(pill => {
+    pill.addEventListener('click', (e) => {
+        const d = parseInt(e.currentTarget.getAttribute('data-d'));
+        if (customRepDays.includes(d)) customRepDays = customRepDays.filter(x => x !== d);
+        else customRepDays.push(d);
+        const active = customRepDays.includes(d);
+        e.currentTarget.className = active
+            ? "rep-day-pill bg-blue-600 border border-blue-400 text-[10px] font-bold py-1.5 rounded-lg text-white"
+            : "rep-day-pill bg-slate-900 border border-slate-700 text-[10px] font-bold py-1.5 rounded-lg text-slate-400";
+    });
+});
 document.getElementById('apply-custom-repeat-btn')?.addEventListener('click', () => {
     const unit = document.getElementById('rep-unit-select').value;
     applyRepeatRuleSelection({ type: 'custom', interval: customRepInterval, unit, daysOfWeek: [...customRepDays] });

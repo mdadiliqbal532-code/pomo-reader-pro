@@ -200,6 +200,7 @@ document.getElementById('edit-deen-purpose-btn')?.addEventListener('click', () =
 document.getElementById('edit-main-goal-btn')?.addEventListener('click', () => openGoalModal('main-goal'));
 document.getElementById('add-side-goal-btn')?.addEventListener('click', () => openGoalModal('side-add'));
 document.getElementById('close-goal-modal-btn')?.addEventListener('click', () => document.getElementById('goal-date-modal').classList.add('hidden'));
+document.getElementById('clear-goal-date-btn')?.addEventListener('click', () => { if (modalContextMode === 'todo-new-due') { window.newTodoDue = ''; document.getElementById('todo-new-due-label').textContent = 'Due Date'; } else if (modalContextMode === 'todo-detail-due') { const t = todos.find(x => x.id === activeDetailTodoId); if (t) { t.dueDate = ''; document.getElementById('detail-due-status').textContent = 'Not Set'; saveTodos(); renderTodos(); } } document.getElementById('goal-date-modal').classList.add('hidden'); });
 
 document.getElementById('dd-minus-btn')?.addEventListener('click', () => { const m = maxDaysInMonth(pMonth, pYear); pDay = pDay <= 1 ? m : pDay - 1; refreshGoalModalUI(); });
 document.getElementById('dd-plus-btn')?.addEventListener('click', () => { const m = maxDaysInMonth(pMonth, pYear); pDay = pDay >= m ? 1 : pDay + 1; refreshGoalModalUI(); });

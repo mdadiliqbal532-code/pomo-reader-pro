@@ -1,6 +1,8 @@
 /* =========================================================================
-   03-VAULT-RPG.JS — 3-TIER COMPASS, CUSTOM STUDY VAULT & RPG LEVELING ARENA
+   03-VAULT-RPG.JS (v7.2) — 3-TIER COMPASS, INTEGRATED STUDY VAULT & PRO RPG ARENA
    ========================================================================= */
+
+window.showCompletedVaultItems = true;
 
 window.activateVaultSubview = function(mode) {
     const compBtn = document.getElementById('mode-compass-btn');
@@ -31,6 +33,7 @@ window.activateVaultSubview = function(mode) {
         neetBtn.className = "flex-1 bg-purple-600 text-white font-bold py-2 rounded-lg text-xs shadow-md transition-all";
         neetView?.classList.remove('hidden');
         neetView?.classList.add('flex');
+        upgradeVaultAddFormUI();
         renderCustomSubjectBar();
         renderTasks(activeTaskTab);
     }
@@ -200,7 +203,16 @@ document.getElementById('edit-deen-purpose-btn')?.addEventListener('click', () =
 document.getElementById('edit-main-goal-btn')?.addEventListener('click', () => openGoalModal('main-goal'));
 document.getElementById('add-side-goal-btn')?.addEventListener('click', () => openGoalModal('side-add'));
 document.getElementById('close-goal-modal-btn')?.addEventListener('click', () => document.getElementById('goal-date-modal').classList.add('hidden'));
-document.getElementById('clear-goal-date-btn')?.addEventListener('click', () => { if (modalContextMode === 'todo-new-due') { window.newTodoDue = ''; document.getElementById('todo-new-due-label').textContent = 'Due Date'; } else if (modalContextMode === 'todo-detail-due') { const t = todos.find(x => x.id === activeDetailTodoId); if (t) { t.dueDate = ''; document.getElementById('detail-due-status').textContent = 'Not Set'; saveTodos(); renderTodos(); } } document.getElementById('goal-date-modal').classList.add('hidden'); });
+document.getElementById('clear-goal-date-btn')?.addEventListener('click', () => {
+    if (modalContextMode === 'todo-new-due') {
+        window.newTodoDue = '';
+        document.getElementById('todo-new-due-label').textContent = 'Due Date';
+    } else if (modalContextMode === 'todo-detail-due') {
+        const t = todos.find(x => x.id === activeDetailTodoId);
+        if (t) { t.dueDate = ''; document.getElementById('detail-due-status').textContent = 'Not Set'; saveTodos(); renderTodos(); }
+    }
+    document.getElementById('goal-date-modal').classList.add('hidden');
+});
 
 document.getElementById('dd-minus-btn')?.addEventListener('click', () => { const m = maxDaysInMonth(pMonth, pYear); pDay = pDay <= 1 ? m : pDay - 1; refreshGoalModalUI(); });
 document.getElementById('dd-plus-btn')?.addEventListener('click', () => { const m = maxDaysInMonth(pMonth, pYear); pDay = pDay >= m ? 1 : pDay + 1; refreshGoalModalUI(); });
@@ -254,8 +266,29 @@ document.getElementById('save-goal-modal-btn')?.addEventListener('click', () => 
 });
 
 /* =========================================================================
-   2. CUSTOMIZABLE STUDY VAULT SUBJECTS, BACKLOG, REVISION, MCQ & MATRIX
+   2. INTEGRATED STUDY VAULT (DUE DATES, NOTES, ⚡ PROTOCOL/RUN & COMPLETED SECTION)
    ========================================================================= */
+function upgradeVaultAddFormUI() {
+    const form = document.getElementById('task-add-form');
+    if (!form || document.getElementById('vault-new-due-input')) return;
+    const today = getLocalTodayString();
+    const extraRow = document.createElement('div');
+    extraRow.className = "grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1";
+    extraRow.innerHTML = `
+        <div class="flex items-center gap-1.5 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5">
+            <span class="text-[10px] font-bold text-emerald-400 shrink-0">📅 Due:</span>
+            <input type="date" id="vault-new-due-input" value="${today}" class="w-full bg-transparent text-xs font-mono text-white focus:outline-none">
+        </div>
+        <div class="flex items-center gap-1.5 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5">
+            <span class="text-[10px] font-bold text-blue-400 shrink-0">⏱️ Mins:</span>
+            <input type="number" id="vault-new-dur-input" value="45" min="5" max="300" class="w-full bg-transparent text-xs font-mono text-white text-center focus:outline-none">
+        </div>
+        <input type="text" id="vault-new-note-input" placeholder="📝 Add note (e.g. NCERT p.42 / PYQs)..." class="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none">
+    `;
+    form.insertBefore(extraRow, document.getElementById('add-task-btn'));
+}
+upgradeVaultAddFormUI();
+
 window.renderCustomSubjectBar = function() {
     const container = document.getElementById('subject-filter-container');
     if (!container) return;
@@ -355,28 +388,61 @@ document.querySelectorAll('.task-tab').forEach(tab => {
 });
 
 document.getElementById('add-task-btn')?.addEventListener('click', () => {
+    upgradeVaultAddFormUI();
     const titleInput = document.getElementById('task-title-input');
+    const dueInput = document.getElementById('vault-new-due-input');
+    const durInput = document.getElementById('vault-new-dur-input');
+    const noteInput = document.getElementById('vault-new-note-input');
     const title = titleInput.value.trim();
     if (!title) return;
+    const today = getLocalTodayString();
     const tasks = JSON.parse(safeGet('pages_pomodoro_tasks_v8', '[]'));
-    tasks.push({ id: Date.now(), title, subject: activeTaskSubj, type: activeTaskTab, completed: false });
+    tasks.unshift({
+        id: Date.now(),
+        title,
+        subject: activeTaskSubj,
+        type: activeTaskTab,
+        completed: false,
+        createdDate: today,
+        dueDate: dueInput?.value || today,
+        durationMins: parseInt(durInput?.value) || 45,
+        note: noteInput?.value.trim() || ''
+    });
     safeSet('pages_pomodoro_tasks_v8', JSON.stringify(tasks));
     titleInput.value = '';
+    if (noteInput) noteInput.value = '';
     renderTasks(activeTaskTab);
     broadcastToCloud();
+    PomoEventBus.emit('vault:updated');
+    showToast(`📚 Added "${title}" to ${activeTaskSubj} ${activeTaskTab.toUpperCase()}!`);
 });
 
 window.toggleTask = function(id) {
+    haptic(20);
     const tasks = JSON.parse(safeGet('pages_pomodoro_tasks_v8', '[]'));
     const t = tasks.find(x => x.id === id);
-    if (t) { t.completed = !t.completed; safeSet('pages_pomodoro_tasks_v8', JSON.stringify(tasks)); renderTasks(activeTaskTab); broadcastToCloud(); PomoEventBus.emit('vault:updated'); }
+    if (t) {
+        t.completed = !t.completed;
+        if (t.completed) {
+            t.completedDate = getLocalTodayString();
+            if (window.playChime) window.playChime('todo');
+        } else {
+            delete t.completedDate;
+        }
+        safeSet('pages_pomodoro_tasks_v8', JSON.stringify(tasks));
+        renderTasks(activeTaskTab);
+        broadcastToCloud();
+        PomoEventBus.emit('vault:updated');
+    }
 };
+
 window.deleteTask = function(id) {
     let tasks = JSON.parse(safeGet('pages_pomodoro_tasks_v8', '[]'));
     tasks = tasks.filter(x => x.id !== id);
     safeSet('pages_pomodoro_tasks_v8', JSON.stringify(tasks));
     renderTasks(activeTaskTab);
     broadcastToCloud();
+    PomoEventBus.emit('vault:updated');
 };
 
 window.loadMCQInputs = function() {
@@ -408,9 +474,44 @@ document.getElementById('save-mcq-btn')?.addEventListener('click', () => {
     safeSet('pages_pomodoro_mcq_v8', JSON.stringify(mcqs));
     showToast("MCQ Stats Saved");
     broadcastToCloud();
+    PomoEventBus.emit('vault:updated');
 });
 
+function createVaultItemCard(task) {
+    const div = document.createElement('div');
+    div.className = `flex justify-between items-center p-3 rounded-xl border transition-all cursor-pointer ${task.completed ? 'bg-slate-950/60 border-slate-900 opacity-55' : 'bg-slate-900 border-slate-800 hover:border-slate-700'}`;
+    div.onclick = () => window.openProtocolRunModal && window.openProtocolRunModal('vault', task.id);
+
+    const bookBadge = task.bookId
+        ? `<button onclick="event.stopPropagation(); window.openBookAtPage && window.openBookAtPage('${task.bookId}', ${task.page || 1})" class="bg-blue-600/25 text-blue-300 border border-blue-500/40 px-2 py-0.5 rounded-lg text-[10px] font-bold shrink-0">📖 p.${task.page || 1}</button>`
+        : '';
+
+    div.innerHTML = `
+        <div class="flex items-center gap-3 min-w-0 flex-1 pr-2">
+            <button onclick="event.stopPropagation(); toggleTask(${task.id})" class="todo-check-circle ${task.completed ? 'checked' : ''}">${task.completed ? '✓' : ''}</button>
+            <div class="min-w-0 flex-1">
+                <p class="text-xs sm:text-sm font-bold truncate ${task.completed ? 'line-through text-slate-500' : 'text-slate-100'}">${escapeHtml(task.title)}</p>
+                <div class="flex flex-wrap items-center gap-2 mt-0.5">
+                    <span class="text-[10px] text-purple-400 font-bold uppercase">${escapeHtml(task.subject)} • ${escapeHtml(task.type)}</span>
+                    <span class="text-[10px] text-blue-400 font-mono">⏱️ ${task.durationMins || 45}m</span>
+                    ${task.dueDate ? `<span class="text-[10px] text-emerald-400 font-mono">📅 Due ${formatDDMMYYYY(task.dueDate)}</span>` : ''}
+                    ${task.note ? `<span class="text-[10px] text-slate-400 truncate max-w-[180px]">📝 ${escapeHtml(task.note)}</span>` : ''}
+                    ${bookBadge}
+                </div>
+            </div>
+        </div>
+        <div class="flex items-center gap-1.5 shrink-0">
+            <button onclick="event.stopPropagation(); window.openProtocolRunModal && window.openProtocolRunModal('vault', '${task.id}')" class="bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/40 px-2.5 py-1.5 rounded-lg text-[10px] font-extrabold transition-all flex items-center gap-1 shadow" title="Add Duration to Live Protocol or Run Timer Now">
+                <span>⚡</span><span>Protocol / Run</span>
+            </button>
+            <button onclick="event.stopPropagation(); deleteTask(${task.id})" class="text-red-400 hover:text-red-300 px-1.5 py-1 text-xs">🗑️</button>
+        </div>
+    `;
+    return div;
+}
+
 window.renderTasks = function(tab) {
+    upgradeVaultAddFormUI();
     const container = document.getElementById('vault-list-container');
     if (!container) return;
     if (tab === 'matrix') {
@@ -426,35 +527,57 @@ window.renderTasks = function(tab) {
             const rDone = subT.filter(t => t.type === 'revision' && t.completed).length;
             const mData = (mcqs[today] && mcqs[today][subj]) ? mcqs[today][subj] : { t: 0, a: 0, c: 0 };
             const mInc = Math.max(0, mData.a - mData.c);
-            container.innerHTML += `<div class="bg-slate-900 border border-slate-800 rounded-xl p-4 mb-2"><h4 class="text-xs font-bold text-white mb-2 uppercase tracking-widest">${escapeHtml(subj)}</h4><div class="grid grid-cols-2 gap-2 text-center mb-2"><div class="bg-slate-950 rounded-lg p-2"><p class="text-[9px] text-slate-400 uppercase tracking-wider mb-0.5">Backlogs Left</p><p class="text-sm font-bold">${bTot - bDone}</p></div><div class="bg-slate-950 rounded-lg p-2"><p class="text-[9px] text-slate-400 uppercase tracking-wider mb-0.5">Revision Left</p><p class="text-sm font-bold">${rTot - rDone}</p></div></div><div class="bg-slate-950 rounded-lg p-2 text-center flex justify-between"><div class="text-[8px] text-slate-400 uppercase">Tar<br><b class="text-xs text-white">${mData.t}</b></div><div class="text-[8px] text-slate-400 uppercase">Att<br><b class="text-xs text-blue-400">${mData.a}</b></div><div class="text-[8px] text-slate-400 uppercase">Cor<br><b class="text-xs text-emerald-400">${mData.c}</b></div><div class="text-[8px] text-slate-400 uppercase">Wr<br><b class="text-xs text-tomato">${mInc}</b></div></div></div>`;
+            container.innerHTML += `<div class="bg-slate-900 border border-slate-800 rounded-xl p-4 mb-2"><h4 class="text-xs font-bold text-white mb-2 uppercase tracking-widest">${escapeHtml(subj)}</h4><div class="grid grid-cols-2 gap-2 text-center mb-2"><div class="bg-slate-950 rounded-lg p-2"><p class="text-[9px] text-slate-400 uppercase tracking-wider mb-0.5">Backlogs Left</p><p class="text-sm font-bold text-purple-300">${bTot - bDone} <span class="text-[10px] text-emerald-400">(${bDone} ✓)</span></p></div><div class="bg-slate-950 rounded-lg p-2"><p class="text-[9px] text-slate-400 uppercase tracking-wider mb-0.5">Revision Left</p><p class="text-sm font-bold text-amber-300">${rTot - rDone} <span class="text-[10px] text-emerald-400">(${rDone} ✓)</span></p></div></div><div class="bg-slate-950 rounded-lg p-2 text-center flex justify-between"><div class="text-[8px] text-slate-400 uppercase">Tar<br><b class="text-xs text-white">${mData.t}</b></div><div class="text-[8px] text-slate-400 uppercase">Att<br><b class="text-xs text-blue-400">${mData.a}</b></div><div class="text-[8px] text-slate-400 uppercase">Cor<br><b class="text-xs text-emerald-400">${mData.c}</b></div><div class="text-[8px] text-slate-400 uppercase">Wr<br><b class="text-xs text-tomato">${mInc}</b></div></div></div>`;
         });
         return;
     }
     if (tab === 'mcq') return;
+
     container.innerHTML = '';
-    const tasks = JSON.parse(safeGet('pages_pomodoro_tasks_v8', '[]')).filter(t => t.type === tab && t.subject === activeTaskSubj);
-    if (!tasks.length) {
-        container.innerHTML = `<p class="text-slate-500 italic p-4 text-xs text-center">No chapters/topics found in ${escapeHtml(activeTaskSubj)}. Add above or send from Book Reader.</p>`;
+    const allSubjTasks = JSON.parse(safeGet('pages_pomodoro_tasks_v8', '[]')).filter(t => t.type === tab && t.subject === activeTaskSubj);
+    const activeTasks = allSubjTasks.filter(t => !t.completed);
+    const completedTasks = allSubjTasks.filter(t => t.completed);
+
+    if (!activeTasks.length && !completedTasks.length) {
+        container.innerHTML = `<p class="text-slate-500 italic p-4 text-xs text-center bg-slate-900/40 rounded-xl border border-slate-800/50">No ${escapeHtml(tab)} items in ${escapeHtml(activeTaskSubj)}. Add one above or send from Book Reader!</p>`;
         return;
     }
-    tasks.forEach(task => {
-        const div = document.createElement('div');
-        div.className = `flex justify-between items-center p-3 rounded-xl border ${task.completed ? 'bg-slate-950 border-slate-900 opacity-50' : 'bg-slate-900 border-slate-800'}`;
-        const bookBadge = task.bookId ? `<button onclick="event.stopPropagation(); window.openBookAtPage && window.openBookAtPage('${task.bookId}', ${task.page || 1})" class="bg-blue-600/25 text-blue-300 border border-blue-500/40 px-2 py-0.5 rounded-lg text-[10px] font-bold shrink-0">📖 p.${task.page || 1}</button>` : '';
-        div.innerHTML = `
-            <div class="flex items-center gap-2.5 min-w-0 flex-1 pr-2">
-                <button onclick="toggleTask(${task.id})" class="w-5 h-5 rounded-md border flex items-center justify-center shrink-0 ${task.completed ? 'bg-emerald-600 border-emerald-500 text-white' : 'border-slate-700 bg-slate-950'}">${task.completed ? '✓' : ''}</button>
-                <span class="text-xs font-medium truncate ${task.completed ? 'line-through text-slate-500' : 'text-slate-200'}">${escapeHtml(task.title)}</span>
-                ${bookBadge}
-            </div>
-            <button onclick="deleteTask(${task.id})" class="text-red-400 ml-2 text-xs">🗑️</button>
-        `;
-        container.appendChild(div);
-    });
+
+    const activeListDiv = document.createElement('div');
+    activeListDiv.className = "flex flex-col gap-2";
+    if (!activeTasks.length) {
+        activeListDiv.innerHTML = `<p class="text-xs text-emerald-400/80 italic text-center p-3 bg-emerald-950/20 rounded-xl border border-emerald-800/30">🎉 All ${escapeHtml(activeTaskSubj)} ${escapeHtml(tab)} items completed!</p>`;
+    } else {
+        activeTasks.forEach(task => activeListDiv.appendChild(createVaultItemCard(task)));
+    }
+    container.appendChild(activeListDiv);
+
+    // Collapsible Completed Section (Just Like Microsoft To-Do!)
+    if (completedTasks.length > 0) {
+        const compWrapper = document.createElement('div');
+        compWrapper.className = "flex flex-col mt-3 pt-2 border-t border-slate-800/80";
+        const toggleBtn = document.createElement('button');
+        toggleBtn.type = "button";
+        toggleBtn.className = "flex items-center gap-2 text-xs font-bold text-slate-400 py-2 px-1";
+        toggleBtn.innerHTML = `<span>${window.showCompletedVaultItems ? '▼' : '▶'}</span><span>Completed ${escapeHtml(activeTaskSubj)} (${escapeHtml(tab.toUpperCase())})</span><span class="bg-slate-800 text-emerald-400 px-2 py-0.5 rounded-full text-[10px] font-mono">${completedTasks.length}</span>`;
+        toggleBtn.onclick = () => {
+            window.showCompletedVaultItems = !window.showCompletedVaultItems;
+            renderTasks(activeTaskTab);
+        };
+        compWrapper.appendChild(toggleBtn);
+
+        if (window.showCompletedVaultItems) {
+            const compListDiv = document.createElement('div');
+            compListDiv.className = "flex flex-col gap-2 mt-1";
+            completedTasks.forEach(task => compListDiv.appendChild(createVaultItemCard(task)));
+            compWrapper.appendChild(compListDiv);
+        }
+        container.appendChild(compWrapper);
+    }
 };
 
 /* =========================================================================
-   3. PRO-GAMER RPG LEVELING & WORLD RANKING ENGINE (LEVEL 0 TO INFINITY)
+   3. PRO-GAMER RPG LEVELING, WORLD RANKER & PRO DEVELOPER TACTICAL ENGINE
    ========================================================================= */
 const RPG_RANKS = [
     { minLv: 0, title: 'Unranked Novice', badge: '🪨', color: 'text-slate-400' },
@@ -478,21 +601,28 @@ function getDayMetrics(isoDate) {
     const salahCount = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'].filter(p => sMap[p]).length;
     const rLog = JSON.parse(safeGet('pages_pomodoro_reader_log_v1', '{}'));
     const readMins = rLog[isoDate]?.totalMins || 0;
+
+    const vaultTasks = JSON.parse(safeGet('pages_pomodoro_tasks_v8', '[]'));
+    const dayTodosDone = todos.filter(t => t.completed && (t.completedDate === isoDate || (!t.completedDate && t.myDayDate === isoDate))).length;
+    const dayVaultDone = vaultTasks.filter(vt => vt.completed && vt.completedDate === isoDate).length;
+
     const salahXP = (salahCount * 100) + (salahCount === 5 ? 250 : 0);
-    const totalXP = Math.round((studyMins * 10) + (deenMins * 15) + salahXP + (readMins * 12) + (sessions * 40));
-    return { studyMins, deenMins, salahCount, readMins, sessions, totalXP };
+    const totalXP = Math.round((studyMins * 10) + (deenMins * 15) + salahXP + (readMins * 12) + (sessions * 40) + (dayTodosDone * 60) + (dayVaultDone * 90));
+    return { studyMins, deenMins, salahCount, readMins, sessions, dayTodosDone, dayVaultDone, totalXP };
 }
 
 window.calculateLifetimeRPGStats = function() {
     const stats = JSON.parse(safeGet('pages_pomodoro_stats_v8', '{"history":{}}'));
     const rLog = JSON.parse(safeGet('pages_pomodoro_reader_log_v1', '{}'));
     const books = JSON.parse(safeGet('pages_pomodoro_reader_books_v1', '[]'));
+    const vaultTasks = JSON.parse(safeGet('pages_pomodoro_tasks_v8', '[]'));
 
     const allDates = new Set([
         ...Object.keys(stats.history || {}),
         ...Object.keys(deenHistory || {}),
         ...Object.keys(salahHistory || {}),
-        ...Object.keys(rLog)
+        ...Object.keys(rLog),
+        getLocalTodayString()
     ]);
 
     let lifetimeXP = 0, activeDaysCount = 0;
@@ -503,14 +633,15 @@ window.calculateLifetimeRPGStats = function() {
     });
 
     const completedTodos = todos.filter(t => t.completed).length;
-    const completedVault = JSON.parse(safeGet('pages_pomodoro_tasks_v8', '[]')).filter(t => t.completed).length;
+    const completedVault = vaultTasks.filter(t => t.completed).length;
+    const pendingVault = vaultTasks.filter(t => !t.completed).length;
     let totalAnnotations = 0, totalPagesRead = 0;
     books.forEach(b => {
         totalAnnotations += (b.annotations || []).length;
         totalPagesRead += Math.max(0, (b.currentPage || 1) - 1);
     });
 
-    lifetimeXP += (completedTodos * 50) + (completedVault * 80) + (totalAnnotations * 25) + (totalPagesRead * 15);
+    lifetimeXP += (completedTodos * 55) + (completedVault * 95) + (totalAnnotations * 25) + (totalPagesRead * 15);
 
     const level = Math.floor(Math.sqrt(lifetimeXP / 120));
     const currentLevelFloorXP = Math.pow(level, 2) * 120;
@@ -536,15 +667,66 @@ window.calculateLifetimeRPGStats = function() {
 
     const disciplineScore = Math.min(99.9, Math.round(((todayM.studyMins / 480) * 55 + (todayM.salahCount / 5) * 45) * 10) / 10);
     const consistencyScore = Math.min(99.9, Math.round((Math.min(1, activeDaysCount / 30) * 60 + (todayM.totalXP >= yestM.totalXP && todayM.totalXP > 0 ? 40 : 20)) * 10) / 10);
-    const readingScore = Math.min(99.9, Math.round((Math.min(1, (todayM.readMins + totalPagesRead * 2) / 120) * 100) * 10) / 10);
+    const executionScore = Math.min(99.9, Math.round((Math.min(1, (completedTodos + completedVault * 2 + totalPagesRead) / 50) * 100) * 10) / 10);
 
     return {
         lifetimeXP, level, xpIntoLevel, xpNeededForNext, levelPct, rankObj,
         todayM, yestM, xpDelta, pctBetter,
-        disciplineScore, consistencyScore, readingScore,
-        totalPagesRead, totalAnnotations, activeDaysCount
+        disciplineScore, consistencyScore, readingScore: executionScore,
+        totalPagesRead, totalAnnotations, activeDaysCount,
+        completedTodos, completedVault, pendingVault
     };
 };
+
+function generateProDeveloperTacticalSuggestions(rpg) {
+    const vaultTasks = JSON.parse(safeGet('pages_pomodoro_tasks_v8', '[]'));
+    const unfinVault = vaultTasks.filter(t => !t.completed);
+    const unfinImpTodos = todos.filter(t => !t.completed && t.important);
+    const unfinTodayTodos = todos.filter(t => !t.completed && t.myDayDate === getLocalTodayString());
+    const tips = [];
+
+    if (unfinVault.length > 0) {
+        const topV = unfinVault[0];
+        tips.push({
+            badge: `📚 VAULT (${topV.subject})`,
+            text: `You have ${unfinVault.length} active Vault chapters. Launch "${topV.title}" into Live Protocol now for +95 XP!`,
+            btnLabel: `⚡ Run "${topV.title.slice(0, 18)}"`,
+            action: `window.openProtocolRunModal('vault', '${topV.id}')`
+        });
+    }
+    if (unfinImpTodos.length > 0) {
+        const topT = unfinImpTodos[0];
+        tips.push({
+            badge: `⭐ PRIORITY TO-DO`,
+            text: `High-priority task "${topT.title}" is pending. Schedule & run it on the countdown timer!`,
+            btnLabel: `▶️ Run Task`,
+            action: `window.openProtocolRunModal('todo', '${topT.id}')`
+        });
+    } else if (unfinTodayTodos.length > 0) {
+        const topT = unfinTodayTodos[0];
+        tips.push({
+            badge: `☀️ MY DAY TASK`,
+            text: `${unfinTodayTodos.length} task(s) left in My Day. Start "${topT.title}" now to boost your 4-Week Progression curve!`,
+            btnLabel: `⚡ Launch Timer`,
+            action: `window.openProtocolRunModal('todo', '${topT.id}')`
+        });
+    }
+    if (rpg.todayM.salahCount < 5) {
+        tips.push({
+            badge: `🕋 SALAH BONUS`,
+            text: `Complete ${5 - rpg.todayM.salahCount} more Salah today to unlock the +250 XP Perfect 5/5 Imaan Bonus!`,
+            btnLabel: `🕌 Log Salah`,
+            action: `switchPage('page-timer')`
+        });
+    }
+    tips.push({
+        badge: `📊 6M ANALYTICS`,
+        text: `Inspect your 1-Week, 4-Week vs. Earlier 4-Week, and 6-Month completion Line Graph.`,
+        btnLabel: `📈 Open Line Graph`,
+        action: `window.openTodoAnalyticsModal('4w')`
+    });
+    return tips.slice(0, 3);
+}
 
 function updateTopBarRpgBadge() {
     const rpg = calculateLifetimeRPGStats();
@@ -559,6 +741,8 @@ window.renderRpgArena = function() {
     const rpgView = document.getElementById('rpg-arena-subview');
     if (!rpgView) return;
     const rpg = calculateLifetimeRPGStats();
+    const prog = window.computeTodoAndVaultProgression ? window.computeTodoAndVaultProgression() : null;
+    const tacticalTips = generateProDeveloperTacticalSuggestions(rpg);
 
     const last7Days = [];
     for (let i = 6; i >= 0; i--) {
@@ -579,9 +763,9 @@ window.renderRpgArena = function() {
 
     const quests = [
         { title: '🕋 Pray 5/5 Salah on Time', done: rpg.todayM.salahCount >= 5, prog: `${rpg.todayM.salahCount}/5`, reward: '+750 XP' },
-        { title: '⚔️ Beat Yesterday\'s Total XP', done: rpg.todayM.totalXP > rpg.yestM.totalXP && rpg.todayM.totalXP > 0, prog: `${rpg.todayM.totalXP}/${Math.max(100, rpg.yestM.totalXP)} XP`, reward: '+300 XP' },
-        { title: '🧠 Complete 4.0h Deep Study', done: rpg.todayM.studyMins >= 240, prog: `${(rpg.todayM.studyMins / 60).toFixed(1)}/4.0h`, reward: '+400 XP' },
-        { title: '📖 Read Books for 30 Mins', done: rpg.todayM.readMins >= 30, prog: `${rpg.todayM.readMins}/30m`, reward: '+360 XP' }
+        { title: '☑️ Complete 3 To-Do / Study Vault Tasks', done: (rpg.todayM.dayTodosDone + rpg.todayM.dayVaultDone) >= 3, prog: `${rpg.todayM.dayTodosDone + rpg.todayM.dayVaultDone}/3`, reward: '+350 XP' },
+        { title: '🧠 Complete 4.0h Deep Study on Timer', done: rpg.todayM.studyMins >= 240, prog: `${(rpg.todayM.studyMins / 60).toFixed(1)}/4.0h`, reward: '+400 XP' },
+        { title: '⚔️ Beat Yesterday\'s Total XP', done: rpg.todayM.totalXP > rpg.yestM.totalXP && rpg.todayM.totalXP > 0, prog: `${rpg.todayM.totalXP}/${Math.max(100, rpg.yestM.totalXP)} XP`, reward: '+300 XP' }
     ];
 
     rpgView.innerHTML = `
@@ -593,14 +777,17 @@ window.renderRpgArena = function() {
                         <span class="text-[10px] font-mono font-extrabold text-blue-400 mt-1">LV.${rpg.level}</span>
                     </div>
                     <div>
-                        <span class="text-[10px] font-extrabold uppercase tracking-widest bg-blue-500/20 text-blue-300 px-2.5 py-0.5 rounded-full border border-blue-500/30">Global Player Progression (Lv.0 → ∞)</span>
+                        <span class="text-[10px] font-extrabold uppercase tracking-widest bg-blue-500/20 text-blue-300 px-2.5 py-0.5 rounded-full border border-blue-500/30">Integrated Timer • To-Do • Study Vault Ranker</span>
                         <h3 class="text-lg sm:text-xl font-extrabold ${rpg.rankObj.color} mt-1">${rpg.rankObj.title}</h3>
-                        <p class="text-xs text-slate-400 font-mono">Lifetime Score: <b class="text-white">${rpg.lifetimeXP.toLocaleString()} XP</b> • Active Days: <b class="text-emerald-400">${rpg.activeDaysCount}d</b></p>
+                        <p class="text-xs text-slate-400 font-mono">Lifetime: <b class="text-white">${rpg.lifetimeXP.toLocaleString()} XP</b> • ☑️ <b class="text-blue-400">${rpg.completedTodos} To-Do</b> • 📚 <b class="text-purple-400">${rpg.completedVault} Vault</b></p>
                     </div>
                 </div>
-                <div class="text-right bg-slate-950/90 border border-slate-800 px-4 py-2.5 rounded-2xl">
-                    <p class="text-[10px] font-bold uppercase text-slate-400">Global Standing</p>
-                    <p class="text-base font-mono font-extrabold text-amber-400">Top ${(100 - Math.min(99.8, (rpg.disciplineScore + rpg.consistencyScore + rpg.readingScore) / 3)).toFixed(1)}% Worldwide</p>
+                <div class="flex flex-col items-end gap-1.5">
+                    <div class="text-right bg-slate-950/90 border border-slate-800 px-4 py-2 rounded-2xl">
+                        <p class="text-[10px] font-bold uppercase text-slate-400">Global Standing</p>
+                        <p class="text-base font-mono font-extrabold text-amber-400">Top ${(100 - Math.min(99.8, (rpg.disciplineScore + rpg.consistencyScore + rpg.readingScore) / 3)).toFixed(1)}% Worldwide</p>
+                    </div>
+                    <button type="button" onclick="window.openTodoAnalyticsModal('4w')" class="bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-extrabold px-3 py-1.5 rounded-xl shadow">📈 Open 1W / 4W / 6M Line Graph</button>
                 </div>
             </div>
             <div>
@@ -614,6 +801,25 @@ window.renderRpgArena = function() {
             </div>
         </div>
 
+        <!-- PRO DEVELOPER TACTICAL ENGINE (1-CLICK ACTION SUGGESTIONS) -->
+        <div class="bg-slate-900 border border-cyan-500/40 rounded-2xl p-4 flex flex-col gap-2.5 shadow-lg">
+            <div class="flex items-center justify-between">
+                <span class="text-[10px] font-extrabold uppercase tracking-widest text-cyan-400">🧠 Pro Developer Tactical Engine — Next Best Actions</span>
+                ${prog ? `<span class="text-[10px] font-mono text-emerald-400">4W Velocity: ${prog.week4.totalItems} items (${prog.delta4W >= 0 ? '+' : ''}${prog.pctGrowth4W}%)</span>` : ''}
+            </div>
+            <div class="grid grid-cols-1 gap-2">
+                ${tacticalTips.map(t => `
+                    <div class="flex flex-wrap items-center justify-between gap-2 bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+                        <div class="min-w-0 flex-1">
+                            <span class="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-700/50">${t.badge}</span>
+                            <p class="text-xs text-slate-200 font-medium mt-1">${escapeHtml(t.text)}</p>
+                        </div>
+                        <button type="button" onclick="${t.action}" class="bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-extrabold px-3 py-2 rounded-xl shrink-0 shadow active:scale-95">${t.btnLabel}</button>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+
         <div class="bg-gradient-to-r ${deltaBannerColor} border rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-lg">
             <div>
                 <span class="text-[10px] font-extrabold uppercase tracking-widest opacity-80">⚡ Day-by-Day Progression (Today vs. Yesterday)</span>
@@ -623,7 +829,7 @@ window.renderRpgArena = function() {
                         : `⚔️ ${Math.abs(rpg.xpDelta)} XP needed to beat Yesterday's score (${Math.ceil(Math.abs(rpg.xpDelta) / 10)}m of Study to overtake!)`}
                 </h4>
                 <p class="text-xs text-slate-300 mt-1 font-mono">
-                    Today: <b>${rpg.todayM.totalXP} XP</b> (${(rpg.todayM.studyMins/60).toFixed(1)}h Study • ${rpg.todayM.readMins}m Read • ${rpg.todayM.salahCount}/5 Salah)
+                    Today: <b>${rpg.todayM.totalXP} XP</b> (${(rpg.todayM.studyMins/60).toFixed(1)}h Study • ${rpg.todayM.dayTodosDone} To-Do • ${rpg.todayM.dayVaultDone} Vault • ${rpg.todayM.salahCount}/5 Salah)
                     &nbsp;|&nbsp; Yesterday: <b>${rpg.yestM.totalXP} XP</b>
                 </p>
             </div>
@@ -641,9 +847,9 @@ window.renderRpgArena = function() {
                 <p class="text-[10px] text-slate-400 mt-1.5">Active Days (${rpg.activeDaysCount}d) & Daily Momentum</p>
             </div>
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3.5">
-                <div class="flex justify-between items-center mb-1.5"><span class="text-xs font-extrabold text-amber-400">📖 Scholar & Reading</span><span class="text-xs font-mono font-extrabold text-white">${rpg.readingScore}%</span></div>
+                <div class="flex justify-between items-center mb-1.5"><span class="text-xs font-extrabold text-amber-400">📚 Vault & To-Do Mastery</span><span class="text-xs font-mono font-extrabold text-white">${rpg.readingScore}%</span></div>
                 <div class="w-full h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800"><div class="h-full bg-amber-500 rounded-full" style="width:${rpg.readingScore}%"></div></div>
-                <p class="text-[10px] text-slate-400 mt-1.5">${rpg.totalPagesRead} Pages Read • ${rpg.totalAnnotations} Notes/Highlights</p>
+                <p class="text-[10px] text-slate-400 mt-1.5">${rpg.completedVault} Vault Cleared • ${rpg.completedTodos} Tasks • ${rpg.totalPagesRead}p Read</p>
             </div>
         </div>
 
@@ -666,7 +872,6 @@ window.renderRpgArena = function() {
     `;
 };
 
-// Listen to Event Bus for automatic RPG & Compass updates
 PomoEventBus.on('stats:updated', updateTopBarRpgBadge);
 PomoEventBus.on('todos:updated', updateTopBarRpgBadge);
 PomoEventBus.on('vault:updated', updateTopBarRpgBadge);
@@ -674,5 +879,7 @@ PomoEventBus.on('reader:updated', updateTopBarRpgBadge);
 PomoEventBus.on('reading:minuteLogged', updateTopBarRpgBadge);
 
 renderCompassView();
+upgradeVaultAddFormUI();
 renderCustomSubjectBar();
+renderTasks(activeTaskTab);
 updateTopBarRpgBadge();

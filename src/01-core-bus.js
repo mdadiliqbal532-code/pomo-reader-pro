@@ -245,3 +245,73 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
         window.showToast("❌ Incorrect Passcode", true);
     }
 });
+
+// 6. WINDOWS DESKTOP NATIVE PERMISSIONS & OS NOTIFICATION ENGINE
+(function initDesktopNativeOS() {
+    // Ensure Continue Reading Widget hides in Stealth/Dim Mode even before CSS cache refreshes
+    const st = document.createElement('style');
+    st.textContent = `body.dim-mode #home-reader-widget-card { display: none !important; }`;
+    document.head.appendChild(st);
+
+    window.sendDesktopNotification = function(title, body, tag = 'pomo-os') {
+        try {
+            if ('Notification' in window && Notification.permission === 'granted') {
+                const n = new Notification(title, {
+                    body,
+                    icon: './icon.svg',
+                    badge: './icon.svg',
+                    tag,
+                    requireInteraction: false
+                });
+                n.onclick = () => { window.focus(); n.close(); };
+            }
+        } catch (e) {}
+    };
+
+    window.requestAllDesktopPermissions = async function(interactive = true) {
+        const grantedList = [];
+        try {
+            if ('Notification' in window) {
+                const np = await Notification.requestPermission();
+                if (np === 'granted') grantedList.push('Notifications');
+            }
+        } catch (e) {}
+        try {
+            if (navigator.storage && navigator.storage.persist) {
+                const sp = await navigator.storage.persist();
+                if (sp) grantedList.push('AppData Lock');
+            }
+        } catch (e) {}
+        try {
+            await window.enforceKeepScreenOn();
+            grantedList.push('WakeLock');
+        } catch (e) {}
+
+        updateDesktopPermBtnUI();
+        if (interactive) {
+            window.showToast(`🖥️ Desktop Permissions Active: ${grantedList.join(' • ') || 'Ready'}`);
+            window.sendDesktopNotification("⚡ DeenTimeR Pro Desktop OS", "All Windows Desktop notifications & background locks are active!");
+        }
+    };
+
+    function updateDesktopPermBtnUI() {
+        const btn = document.getElementById('desktop-perm-top-btn');
+        if (!btn) return;
+        const isGranted = ('Notification' in window && Notification.permission === 'granted');
+        btn.className = isGranted
+            ? "bg-slate-900/90 hover:bg-slate-800 text-cyan-400 border border-cyan-500/40 px-2.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1 active:scale-95"
+            : "bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/50 px-2.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1 animate-pulse active:scale-95";
+        btn.innerHTML = isGranted ? `<span>🔔</span><span class="hidden md:inline text-[10px]">OS Ready</span>` : `<span>🔔</span><span class="hidden md:inline text-[10px]">Allow Alerts</span>`;
+        btn.title = isGranted ? "Windows Desktop Notifications & Permissions Active (Click to Test)" : "Click to Allow All Windows Desktop Notifications & Permissions";
+    }
+
+    const leftHeaderGrp = document.getElementById('dim-toggle-btn')?.parentElement;
+    if (leftHeaderGrp && !document.getElementById('desktop-perm-top-btn')) {
+        const permBtn = document.createElement('button');
+        permBtn.type = 'button';
+        permBtn.id = 'desktop-perm-top-btn';
+        permBtn.onclick = () => window.requestAllDesktopPermissions(true);
+        leftHeaderGrp.appendChild(permBtn);
+        updateDesktopPermBtnUI();
+    }
+})();

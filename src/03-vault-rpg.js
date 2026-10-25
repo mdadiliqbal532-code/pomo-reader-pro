@@ -1,8 +1,13 @@
 /* =========================================================================
-   03-VAULT-RPG.JS (v8.0) — 3-TIER COMPASS, INTEGRATED STUDY VAULT & PRO RPG ARENA
+   03-VAULT-RPG.JS (v9.0) — 3-TIER COMPASS, 5-WAY SYNC, OVERTIME GUARDRAIL,
+   OMNI-BENTO WIDGETS, ADVANCED PROFILE ANALYTICS & PRO-GAMER RPG ARENA
    ========================================================================= */
 
 window.showCompletedVaultItems = true;
+window.overtimeExtensionMins = 0;
+window.lastOvertimeWarnStage = 0;
+window.isPureCountUpMode = false;
+window.pureCountUpSeconds = 0;
 
 window.activateVaultSubview = function(mode) {
     const compBtn = document.getElementById('mode-compass-btn');
@@ -12,8 +17,8 @@ window.activateVaultSubview = function(mode) {
     const neetView = document.getElementById('neet-vault-subview');
     const rpgView = document.getElementById('rpg-arena-subview');
 
-    compBtn.className = "flex-1 bg-transparent text-slate-400 font-bold py-2 rounded-lg text-xs transition-all";
-    neetBtn.className = "flex-1 bg-transparent text-slate-400 font-bold py-2 rounded-lg text-xs transition-all";
+    if (compBtn) compBtn.className = "flex-1 bg-transparent text-slate-400 font-bold py-2 rounded-lg text-xs transition-all";
+    if (neetBtn) neetBtn.className = "flex-1 bg-transparent text-slate-400 font-bold py-2 rounded-lg text-xs transition-all";
     if (rpgBtn) rpgBtn.className = "flex-1 bg-transparent text-amber-400 font-bold py-2 rounded-lg text-xs transition-all";
 
     compView?.classList.add('hidden');
@@ -21,7 +26,7 @@ window.activateVaultSubview = function(mode) {
     rpgView?.classList.add('hidden');
 
     if (mode === 'compass') {
-        compBtn.className = "flex-1 bg-emerald-600 text-white font-bold py-2 rounded-lg text-xs shadow-md transition-all";
+        if (compBtn) compBtn.className = "flex-1 bg-emerald-600 text-white font-bold py-2 rounded-lg text-xs shadow-md transition-all";
         compView?.classList.remove('hidden');
         renderCompassView();
     } else if (mode === 'rpg') {
@@ -30,7 +35,7 @@ window.activateVaultSubview = function(mode) {
         rpgView?.classList.add('flex');
         renderRpgArena();
     } else {
-        neetBtn.className = "flex-1 bg-purple-600 text-white font-bold py-2 rounded-lg text-xs shadow-md transition-all";
+        if (neetBtn) neetBtn.className = "flex-1 bg-purple-600 text-white font-bold py-2 rounded-lg text-xs shadow-md transition-all";
         neetView?.classList.remove('hidden');
         neetView?.classList.add('flex');
         upgradeVaultAddFormUI();
@@ -114,41 +119,46 @@ window.deleteSideGoal = function(idx) {
     showToast("Side Goal Removed");
 };
 
-let modalContextMode = 'main-goal', modalEditIndex = -1;
-let pDay = 15, pMonth = 5, pYear = 2027, pDaysBuffer = "210", numpadFreshOpen = true;
+window.modalContextMode = 'main-goal';
+window.modalEditIndex = -1;
+window.pDay = 15;
+window.pMonth = 5;
+window.pYear = 2027;
+window.pDaysBuffer = "210";
+window.numpadFreshOpen = true;
 
 function maxDaysInMonth(m, y) { return new Date(y, m, 0).getDate(); }
 
 function refreshGoalModalUI() {
-    const maxD = maxDaysInMonth(pMonth, pYear);
-    if (pDay > maxD) pDay = maxD;
-    const iso = `${pYear}-${String(pMonth).padStart(2, '0')}-${String(pDay).padStart(2, '0')}`;
+    const maxD = maxDaysInMonth(window.pMonth, window.pYear);
+    if (window.pDay > maxD) window.pDay = maxD;
+    const iso = `${window.pYear}-${String(window.pMonth).padStart(2, '0')}-${String(window.pDay).padStart(2, '0')}`;
     const daysLeft = Math.max(0, calcDaysRemaining(iso));
-    document.getElementById('picker-dd-val').textContent = String(pDay).padStart(2, '0');
-    document.getElementById('picker-mm-val').textContent = String(pMonth).padStart(2, '0');
-    document.getElementById('picker-yy-val').textContent = String(pYear);
-    document.getElementById('modal-live-date-badge').textContent = `${String(pDay).padStart(2, '0')}/${String(pMonth).padStart(2, '0')}/${pYear}`;
+    document.getElementById('picker-dd-val').textContent = String(window.pDay).padStart(2, '0');
+    document.getElementById('picker-mm-val').textContent = String(window.pMonth).padStart(2, '0');
+    document.getElementById('picker-yy-val').textContent = String(window.pYear);
+    document.getElementById('modal-live-date-badge').textContent = `${String(window.pDay).padStart(2, '0')}/${String(window.pMonth).padStart(2, '0')}/${window.pYear}`;
     document.getElementById('picker-days-display').textContent = daysLeft;
-    document.getElementById('modal-goal-smart-suggestion').textContent = getSmartGoalSuggestion(daysLeft, modalContextMode === 'main-goal');
+    document.getElementById('modal-goal-smart-suggestion').textContent = getSmartGoalSuggestion(daysLeft, window.modalContextMode === 'main-goal');
 }
 
 function syncPickerFromISO(isoStr) {
     const parts = (isoStr || addDaysToTodayISO(30)).split('-').map(Number);
-    pYear = parts[0] || 2027; pMonth = parts[1] || 5; pDay = parts[2] || 15;
-    pDaysBuffer = String(Math.max(0, calcDaysRemaining(`${pYear}-${String(pMonth).padStart(2, '0')}-${String(pDay).padStart(2, '0')}`)));
+    window.pYear = parts[0] || 2027; window.pMonth = parts[1] || 5; window.pDay = parts[2] || 15;
+    window.pDaysBuffer = String(Math.max(0, calcDaysRemaining(`${window.pYear}-${String(window.pMonth).padStart(2, '0')}-${String(window.pDay).padStart(2, '0')}`)));
     refreshGoalModalUI();
 }
 
 function syncPickerFromDays(daysInt) {
     const iso = addDaysToTodayISO(Math.max(0, Math.min(9999, parseInt(daysInt) || 0)));
     const [y, m, d] = iso.split('-').map(Number);
-    pYear = y; pMonth = m; pDay = d;
+    window.pYear = y; window.pMonth = m; window.pDay = d;
     refreshGoalModalUI();
 }
 
 window.openGoalModal = function(mode, idx = -1) {
-    modalContextMode = mode;
-    modalEditIndex = idx;
+    window.modalContextMode = mode;
+    window.modalEditIndex = idx;
     const titleWrap = document.getElementById('goal-title-wrapper');
     const descWrap = document.getElementById('goal-desc-wrapper');
     const dateSection = document.getElementById('goal-date-picker-section');
@@ -204,92 +214,83 @@ document.getElementById('edit-main-goal-btn')?.addEventListener('click', () => o
 document.getElementById('add-side-goal-btn')?.addEventListener('click', () => openGoalModal('side-add'));
 document.getElementById('close-goal-modal-btn')?.addEventListener('click', () => document.getElementById('goal-date-modal').classList.add('hidden'));
 document.getElementById('clear-goal-date-btn')?.addEventListener('click', () => {
-    if (modalContextMode === 'todo-new-due') {
+    if (window.modalContextMode === 'todo-new-due') {
         window.newTodoDue = '';
         document.getElementById('todo-new-due-label').textContent = 'Due Date';
-    } else if (modalContextMode === 'todo-detail-due') {
+    } else if (window.modalContextMode === 'todo-detail-due') {
         const t = todos.find(x => String(x.id) === String(activeDetailTodoId));
         if (t) { t.dueDate = ''; document.getElementById('detail-due-status').textContent = 'Not Set'; saveTodos(); renderTodos(); }
     }
     document.getElementById('goal-date-modal').classList.add('hidden');
 });
 
-document.getElementById('dd-minus-btn')?.addEventListener('click', () => { const m = maxDaysInMonth(pMonth, pYear); pDay = pDay <= 1 ? m : pDay - 1; refreshGoalModalUI(); });
-document.getElementById('dd-plus-btn')?.addEventListener('click', () => { const m = maxDaysInMonth(pMonth, pYear); pDay = pDay >= m ? 1 : pDay + 1; refreshGoalModalUI(); });
-document.getElementById('mm-minus-btn')?.addEventListener('click', () => { pMonth = pMonth <= 1 ? 12 : pMonth - 1; refreshGoalModalUI(); });
-document.getElementById('mm-plus-btn')?.addEventListener('click', () => { pMonth = pMonth >= 12 ? 1 : pMonth + 1; refreshGoalModalUI(); });
-document.getElementById('yy-minus-btn')?.addEventListener('click', () => { pYear = Math.max(2025, pYear - 1); refreshGoalModalUI(); });
-document.getElementById('yy-plus-btn')?.addEventListener('click', () => { pYear = Math.min(2045, pYear + 1); refreshGoalModalUI(); });
+document.getElementById('dd-minus-btn')?.addEventListener('click', () => { const m = maxDaysInMonth(window.pMonth, window.pYear); window.pDay = window.pDay <= 1 ? m : window.pDay - 1; refreshGoalModalUI(); });
+document.getElementById('dd-plus-btn')?.addEventListener('click', () => { const m = maxDaysInMonth(window.pMonth, window.pYear); window.pDay = window.pDay >= m ? 1 : window.pDay + 1; refreshGoalModalUI(); });
+document.getElementById('mm-minus-btn')?.addEventListener('click', () => { window.pMonth = window.pMonth <= 1 ? 12 : window.pMonth - 1; refreshGoalModalUI(); });
+document.getElementById('mm-plus-btn')?.addEventListener('click', () => { window.pMonth = window.pMonth >= 12 ? 1 : window.pMonth + 1; refreshGoalModalUI(); });
+document.getElementById('yy-minus-btn')?.addEventListener('click', () => { window.pYear = Math.max(2025, window.pYear - 1); refreshGoalModalUI(); });
+document.getElementById('yy-plus-btn')?.addEventListener('click', () => { window.pYear = Math.min(2045, window.pYear + 1); refreshGoalModalUI(); });
 
 document.querySelectorAll('.days-numpad-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
         const key = e.currentTarget.getAttribute('data-key');
-        if (key === 'CLR') { pDaysBuffer = '0'; numpadFreshOpen = false; }
-        else if (key === 'BS') { pDaysBuffer = pDaysBuffer.length > 1 ? pDaysBuffer.slice(0, -1) : '0'; numpadFreshOpen = false; }
+        if (key === 'CLR') { window.pDaysBuffer = '0'; window.numpadFreshOpen = false; }
+        else if (key === 'BS') { window.pDaysBuffer = window.pDaysBuffer.length > 1 ? window.pDaysBuffer.slice(0, -1) : '0'; window.numpadFreshOpen = false; }
         else {
-            if (numpadFreshOpen || pDaysBuffer === '0') { pDaysBuffer = key; numpadFreshOpen = false; }
-            else if (pDaysBuffer.length < 4) pDaysBuffer += key;
+            if (window.numpadFreshOpen || window.pDaysBuffer === '0') { window.pDaysBuffer = key; window.numpadFreshOpen = false; }
+            else if (window.pDaysBuffer.length < 4) window.pDaysBuffer += key;
         }
-        syncPickerFromDays(parseInt(pDaysBuffer) || 0);
+        syncPickerFromDays(parseInt(window.pDaysBuffer) || 0);
     });
 });
 
 document.getElementById('save-goal-modal-btn')?.addEventListener('click', () => {
-    const iso = `${pYear}-${String(pMonth).padStart(2, '0')}-${String(pDay).padStart(2, '0')}`;
+    const iso = `${window.pYear}-${String(window.pMonth).padStart(2, '0')}-${String(window.pDay).padStart(2, '0')}`;
     const titleVal = document.getElementById('modal-goal-title-input').value.trim();
     const descVal = document.getElementById('modal-goal-desc-input').value.trim();
 
-    if (modalContextMode === 'main-goal') {
+    if (window.modalContextMode === 'main-goal') {
         extConfig.mainGoal.title = titleVal || "Primary Life & Academic Goal";
         extConfig.mainGoal.targetDate = iso;
         saveExtConfig(); renderHomeHUD(); renderCompassView(); broadcastToCloud();
-    } else if (modalContextMode === 'side-add') {
+    } else if (window.modalContextMode === 'side-add') {
         extConfig.sideGoals.push({ id: Date.now(), title: titleVal || `Side Milestone #${extConfig.sideGoals.length + 1}`, targetDate: iso });
         saveExtConfig(); renderCompassView(); broadcastToCloud();
-    } else if (modalContextMode === 'side-edit' && extConfig.sideGoals[modalEditIndex]) {
-        extConfig.sideGoals[modalEditIndex].title = titleVal || extConfig.sideGoals[modalEditIndex].title;
-        extConfig.sideGoals[modalEditIndex].targetDate = iso;
+    } else if (window.modalContextMode === 'side-edit' && extConfig.sideGoals[window.modalEditIndex]) {
+        extConfig.sideGoals[window.modalEditIndex].title = titleVal || extConfig.sideGoals[window.modalEditIndex].title;
+        extConfig.sideGoals[window.modalEditIndex].targetDate = iso;
         saveExtConfig(); renderCompassView(); broadcastToCloud();
-    } else if (modalContextMode === 'deen-purpose') {
+    } else if (window.modalContextMode === 'deen-purpose') {
         extConfig.deenPurpose.title = titleVal || "🕌 Strengthen Deen & Imaan";
         extConfig.deenPurpose.desc = descVal || "Follow the Islamic path for my entire life.";
         saveExtConfig(); renderCompassView(); broadcastToCloud();
-    } else if (modalContextMode === 'todo-new-due') {
+    } else if (window.modalContextMode === 'todo-new-due') {
         window.newTodoDue = iso;
         document.getElementById('todo-new-due-label').textContent = formatDDMMYYYY(iso);
-    } else if (modalContextMode === 'todo-detail-due') {
+    } else if (window.modalContextMode === 'todo-detail-due') {
         const t = todos.find(x => String(x.id) === String(activeDetailTodoId));
         if (t) { t.dueDate = iso; document.getElementById('detail-due-status').textContent = formatDDMMYYYY(iso); saveTodos(); renderTodos(); }
     }
-    numpadFreshOpen = true;
+    window.numpadFreshOpen = true;
     document.getElementById('goal-date-modal').classList.add('hidden');
 });
 
 /* =========================================================================
-   2. INTEGRATED STUDY VAULT (DUE DATES, NOTES, ⚡ PROTOCOL/RUN & COMPLETED SECTION)
+   2. INTEGRATED STUDY VAULT (AUTO TO-DO MIRRORING, REMINDERS & COMPLETED SECTION)
    ========================================================================= */
 function upgradeVaultAddFormUI() {
     const dueInp = document.getElementById('vault-new-due-input');
     if (dueInp && !dueInp.value) {
         dueInp.value = getLocalTodayString();
     }
-    const form = document.getElementById('task-add-form');
-    if (!form || document.getElementById('vault-new-due-input')) return;
-    const today = getLocalTodayString();
-    const extraRow = document.createElement('div');
-    extraRow.className = "grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1";
-    extraRow.innerHTML = `
-        <div class="flex items-center gap-1.5 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5">
-            <span class="text-[10px] font-bold text-emerald-400 shrink-0">📅 Due:</span>
-            <input type="date" id="vault-new-due-input" value="${today}" class="w-full bg-transparent text-xs font-mono text-white focus:outline-none">
-        </div>
-        <div class="flex items-center gap-1.5 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5">
-            <span class="text-[10px] font-bold text-blue-400 shrink-0">⏱️ Mins:</span>
-            <input type="number" id="vault-new-dur-input" value="45" min="5" max="300" class="w-full bg-transparent text-xs font-mono text-white text-center focus:outline-none">
-        </div>
-        <input type="text" id="vault-new-note-input" placeholder="📝 Add note (e.g. NCERT p.42 / PYQs)..." class="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none">
-    `;
-    form.insertBefore(extraRow, document.getElementById('add-task-btn'));
+    // Add Reminder Clock Input to To-Do Bar if not yet present
+    const todoBar = document.getElementById('todo-pick-due-btn')?.parentElement;
+    if (todoBar && !document.getElementById('todo-new-rem-time')) {
+        const remWrap = document.createElement('div');
+        remWrap.className = "inline-flex items-center gap-1 bg-slate-950 text-amber-300 border border-slate-800 px-2 py-0.5 rounded-lg text-[11px] font-semibold";
+        remWrap.innerHTML = `<span>⏰</span><input type="time" id="todo-new-rem-time" class="bg-transparent text-[11px] font-mono text-amber-300 focus:outline-none" title="Set Reminder Notification Time">`;
+        todoBar.appendChild(remWrap);
+    }
 }
 upgradeVaultAddFormUI();
 
@@ -391,6 +392,7 @@ document.querySelectorAll('.task-tab').forEach(tab => {
     });
 });
 
+// Create Study Vault Item + Automatically Mirror to To-Do List!
 function createNewVaultTaskObject() {
     upgradeVaultAddFormUI();
     const titleInput = document.getElementById('task-title-input');
@@ -403,20 +405,48 @@ function createNewVaultTaskObject() {
         return null;
     }
     const today = getLocalTodayString();
+    const vaultId = Date.now();
+    const todoMirrorId = vaultId + 1;
+    const durMins = Math.max(5, parseInt(durInput?.value) || 45);
+    const dueIso = dueInput?.value || today;
+    const noteStr = (noteInput?.value || '').trim();
+    const vType = activeTaskTab === 'revision' ? 'revision' : 'backlog';
+
     const tasks = JSON.parse(safeGet('pages_pomodoro_tasks_v8', '[]'));
     const newItem = {
-        id: Date.now(),
+        id: vaultId,
+        linkedTodoId: todoMirrorId,
         title,
         subject: activeTaskSubj,
-        type: activeTaskTab === 'revision' ? 'revision' : 'backlog',
+        type: vType,
         completed: false,
         createdDate: today,
-        dueDate: dueInput?.value || today,
-        durationMins: Math.max(5, parseInt(durInput?.value) || 45),
-        note: (noteInput?.value || '').trim()
+        dueDate: dueIso,
+        durationMins: durMins,
+        note: noteStr
     };
     tasks.unshift(newItem);
     safeSet('pages_pomodoro_tasks_v8', JSON.stringify(tasks));
+
+    // Auto-Mirror into Microsoft To-Do so Vault & To-Do stay 100% integrated
+    todos.unshift({
+        id: todoMirrorId,
+        linkedVaultId: vaultId,
+        title: `📚 [${activeTaskSubj} • ${vType.toUpperCase()}] ${title}`,
+        completed: false,
+        important: vType === 'backlog',
+        myDayDate: today,
+        createdDate: today,
+        dueDate: dueIso,
+        durationMins: durMins,
+        repeat: { type: 'none' },
+        steps: [],
+        note: noteStr,
+        listId: 'tasks'
+    });
+    saveTodos();
+    renderTodos();
+
     if (titleInput) titleInput.value = '';
     if (noteInput) noteInput.value = '';
     renderTasks(activeTaskTab);
@@ -427,7 +457,7 @@ function createNewVaultTaskObject() {
 
 document.getElementById('add-task-btn')?.addEventListener('click', () => {
     const created = createNewVaultTaskObject();
-    if (created) showToast(`📚 Added "${created.title}" to ${created.subject} ${created.type.toUpperCase()}!`);
+    if (created) showToast(`📚 Added "${created.title}" to Vault & synced to To-Do!`);
 });
 
 document.getElementById('add-and-run-vault-btn')?.addEventListener('click', () => {
@@ -440,27 +470,153 @@ document.getElementById('add-and-run-vault-btn')?.addEventListener('click', () =
 document.getElementById('task-title-input')?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
         const created = createNewVaultTaskObject();
-        if (created) showToast(`📚 Added "${created.title}" to ${created.subject} ${created.type.toUpperCase()}!`);
+        if (created) showToast(`📚 Added "${created.title}" to Vault & synced to To-Do!`);
     }
 });
 
+/* =========================================================================
+   3. CLOSED-LOOP 5-WAY BI-DIRECTIONAL SYNC ENGINE
+      (Timer <-> Plan <-> To-Do <-> Study Vault <-> Profile Stats)
+   ========================================================================= */
+window.recordOvertimeToStatsLedger = function(extraMins) {
+    if (!extraMins || extraMins <= 0) return;
+    const today = getLocalTodayString();
+    const stats = JSON.parse(safeGet('pages_pomodoro_stats_v8', '{"history":{}}'));
+    if (!stats.history[today]) stats.history[today] = { mins: 0, sessions: 0, overtimeMins: 0 };
+    stats.history[today].overtimeMins = (stats.history[today].overtimeMins || 0) + extraMins;
+    safeSet('pages_pomodoro_stats_v8', JSON.stringify(stats));
+};
+
+// Helper: If user checks off a To-Do or Study Vault item, stop/complete its linked Timer or Live Protocol block!
+window.syncCompletionToTimerAndProtocol = function(sourceType, itemId, isNowCompleted) {
+    if (!isNowCompleted) return { usedMins: 0, plannedMins: 0, overtimeMins: 0 };
+    const today = getLocalTodayString();
+    let matchedIdx = -1;
+
+    schedule.forEach((blk, idx) => {
+        if (blk.status === 'completed') return;
+        if (sourceType === 'todo' && String(blk.linkedTodoId) === String(itemId)) matchedIdx = idx;
+        if (sourceType === 'vault' && String(blk.linkedVaultId) === String(itemId)) matchedIdx = idx;
+    });
+
+    if (matchedIdx === -1) return null;
+
+    const blk = schedule[matchedIdx];
+    const plannedMins = Math.max(1, Math.round((blk.duration || 2700) / 60));
+    let usedMins = plannedMins;
+    let overtimeMins = 0;
+
+    if (matchedIdx === currentStepIndex && (isRunning || isOvertime || timeLeft < blk.duration)) {
+        if (isOvertime) {
+            overtimeMins = Math.max(1, Math.ceil(timeLeft / 60));
+            usedMins = plannedMins + overtimeMins;
+            window.recordOvertimeToStatsLedger(overtimeMins);
+        } else {
+            const elapsedSec = Math.max(60, (blk.duration || 2700) - timeLeft);
+            usedMins = Math.max(1, Math.round(elapsedSec / 60));
+        }
+
+        // Credit the actual elapsed time to Study or Deen before stopping
+        stopTimer(true, true);
+        blk.status = 'completed';
+        blk._credited = true;
+        blk.usedDurationMins = usedMins;
+        blk.overtimeMins = overtimeMins;
+
+        if (isDeenBlock(blk)) {
+            deenHistory[today] = (deenHistory[today] || 0) + usedMins;
+            saveExtConfig();
+        } else {
+            const stats = JSON.parse(safeGet('pages_pomodoro_stats_v8', '{"history":{}}'));
+            if (!stats.history[today]) stats.history[today] = { mins: 0, sessions: 0 };
+            stats.history[today].mins += usedMins;
+            stats.history[today].sessions += 1;
+            safeSet('pages_pomodoro_stats_v8', JSON.stringify(stats));
+        }
+
+        window.accumulatedStudyTime = 0;
+        window.accumulatedDeenTime = 0;
+        window.isOvertime = false;
+        document.getElementById('complete-main-btn')?.classList.add('hidden');
+        timeDisplay?.classList.remove('overtime-glow');
+        safeSet('pages_pomodoro_schedule_v8', JSON.stringify(schedule));
+        loadStep(currentStepIndex + 1, false);
+        renderSchedule();
+        renderStats();
+        renderHomeHUD();
+        showToast(`⏱️ Timer Auto-Stopped! Logged ${usedMins}m${overtimeMins > 0 ? ` (incl. +${overtimeMins}m overtime)` : ''} to Stats!`);
+    } else {
+        // Queued block in Live Protocol (not currently running)
+        blk.status = 'completed';
+        blk.usedDurationMins = plannedMins;
+        if (blk.type === 'work' && !blk._credited) {
+            blk._credited = true;
+            if (isDeenBlock(blk)) {
+                deenHistory[today] = (deenHistory[today] || 0) + plannedMins;
+                saveExtConfig();
+            } else {
+                const stats = JSON.parse(safeGet('pages_pomodoro_stats_v8', '{"history":{}}'));
+                if (!stats.history[today]) stats.history[today] = { mins: 0, sessions: 0 };
+                stats.history[today].mins += plannedMins;
+                stats.history[today].sessions += 1;
+                safeSet('pages_pomodoro_stats_v8', JSON.stringify(stats));
+            }
+        }
+        safeSet('pages_pomodoro_schedule_v8', JSON.stringify(schedule));
+        renderSchedule();
+        renderStats();
+        renderHomeHUD();
+    }
+
+    return { usedMins, plannedMins, overtimeMins };
+};
+
+// Two-Way Vault Toggle (Syncs Vault <-> To-Do <-> Timer & Live Protocol)
 window.toggleTask = function(id) {
     haptic(20);
+    const today = getLocalTodayString();
     const tasks = JSON.parse(safeGet('pages_pomodoro_tasks_v8', '[]'));
     const t = tasks.find(x => String(x.id) === String(id));
-    if (t) {
-        t.completed = !t.completed;
-        if (t.completed) {
-            t.completedDate = getLocalTodayString();
-            if (window.playChime) window.playChime('todo');
-        } else {
-            delete t.completedDate;
+    if (!t) return;
+
+    t.completed = !t.completed;
+    if (t.completed) {
+        t.completedDate = today;
+        if (window.playChime) window.playChime('todo');
+
+        const timerUsage = window.syncCompletionToTimerAndProtocol('vault', t.id, true);
+        if (timerUsage) {
+            t.usedDurationMins = timerUsage.usedMins;
+            t.plannedDurationMins = timerUsage.plannedMins;
+            t.overtimeMins = timerUsage.overtimeMins;
+        } else if (!t.usedDurationMins) {
+            t.usedDurationMins = t.durationMins || 45;
+            t.plannedDurationMins = t.durationMins || 45;
         }
-        safeSet('pages_pomodoro_tasks_v8', JSON.stringify(tasks));
-        renderTasks(activeTaskTab);
-        broadcastToCloud();
-        PomoEventBus.emit('vault:updated');
+    } else {
+        delete t.completedDate;
     }
+
+    // Mirror completion state to linked To-Do task
+    const linkedTodo = todos.find(x => String(x.id) === String(t.linkedTodoId) || String(x.linkedVaultId) === String(t.id));
+    if (linkedTodo) {
+        linkedTodo.completed = t.completed;
+        if (t.completed) {
+            linkedTodo.completedDate = today;
+            linkedTodo.usedDurationMins = t.usedDurationMins;
+            linkedTodo.plannedDurationMins = t.plannedDurationMins;
+            linkedTodo.overtimeMins = t.overtimeMins || 0;
+        } else {
+            delete linkedTodo.completedDate;
+        }
+        saveTodos();
+        renderTodos();
+    }
+
+    safeSet('pages_pomodoro_tasks_v8', JSON.stringify(tasks));
+    renderTasks(activeTaskTab);
+    broadcastToCloud();
+    PomoEventBus.emit('vault:updated');
 };
 
 window.deleteTask = function(id) {
@@ -472,6 +628,340 @@ window.deleteTask = function(id) {
     PomoEventBus.emit('vault:updated');
 };
 
+// Two-Way To-Do Toggle (Syncs To-Do <-> Vault <-> Timer & Live Protocol)
+window.toggleTodoComplete = function(id) {
+    haptic(20);
+    const t = todos.find(x => String(x.id) === String(id));
+    if (!t) return;
+    t.completed = !t.completed;
+    const today = getLocalTodayString();
+
+    if (t.completed) {
+        t.completedDate = today;
+        playChime('todo');
+
+        const timerUsage = window.syncCompletionToTimerAndProtocol('todo', t.id, true);
+        if (timerUsage) {
+            t.usedDurationMins = timerUsage.usedMins;
+            t.plannedDurationMins = timerUsage.plannedMins;
+            t.overtimeMins = timerUsage.overtimeMins;
+        } else if (!t.usedDurationMins && t.durationMins) {
+            t.usedDurationMins = t.durationMins;
+            t.plannedDurationMins = t.durationMins;
+        }
+
+        // Also sync linked Study Vault item if linked
+        if (t.linkedVaultId) {
+            const vTasks = JSON.parse(safeGet('pages_pomodoro_tasks_v8', '[]'));
+            const vt = vTasks.find(x => String(x.id) === String(t.linkedVaultId));
+            if (vt) {
+                vt.completed = true;
+                vt.completedDate = today;
+                vt.usedDurationMins = t.usedDurationMins || vt.durationMins || 45;
+                vt.overtimeMins = t.overtimeMins || 0;
+                safeSet('pages_pomodoro_tasks_v8', JSON.stringify(vTasks));
+                renderTasks(activeTaskTab);
+            }
+        }
+    } else {
+        delete t.completedDate;
+        if (t.linkedVaultId) {
+            const vTasks = JSON.parse(safeGet('pages_pomodoro_tasks_v8', '[]'));
+            const vt = vTasks.find(x => String(x.id) === String(t.linkedVaultId));
+            if (vt) {
+                vt.completed = false;
+                delete vt.completedDate;
+                safeSet('pages_pomodoro_tasks_v8', JSON.stringify(vTasks));
+                renderTasks(activeTaskTab);
+            }
+        }
+    }
+    saveTodos();
+    renderTodos();
+};
+
+// Upgrade createTodoRow to display Used Duration, Reverse Count-Up Overtime, Reminder Time & Live Protocol Badges
+window.createTodoRow = function(t) {
+    const div = document.createElement('div');
+    div.className = `flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${t.completed ? 'bg-slate-950/60 border-slate-900 opacity-65' : 'bg-slate-900 border-slate-800 hover:border-slate-700'}`;
+    const stepsDone = (t.steps || []).filter(s => s.done).length;
+    const stepsTot = (t.steps || []).length;
+    const repText = formatRepeatBadge(t.repeat);
+
+    const inLiveQueue = schedule.some(s => String(s.linkedTodoId) === String(t.id) && s.status !== 'completed');
+    const isRunningNow = isRunning && schedule[currentStepIndex] && String(schedule[currentStepIndex].linkedTodoId) === String(t.id);
+
+    let durationBadgeHtml = '';
+    if (t.usedDurationMins) {
+        if (t.overtimeMins && t.overtimeMins > 0) {
+            durationBadgeHtml = `<span class="text-[10px] bg-rose-950/90 text-rose-300 border border-rose-500/50 px-2 py-0.5 rounded-md font-mono font-extrabold" title="Total Time Used (Planned + Extra Count-Up Overtime)">🔥 Used: ${t.usedDurationMins}m (${t.plannedDurationMins || (t.usedDurationMins - t.overtimeMins)}m + ${t.overtimeMins}m Extra Count-Up)</span>`;
+        } else {
+            durationBadgeHtml = `<span class="text-[10px] bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-md font-mono font-bold">⏱️ Used: ${t.usedDurationMins}m${t.plannedDurationMins ? ` / ${t.plannedDurationMins}m` : ''}</span>`;
+        }
+    } else if (t.durationMins) {
+        durationBadgeHtml = `<span class="text-[10px] text-blue-400 font-mono">⏱️ ${t.durationMins}m</span>`;
+    }
+
+    div.onclick = () => openTodoDetail(t.id);
+    div.innerHTML = `
+        <div class="flex items-center gap-3 min-w-0 flex-1 pr-2">
+            <button type="button" onclick="event.stopPropagation(); toggleTodoComplete('${t.id}')" class="todo-check-circle ${t.completed ? 'checked' : ''}">${t.completed ? '✓' : ''}</button>
+            <div class="min-w-0 flex-1">
+                <p class="text-xs sm:text-sm font-bold truncate ${t.completed ? 'line-through text-slate-400' : 'text-slate-100'}">${escapeHtml(t.title)}</p>
+                <div class="flex flex-wrap items-center gap-1.5 mt-1">
+                    ${isRunningNow ? '<span class="text-[9px] bg-emerald-600 text-white px-2 py-0.5 rounded-full font-extrabold animate-pulse">▶️ RUNNING ON TIMER</span>' : (inLiveQueue ? '<span class="text-[9px] bg-blue-950 text-blue-300 border border-blue-600/40 px-1.5 py-0.5 rounded font-bold">⏳ In Live Protocol</span>' : '')}
+                    ${durationBadgeHtml}
+                    ${t.reminderTime ? `<span class="text-[10px] bg-amber-950/80 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded font-mono font-bold">⏰ ${escapeHtml(t.reminderTime)}</span>` : ''}
+                    ${t.myDayDate === getLocalTodayString() ? '<span class="text-[10px] text-blue-400 font-semibold">☀️ My Day</span>' : ''}
+                    ${t.dueDate ? `<span class="text-[10px] text-emerald-400 font-mono">📅 ${formatDDMMYYYY(t.dueDate)}</span>` : ''}
+                    ${repText ? `<span class="text-[10px] text-purple-400 font-semibold">${escapeHtml(repText)}</span>` : ''}
+                    ${stepsTot > 0 ? `<span class="text-[10px] text-slate-400 font-mono">☑️ ${stepsDone}/${stepsTot}</span>` : ''}
+                    ${t.note ? `<span class="text-[10px] text-slate-400 truncate max-w-[140px]">📝 ${escapeHtml(t.note)}</span>` : ''}
+                    ${t.bookId ? `<button type="button" onclick="event.stopPropagation(); window.openBookAtPage && window.openBookAtPage('${t.bookId}', ${t.bookPage || 1})" class="text-[10px] bg-emerald-600/25 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-md font-bold hover:bg-emerald-600 hover:text-white">📖 Open p.${t.bookPage || 1}</button>` : ''}
+                </div>
+            </div>
+        </div>
+        <div class="flex items-center gap-1.5 shrink-0">
+            <button type="button" onclick="event.stopPropagation(); window.openProtocolRunModal('todo', '${t.id}')" class="bg-blue-600/20 hover:bg-emerald-600 text-blue-300 hover:text-white border border-blue-500/40 px-2.5 py-1 rounded-lg text-[10px] font-extrabold transition-all flex items-center gap-1" title="Add to Live Protocol or Run Timer Now">
+                <span>⚡</span><span class="hidden sm:inline">Run</span>
+            </button>
+            <button type="button" onclick="event.stopPropagation(); toggleTodoImportant('${t.id}')" class="text-base px-1.5 ${t.important ? 'text-amber-400' : 'text-slate-600'}" title="Mark Important">${t.important ? '★' : '☆'}</button>
+        </div>
+    `;
+    return div;
+};
+
+// Save Reminder Time when adding a new To-Do task
+document.getElementById('todo-add-submit-btn')?.addEventListener('click', () => {
+    const remInp = document.getElementById('todo-new-rem-time');
+    if (remInp && remInp.value && todos[0]) {
+        todos[0].reminderTime = remInp.value;
+        remInp.value = '';
+        saveTodos();
+        renderTodos();
+    }
+});
+
+// Auto-Sync any Live Protocol Block insertion to Microsoft To-Do!
+window.ensureProtocolBlockSyncedToTodo = function(blk) {
+    if (!blk || blk.type === 'break') return;
+    const today = getLocalTodayString();
+    const plannedMins = Math.max(1, Math.round((blk.duration || 2700) / 60));
+
+    if (blk.linkedTodoId) {
+        const existing = todos.find(t => String(t.id) === String(blk.linkedTodoId));
+        if (existing) {
+            existing.durationMins = plannedMins;
+            existing.myDayDate = today;
+            saveTodos();
+            renderTodos();
+            return;
+        }
+    }
+
+    const newTodoId = Date.now() + Math.floor(Math.random() * 999);
+    blk.linkedTodoId = newTodoId;
+    todos.unshift({
+        id: newTodoId,
+        linkedVaultId: blk.linkedVaultId || null,
+        title: blk.title,
+        completed: false,
+        important: true,
+        myDayDate: today,
+        createdDate: today,
+        dueDate: blk.dueDate || today,
+        durationMins: plannedMins,
+        repeat: { type: 'none' },
+        steps: [],
+        note: blk.note || 'Auto-synced from Live Protocol',
+        listId: 'tasks'
+    });
+    saveTodos();
+    renderTodos();
+    safeSet('pages_pomodoro_schedule_v8', JSON.stringify(schedule));
+};
+
+document.getElementById('confirm-live-insert-btn')?.addEventListener('click', () => {
+    setTimeout(() => {
+        const lastBlk = schedule[schedule.length - 1];
+        if (lastBlk && !lastBlk.linkedTodoId && lastBlk.type === 'work') {
+            window.ensureProtocolBlockSyncedToTodo(lastBlk);
+            renderSchedule();
+        }
+    }, 60);
+});
+
+document.getElementById('load-day-btn')?.addEventListener('click', () => {
+    setTimeout(() => {
+        schedule.forEach(blk => {
+            if (blk.type === 'work' && !blk.linkedTodoId) window.ensureProtocolBlockSyncedToTodo(blk);
+        });
+        renderSchedule();
+    }, 80);
+});
+
+// Hook completeSession() so finishing a Timer / Reverse Count-Up session saves exact Used + Overtime duration into To-Do & Vault!
+const origCompleteSession = window.completeSession;
+window.completeSession = function() {
+    const cur = schedule[currentStepIndex];
+    const today = getLocalTodayString();
+    if (cur && cur.type === 'work') {
+        const plannedMins = Math.max(1, Math.round((cur.duration || 2700) / 60));
+        let overtimeMins = 0;
+        let usedMins = plannedMins;
+
+        if (window.isPureCountUpMode) {
+            usedMins = Math.max(1, Math.ceil(window.pureCountUpSeconds / 60));
+            overtimeMins = Math.max(0, usedMins - plannedMins);
+            window.isPureCountUpMode = false;
+            window.pureCountUpSeconds = 0;
+        } else if (isOvertime) {
+            overtimeMins = Math.max(1, Math.ceil(timeLeft / 60));
+            usedMins = plannedMins + overtimeMins;
+            window.recordOvertimeToStatsLedger(overtimeMins);
+        } else if (timeLeft > 0 && timeLeft < cur.duration) {
+            usedMins = Math.max(1, Math.round((cur.duration - timeLeft) / 60));
+        }
+
+        cur.usedDurationMins = usedMins;
+        cur.overtimeMins = overtimeMins;
+
+        if (!cur.linkedTodoId) window.ensureProtocolBlockSyncedToTodo(cur);
+
+        if (cur.linkedTodoId) {
+            const t = todos.find(x => String(x.id) === String(cur.linkedTodoId));
+            if (t) {
+                t.completed = true;
+                t.completedDate = today;
+                t.usedDurationMins = usedMins;
+                t.plannedDurationMins = plannedMins;
+                t.overtimeMins = overtimeMins;
+                saveTodos();
+                renderTodos();
+            }
+        }
+        if (cur.linkedVaultId) {
+            const vTasks = JSON.parse(safeGet('pages_pomodoro_tasks_v8', '[]'));
+            const vt = vTasks.find(x => String(x.id) === String(cur.linkedVaultId));
+            if (vt) {
+                vt.completed = true;
+                vt.completedDate = today;
+                vt.usedDurationMins = usedMins;
+                vt.plannedDurationMins = plannedMins;
+                vt.overtimeMins = overtimeMins;
+                safeSet('pages_pomodoro_tasks_v8', JSON.stringify(vTasks));
+                renderTasks(activeTaskTab);
+            }
+        }
+    }
+    window.overtimeExtensionMins = 0;
+    window.lastOvertimeWarnStage = 0;
+    if (window.stopLoudSirenLoop) window.stopLoudSirenLoop();
+    document.getElementById('critical-overtime-modal')?.classList.add('hidden');
+    if (origCompleteSession) origCompleteSession();
+    renderStats();
+    if (window.renderOmniBentoStrip) window.renderOmniBentoStrip();
+};
+
+/* =========================================================================
+   4. 3-STAGE ESCALATING OVERTIME GUARDRAIL & PURE COUNT-UP STOPWATCH MODE
+   ========================================================================= */
+window.startPureCountUpStopwatch = function(customTitle = null) {
+    stopTimer(true, true);
+    const title = customTitle || '⏱️ Open Count-Up Focus Session';
+    const newBlk = {
+        id: Date.now(),
+        type: 'work',
+        category: 'study',
+        title,
+        duration: 25 * 60
+    };
+    window.ensureProtocolBlockSyncedToTodo(newBlk);
+    const insertAt = Math.min(currentStepIndex, schedule.length);
+    schedule.splice(insertAt, 0, newBlk);
+    safeSet('pages_pomodoro_schedule_v8', JSON.stringify(schedule));
+    loadStep(insertAt, false);
+
+    window.isOvertime = true;
+    window.isPureCountUpMode = true;
+    window.timeLeft = 0;
+    window.targetEndTime = Date.now();
+    document.getElementById('complete-main-btn')?.classList.remove('hidden');
+    switchPage('page-timer');
+    startTimer();
+    showToast("⏱️ Count-Up Stopwatch Started! All time will save to To-Do & Stats.");
+};
+
+// Monitor Overtime Every Second for 3-Stage Escalating Guardrail (+5m Soft Warning, +10m Critical Siren)
+setInterval(() => {
+    if (!isRunning || !isOvertime || window.isPureCountUpMode) return;
+    const curSess = schedule[currentStepIndex];
+    if (!curSess || curSess.type !== 'work') return;
+
+    const overMins = Math.floor(timeLeft / 60);
+    const softLimit = 5 + window.overtimeExtensionMins;
+    const critLimit = 10 + window.overtimeExtensionMins;
+
+    if (overMins >= softLimit && overMins < critLimit && window.lastOvertimeWarnStage < 1) {
+        window.lastOvertimeWarnStage = 1;
+        if (window.playChime) window.playChime('salah');
+        showToast(`⚠️ +${overMins}m Overtime on "${curSess.title}"! Wrap up your current point.`, true);
+        if (window.sendDesktopNotification) {
+            window.sendDesktopNotification(`⚠️ +${overMins}m Overtime Warning`, `You are ${overMins} mins over assigned time on "${curSess.title}".`, 'overtime-soft');
+        }
+    } else if (overMins >= critLimit && window.lastOvertimeWarnStage < 2) {
+        window.lastOvertimeWarnStage = 2;
+        window.triggerCriticalOvertimeModal(curSess, overMins);
+    }
+}, 2000);
+
+window.triggerCriticalOvertimeModal = function(sessObj, overMins) {
+    let modal = document.getElementById('critical-overtime-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'critical-overtime-modal';
+        modal.className = "hidden fixed inset-0 z-[99990] alarmy-siren-bg flex items-center justify-center p-4";
+        document.body.appendChild(modal);
+    }
+    if (window.startLoudSirenLoop) window.startLoudSirenLoop();
+    if (window.sendDesktopNotification) {
+        window.sendDesktopNotification(`🚨 CRITICAL OVERTIME (+${overMins}m)`, `Stop cannibalizing your next schedule block! Complete "${sessObj.title}" now.`, 'overtime-crit', true);
+    }
+
+    const plannedMins = Math.max(1, Math.round((sessObj.duration || 2700) / 60));
+    modal.innerHTML = `
+        <div class="bg-slate-950/95 border-2 border-red-500 rounded-3xl p-6 w-full max-w-md shadow-2xl text-center flex flex-col gap-4">
+            <span class="text-5xl animate-bounce">🚨</span>
+            <div>
+                <span class="text-[10px] font-mono font-extrabold uppercase tracking-widest bg-red-600 text-white px-3 py-1 rounded-full">CRITICAL SCHEDULE DRIFT ALARM (+${overMins}m EXTRA)</span>
+                <h3 class="text-lg font-extrabold text-white mt-2">${escapeHtml(sessObj.title)}</h3>
+                <p class="text-xs text-amber-200 mt-1">Assigned: <b>${plannedMins}m</b> • Extra Count-Up: <b class="text-red-400">+${overMins}m</b> (Total: ${plannedMins + overMins}m)</p>
+                <p class="text-[11px] text-slate-400 mt-1">Overdoing this task is eating into your next Live Protocol block & Salah schedule!</p>
+            </div>
+            <div class="flex flex-col gap-2">
+                <button type="button" onclick="window.completeSession()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-3.5 rounded-2xl text-xs uppercase tracking-wider shadow-lg">
+                    ✅ Complete Session & Save ${plannedMins + overMins}m to To-Do Now
+                </button>
+                <button type="button" onclick="window.authorizeOvertimeExtension(10)" class="w-full bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40 font-bold py-2.5 rounded-xl text-xs">
+                    ⏳ Authorize +10m Extension (Snooze Siren)
+                </button>
+            </div>
+        </div>
+    `;
+    modal.classList.remove('hidden');
+};
+
+window.authorizeOvertimeExtension = function(extraM) {
+    window.overtimeExtensionMins += (extraM || 10);
+    window.lastOvertimeWarnStage = 1;
+    if (window.stopLoudSirenLoop) window.stopLoudSirenLoop();
+    document.getElementById('critical-overtime-modal')?.classList.add('hidden');
+    showToast(`⏳ Authorized +${extraM}m overtime extension.`);
+};
+
+/* =========================================================================
+   5. STUDY VAULT CARDS, MCQ & MATRIX RENDERING
+   ========================================================================= */
 window.loadMCQInputs = function() {
     const mcqs = JSON.parse(safeGet('pages_pomodoro_mcq_v8', '{}'));
     const today = getLocalTodayString();
@@ -501,26 +991,31 @@ document.getElementById('save-mcq-btn')?.addEventListener('click', () => {
     safeSet('pages_pomodoro_mcq_v8', JSON.stringify(mcqs));
     showToast("MCQ Stats Saved");
     broadcastToCloud();
+    renderStats();
     PomoEventBus.emit('vault:updated');
 });
 
 function createVaultItemCard(task) {
     const div = document.createElement('div');
-    div.className = `flex justify-between items-center p-3 rounded-xl border transition-all cursor-pointer ${task.completed ? 'bg-slate-950/60 border-slate-900 opacity-55' : 'bg-slate-900 border-slate-800 hover:border-slate-700'}`;
+    div.className = `flex justify-between items-center p-3 rounded-xl border transition-all cursor-pointer ${task.completed ? 'bg-slate-950/60 border-slate-900 opacity-65' : 'bg-slate-900 border-slate-800 hover:border-slate-700'}`;
     div.onclick = () => window.openProtocolRunModal && window.openProtocolRunModal('vault', task.id);
 
     const bookBadge = task.bookId
-        ? `<button onclick="event.stopPropagation(); window.openBookAtPage && window.openBookAtPage('${task.bookId}', ${task.page || 1})" class="bg-blue-600/25 text-blue-300 border border-blue-500/40 px-2 py-0.5 rounded-lg text-[10px] font-bold shrink-0">📖 p.${task.page || 1}</button>`
+        ? `<button type="button" onclick="event.stopPropagation(); window.openBookAtPage && window.openBookAtPage('${task.bookId}', ${task.page || 1})" class="bg-blue-600/25 text-blue-300 border border-blue-500/40 px-2 py-0.5 rounded-lg text-[10px] font-bold shrink-0">📖 p.${task.page || 1}</button>`
         : '';
+
+    const usedBadge = task.usedDurationMins
+        ? `<span class="text-[10px] ${task.overtimeMins > 0 ? 'bg-rose-950 text-rose-300 border-rose-500/40' : 'bg-emerald-950 text-emerald-300 border-emerald-500/40'} border px-1.5 py-0.5 rounded font-mono font-bold">⏱️ Used: ${task.usedDurationMins}m${task.overtimeMins > 0 ? ` (+${task.overtimeMins}m Extra)` : ''}</span>`
+        : `<span class="text-[10px] text-blue-400 font-mono">⏱️ ${task.durationMins || 45}m</span>`;
 
     div.innerHTML = `
         <div class="flex items-center gap-3 min-w-0 flex-1 pr-2">
             <button type="button" onclick="event.stopPropagation(); toggleTask('${task.id}')" class="todo-check-circle ${task.completed ? 'checked' : ''}">${task.completed ? '✓' : ''}</button>
             <div class="min-w-0 flex-1">
-                <p class="text-xs sm:text-sm font-bold truncate ${task.completed ? 'line-through text-slate-500' : 'text-slate-100'}">${escapeHtml(task.title)}</p>
+                <p class="text-xs sm:text-sm font-bold truncate ${task.completed ? 'line-through text-slate-400' : 'text-slate-100'}">${escapeHtml(task.title)}</p>
                 <div class="flex flex-wrap items-center gap-2 mt-0.5">
                     <span class="text-[10px] text-purple-400 font-bold uppercase">${escapeHtml(task.subject)} • ${escapeHtml(task.type)}</span>
-                    <span class="text-[10px] text-blue-400 font-mono">⏱️ ${task.durationMins || 45}m</span>
+                    ${usedBadge}
                     ${task.dueDate ? `<span class="text-[10px] text-emerald-400 font-mono">📅 Due ${formatDDMMYYYY(task.dueDate)}</span>` : ''}
                     ${task.note ? `<span class="text-[10px] text-slate-400 truncate max-w-[180px]">📝 ${escapeHtml(task.note)}</span>` : ''}
                     ${bookBadge}
@@ -579,7 +1074,6 @@ window.renderTasks = function(tab) {
     }
     container.appendChild(activeListDiv);
 
-    // Collapsible Completed Section (Just Like Microsoft To-Do!)
     if (completedTasks.length > 0) {
         const compWrapper = document.createElement('div');
         compWrapper.className = "flex flex-col mt-3 pt-2 border-t border-slate-800/80";
@@ -604,7 +1098,175 @@ window.renderTasks = function(tab) {
 };
 
 /* =========================================================================
-   3. PRO-GAMER RPG LEVELING, WORLD RANKER & PRO DEVELOPER TACTICAL ENGINE
+   6. ADVANCED ANALYTICAL PROFILE STATS STUDIO (INSIDE #prof-stats)
+   ========================================================================= */
+const origRenderStats = window.renderStats;
+window.renderStats = function() {
+    if (origRenderStats) origRenderStats();
+    const profStatsPanel = document.getElementById('prof-stats');
+    if (!profStatsPanel) return;
+
+    let advBox = document.getElementById('advanced-analytics-prof-box');
+    if (!advBox) {
+        advBox = document.createElement('div');
+        advBox.id = 'advanced-analytics-prof-box';
+        advBox.className = "flex flex-col gap-3 shrink-0";
+        const tgCard = document.getElementById('save-tg-btn')?.closest('div.bg-slate-900');
+        if (tgCard) profStatsPanel.insertBefore(advBox, tgCard);
+        else profStatsPanel.appendChild(advBox);
+    }
+
+    const today = getLocalTodayString();
+    const stats = JSON.parse(safeGet('pages_pomodoro_stats_v8', '{"history":{}}'));
+    const todayRec = stats.history[today] || { mins: 0, sessions: 0, overtimeMins: 0 };
+    const deenMins = Math.round(getTodayDeenMinutes());
+    const vaultTasks = JSON.parse(safeGet('pages_pomodoro_tasks_v8', '[]'));
+    const mcqs = JSON.parse(safeGet('pages_pomodoro_mcq_v8', '{}'));
+
+    // Calculate Extra Overtime Mins from today's completed To-Do & Stats
+    let extraOvertimeToday = todayRec.overtimeMins || 0;
+    let totalPlannedToday = 0;
+    todos.forEach(t => {
+        if (t.completed && t.completedDate === today) {
+            totalPlannedToday += (t.plannedDurationMins || t.durationMins || 0);
+        }
+    });
+    const focusEffPct = Math.min(100, Math.round(((todayRec.mins + deenMins) / Math.max(60, (extConfig.studyTargetHours + extConfig.deenTargetHours) * 60)) * 100));
+
+    // Calculate MCQ Accuracy across all subjects today
+    let mcqAtt = 0, mcqCor = 0;
+    Object.values(mcqs[today] || {}).forEach(m => { mcqAtt += (m.a || 0); mcqCor += (m.c || 0); });
+    const mcqAccPct = mcqAtt > 0 ? Math.round((mcqCor / mcqAtt) * 100) : 0;
+
+    const todoCompCount = todos.filter(t => t.completed).length;
+    const todoTotCount = Math.max(1, todos.length);
+    const vaultCompCount = vaultTasks.filter(v => v.completed).length;
+    const vaultTotCount = Math.max(1, vaultTasks.length);
+
+    advBox.innerHTML = `
+        <div class="bg-slate-900 border border-blue-500/30 rounded-2xl p-3.5 flex flex-col gap-3 shadow-lg">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                <div>
+                    <span class="text-[9px] font-extrabold uppercase tracking-widest text-cyan-400">📊 Deep Analytical Intelligence</span>
+                    <h3 class="text-xs font-extrabold text-white mt-0.5">Timer • To-Do • Study Vault • Overtime Telemetry</h3>
+                </div>
+                <button type="button" onclick="window.openTodoAnalyticsModal('4w')" class="bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-extrabold px-2.5 py-1 rounded-lg shadow">📈 6M Line Graph</button>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                <div class="bg-slate-950 border border-slate-800 rounded-xl p-2">
+                    <p class="text-[9px] font-bold uppercase text-slate-400">Target Efficiency</p>
+                    <p class="text-base font-mono font-extrabold text-emerald-400 mt-0.5">${focusEffPct}%</p>
+                </div>
+                <div class="bg-slate-950 border border-slate-800 rounded-xl p-2">
+                    <p class="text-[9px] font-bold uppercase text-rose-400">🔥 Extra Count-Up</p>
+                    <p class="text-base font-mono font-extrabold text-rose-300 mt-0.5">+${extraOvertimeToday}m</p>
+                </div>
+                <div class="bg-slate-950 border border-slate-800 rounded-xl p-2">
+                    <p class="text-[9px] font-bold uppercase text-purple-400">📚 Vault Mastery</p>
+                    <p class="text-base font-mono font-extrabold text-purple-300 mt-0.5">${vaultCompCount}/${vaultTasks.length}</p>
+                </div>
+                <div class="bg-slate-950 border border-slate-800 rounded-xl p-2">
+                    <p class="text-[9px] font-bold uppercase text-amber-400">🎯 MCQ Accuracy</p>
+                    <p class="text-base font-mono font-extrabold text-amber-300 mt-0.5">${mcqAccPct}% <span class="text-[9px] text-slate-500">(${mcqCor}/${mcqAtt})</span></p>
+                </div>
+            </div>
+
+            <!-- Subject & Pillar Progress Breakdown -->
+            <div class="bg-slate-950 border border-slate-800 rounded-xl p-2.5 flex flex-col gap-1.5">
+                <div class="flex justify-between text-[10px] font-bold">
+                    <span class="text-blue-400">☑️ To-Do Completion Rate (${todoCompCount}/${todos.length})</span>
+                    <span class="font-mono text-white">${Math.round((todoCompCount / todoTotCount) * 100)}%</span>
+                </div>
+                <div class="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden"><div class="h-full bg-blue-500 rounded-full" style="width:${Math.min(100, Math.round((todoCompCount / todoTotCount) * 100))}%"></div></div>
+
+                <div class="flex justify-between text-[10px] font-bold mt-1">
+                    <span class="text-purple-400">📚 Study Vault Backlog & Revision Cleared</span>
+                    <span class="font-mono text-white">${Math.round((vaultCompCount / vaultTotCount) * 100)}%</span>
+                </div>
+                <div class="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden"><div class="h-full bg-purple-500 rounded-full" style="width:${Math.min(100, Math.round((vaultCompCount / vaultTotCount) * 100))}%"></div></div>
+            </div>
+        </div>
+    `;
+};
+
+/* =========================================================================
+   7. INTERACTIVE 4-WIDGET "OMNI-COMMAND BENTO STRIP" ON HOME TIMER PAGE
+      (Works on Desktop + Smartphone, Auto-Hides in Stealth / Dim Mode!)
+   ========================================================================= */
+window.renderOmniBentoStrip = function() {
+    const rightCol = document.querySelector('#page-timer .cockpit-right');
+    if (!rightCol) return;
+
+    let strip = document.getElementById('home-omni-bento-strip');
+    if (!strip) {
+        strip = document.createElement('div');
+        strip.id = 'home-omni-bento-strip';
+        strip.className = "w-full grid grid-cols-2 gap-2";
+        rightCol.appendChild(strip);
+    }
+
+    const rpg = calculateLifetimeRPGStats();
+    const curSess = schedule[currentStepIndex];
+    const vaultTasks = JSON.parse(safeGet('pages_pomodoro_tasks_v8', '[]'));
+    const unfinVault = vaultTasks.filter(v => !v.completed);
+    const activeAlarmsCount = (window.pomoAlarms || []).filter(a => a.enabled).length;
+
+    strip.innerHTML = `
+        <!-- Widget 1: Active Task & Count-Up Stopwatch -->
+        <div class="bg-slate-900/90 border border-blue-500/40 rounded-2xl p-2.5 flex flex-col justify-between gap-1.5 shadow">
+            <div class="flex items-center justify-between">
+                <span class="text-[9px] font-extrabold uppercase tracking-wider text-blue-400">⏱️ Active Protocol</span>
+                <button type="button" onclick="window.startPureCountUpStopwatch()" class="bg-blue-600/25 hover:bg-blue-600 text-blue-300 hover:text-white border border-blue-500/40 px-1.5 py-0.5 rounded text-[9px] font-extrabold" title="Start Pure Count-Up Stopwatch">+Count-Up</button>
+            </div>
+            <p class="text-[11px] font-extrabold text-white truncate">${escapeHtml(curSess ? curSess.title : 'No Active Session')}</p>
+            <div class="flex gap-1">
+                <button type="button" onclick="window.completeSession()" class="flex-1 bg-emerald-600/25 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/40 py-1 rounded-lg text-[9px] font-extrabold">✓ Complete & Log</button>
+                <button type="button" onclick="switchPage('page-todo')" class="bg-slate-800 text-slate-300 px-2 py-1 rounded-lg text-[9px] font-bold">☑️ To-Do</button>
+            </div>
+        </div>
+
+        <!-- Widget 2: Interactive RPG Level & World Ranker -->
+        <div onclick="switchPage('page-vault'); activateVaultSubview('rpg');" class="bg-slate-900/90 border border-amber-500/40 rounded-2xl p-2.5 flex flex-col justify-between gap-1 cursor-pointer hover:border-amber-400 shadow">
+            <div class="flex items-center justify-between">
+                <span class="text-[9px] font-extrabold uppercase tracking-wider text-amber-400">${rpg.rankObj.badge} Lv.${rpg.level} Ranker</span>
+                <span class="text-[9px] font-mono font-bold text-emerald-400">${rpg.levelPct}%</span>
+            </div>
+            <p class="text-[11px] font-extrabold text-white truncate">${escapeHtml(rpg.rankObj.title)}</p>
+            <div class="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+                <div class="h-full bg-gradient-to-r from-amber-500 to-emerald-400 rounded-full" style="width:${rpg.levelPct}%"></div>
+            </div>
+        </div>
+
+        <!-- Widget 3: Study Vault Quick-Runner -->
+        <div class="bg-slate-900/90 border border-purple-500/40 rounded-2xl p-2.5 flex flex-col justify-between gap-1.5 shadow">
+            <div class="flex items-center justify-between">
+                <span class="text-[9px] font-extrabold uppercase tracking-wider text-purple-400">📚 Study Vault</span>
+                <span class="text-[9px] font-mono font-bold text-purple-300">${unfinVault.length} Left</span>
+            </div>
+            <p class="text-[11px] font-bold text-slate-200 truncate">${escapeHtml(unfinVault[0]?.title || 'All Vault Chapters Done!')}</p>
+            <div class="flex gap-1">
+                ${unfinVault[0] ? `<button type="button" onclick="window.openProtocolRunModal('vault', '${unfinVault[0].id}')" class="flex-1 bg-purple-600 hover:bg-purple-500 text-white py-1 rounded-lg text-[9px] font-extrabold">⚡ Run Top Vault</button>` : ''}
+                <button type="button" onclick="switchPage('page-vault'); activateVaultSubview('neet');" class="bg-slate-800 text-slate-300 px-2 py-1 rounded-lg text-[9px] font-bold">Open</button>
+            </div>
+        </div>
+
+        <!-- Widget 4: Mission Alarms & 6M Analytics -->
+        <div class="bg-slate-900/90 border border-rose-500/40 rounded-2xl p-2.5 flex flex-col justify-between gap-1.5 shadow">
+            <div class="flex items-center justify-between">
+                <span class="text-[9px] font-extrabold uppercase tracking-wider text-rose-400">⏰ Alarmy & Stats</span>
+                <span class="text-[9px] font-mono font-bold text-rose-300">${activeAlarmsCount} ON</span>
+            </div>
+            <div class="flex gap-1 mt-0.5">
+                <button type="button" onclick="window.openAlarmyStudioModal && window.openAlarmyStudioModal()" class="flex-1 bg-rose-600/25 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/40 py-1.5 rounded-lg text-[9px] font-extrabold">⏰ Mission Alarms</button>
+                <button type="button" onclick="window.openTodoAnalyticsModal('4w')" class="flex-1 bg-cyan-600/25 hover:bg-cyan-600 text-cyan-300 hover:text-white border border-cyan-500/40 py-1.5 rounded-lg text-[9px] font-extrabold">📈 6M Graph</button>
+            </div>
+        </div>
+    `;
+};
+
+/* =========================================================================
+   8. PRO-GAMER RPG LEVELING, WORLD RANKER & PRO DEVELOPER TACTICAL ENGINE
    ========================================================================= */
 const RPG_RANKS = [
     { minLv: 0, title: 'Unranked Novice', badge: '🪨', color: 'text-slate-400' },
@@ -619,7 +1281,6 @@ const RPG_RANKS = [
     { minLv: 100, title: 'Apex Sovereign (∞)', badge: '🌌', color: 'text-amber-300' }
 ];
 
-// High-speed O(1) day metrics calculator (pre-parsed caches prevent 300x JSON.parse lag)
 function getDayMetrics(isoDate, preStats = null, preRLog = null, preVault = null) {
     const stats = preStats || JSON.parse(safeGet('pages_pomodoro_stats_v8', '{"history":{}}'));
     const rLog = preRLog || JSON.parse(safeGet('pages_pomodoro_reader_log_v1', '{}'));
@@ -763,6 +1424,7 @@ function updateTopBarRpgBadge() {
     const lvEl = document.getElementById('top-rpg-lv-text');
     if (iconEl) iconEl.textContent = rpg.rankObj.badge;
     if (lvEl) lvEl.textContent = `Lv.${rpg.level}`;
+    if (window.renderOmniBentoStrip) window.renderOmniBentoStrip();
 }
 
 window.renderRpgArena = function() {
@@ -910,9 +1572,17 @@ PomoEventBus.on('todos:updated', updateTopBarRpgBadge);
 PomoEventBus.on('vault:updated', updateTopBarRpgBadge);
 PomoEventBus.on('reader:updated', updateTopBarRpgBadge);
 PomoEventBus.on('reading:minuteLogged', updateTopBarRpgBadge);
+PomoEventBus.on('alarms:updated', updateTopBarRpgBadge);
+PomoEventBus.on('hud:rendered', () => {
+    if (window.renderOmniBentoStrip) window.renderOmniBentoStrip();
+});
 
 renderCompassView();
 upgradeVaultAddFormUI();
 renderCustomSubjectBar();
 renderTasks(activeTaskTab);
+renderTodos();
+renderStats();
 updateTopBarRpgBadge();
+setTimeout(() => { if (window.renderOmniBentoStrip) window.renderOmniBentoStrip(); }, 300);
+// ✅ END OF FILE (03-vault-rpg.js v9.0) — 100% UNCUT

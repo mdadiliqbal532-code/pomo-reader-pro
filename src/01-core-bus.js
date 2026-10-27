@@ -1,8 +1,10 @@
 /* =========================================================================
-   01-CORE-BUS.JS (v9.0) — EVENT BUS, 50GB APPDATA, ALARMY MISSION ENGINE & MOON+ CLOUD
+   01-CORE-BUS.JS (v16.0 PURE DESKTOP EDITION) — EVENT BUS, 16GB INDEXEDDB,
+   DESKTOP KEYBOARD SHORTCUTS ENGINE, FORCE ACHIEVEMENT NOTIFICATIONS,
+   POMOWAKE MISSION OS, 4-LANGUAGE DICTIONARY & EXTERNAL STUDIO BRIDGE
    ========================================================================= */
 
-// 1. CENTRAL EVENT BUS (Decoupled Walkie-Talkie Between Modules)
+// 1. CENTRAL EVENT BUS
 window.PomoEventBus = {
     _listeners: {},
     on(event, fn) {
@@ -16,37 +18,59 @@ window.PomoEventBus = {
     }
 };
 
-// 2. UNIFIED INDEXEDDB ENGINE (50+ GB Capacity for Books, Covers, Alarms & Attachments)
+// 2. 16GB-READY NON-BLOCKING UNIFIED INDEXEDDB ENGINE (SHARED WITH EXTERNAL STUDIO BRIDGE)
 const DB_NAME = 'PomoReaderProDB_v1';
-const DB_VERSION = 2;
+const DB_VERSION = 6;
 let idbInstance = null;
 window.coverMemoryCache = {};
 
 function openUnifiedIDB() {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
         if (idbInstance) return resolve(idbInstance);
-        const req = indexedDB.open(DB_NAME, DB_VERSION);
-        req.onupgradeneeded = (e) => {
-            const db = e.target.result;
-            if (!db.objectStoreNames.contains('bookFiles')) db.createObjectStore('bookFiles', { keyPath: 'id' });
-            if (!db.objectStoreNames.contains('lineAttachments')) db.createObjectStore('lineAttachments', { keyPath: 'id' });
-            if (!db.objectStoreNames.contains('handles')) db.createObjectStore('handles', { keyPath: 'key' });
-            if (!db.objectStoreNames.contains('bookCovers')) db.createObjectStore('bookCovers', { keyPath: 'id' });
-            if (!db.objectStoreNames.contains('steelSnapshots')) db.createObjectStore('steelSnapshots', { keyPath: 'key' });
+        let settled = false;
+        const finish = (db) => {
+            if (settled) return;
+            settled = true;
+            if (db) {
+                db.onversionchange = () => { try { db.close(); } catch (e) {} idbInstance = null; };
+                idbInstance = db;
+            }
+            resolve(db || null);
         };
-        req.onsuccess = (e) => { idbInstance = e.target.result; resolve(idbInstance); };
-        req.onerror = () => {
-            const fb = indexedDB.open(DB_NAME);
-            fb.onsuccess = (ev) => { idbInstance = ev.target.result; resolve(idbInstance); };
-            fb.onerror = (er) => reject(er);
-        };
+        const safetyTimer = setTimeout(() => finish(null), 2500);
+        try {
+            const req = indexedDB.open(DB_NAME, DB_VERSION);
+            req.onupgradeneeded = (e) => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains('bookFiles')) db.createObjectStore('bookFiles', { keyPath: 'id' });
+                if (!db.objectStoreNames.contains('lineAttachments')) db.createObjectStore('lineAttachments', { keyPath: 'id' });
+                if (!db.objectStoreNames.contains('handles')) db.createObjectStore('handles', { keyPath: 'key' });
+                if (!db.objectStoreNames.contains('bookCovers')) db.createObjectStore('bookCovers', { keyPath: 'id' });
+                if (!db.objectStoreNames.contains('steelSnapshots')) db.createObjectStore('steelSnapshots', { keyPath: 'key' });
+                if (!db.objectStoreNames.contains('flashcardsStore')) db.createObjectStore('flashcardsStore', { keyPath: 'id' });
+                if (!db.objectStoreNames.contains('pageTextIndex')) db.createObjectStore('pageTextIndex', { keyPath: 'bookId' });
+            };
+            req.onsuccess = (e) => { clearTimeout(safetyTimer); finish(e.target.result); };
+            req.onblocked = () => { clearTimeout(safetyTimer); finish(null); };
+            req.onerror = () => {
+                clearTimeout(safetyTimer);
+                try {
+                    const fb = indexedDB.open(DB_NAME);
+                    fb.onsuccess = (ev) => finish(ev.target.result);
+                    fb.onerror = () => finish(null);
+                } catch (err) { finish(null); }
+            };
+        } catch (err) {
+            clearTimeout(safetyTimer);
+            finish(null);
+        }
     });
 }
 
 window.idbPut = async function(storeName, obj) {
     try {
         const db = await openUnifiedIDB();
-        if (!db.objectStoreNames.contains(storeName)) return false;
+        if (!db || !db.objectStoreNames.contains(storeName)) return false;
         return new Promise((res) => {
             const tx = db.transaction(storeName, 'readwrite');
             tx.objectStore(storeName).put(obj);
@@ -59,7 +83,7 @@ window.idbPut = async function(storeName, obj) {
 window.idbGet = async function(storeName, key) {
     try {
         const db = await openUnifiedIDB();
-        if (!db.objectStoreNames.contains(storeName)) return null;
+        if (!db || !db.objectStoreNames.contains(storeName)) return null;
         return new Promise((res) => {
             const tx = db.transaction(storeName, 'readonly');
             const r = tx.objectStore(storeName).get(key);
@@ -69,10 +93,23 @@ window.idbGet = async function(storeName, key) {
     } catch (e) { return null; }
 };
 
+window.idbGetAll = async function(storeName) {
+    try {
+        const db = await openUnifiedIDB();
+        if (!db || !db.objectStoreNames.contains(storeName)) return [];
+        return new Promise((res) => {
+            const tx = db.transaction(storeName, 'readonly');
+            const r = tx.objectStore(storeName).getAll();
+            r.onsuccess = () => res(r.result || []);
+            r.onerror = () => res([]);
+        });
+    } catch (e) { return []; }
+};
+
 window.idbDelete = async function(storeName, key) {
     try {
         const db = await openUnifiedIDB();
-        if (!db.objectStoreNames.contains(storeName)) return false;
+        if (!db || !db.objectStoreNames.contains(storeName)) return false;
         return new Promise((res) => {
             const tx = db.transaction(storeName, 'readwrite');
             tx.objectStore(storeName).delete(key);
@@ -85,13 +122,11 @@ window.idbDelete = async function(storeName, key) {
 if (navigator.storage && navigator.storage.persist) {
     navigator.storage.persist().then(persisted => {
         const badge = document.getElementById('reader-folder-sync-badge');
-        if (badge) {
-            badge.innerHTML = `🛡️ AppData ${persisted ? 'Locked' : 'Active'} • Unlimited Shelf`;
-        }
+        if (badge) badge.innerHTML = `🛡️ 16GB Unleashed ${persisted ? 'Locked' : 'Active'} • Unlimited Shelf`;
     }).catch(() => {});
 }
 
-// 3. SAFE LOCALSTORAGE ENGINE + UTILITIES
+// 3. SAFE LOCALSTORAGE ENGINE + ESCAPE UTILITIES
 const MEM_CACHE = {};
 window.safeGet = function(key, def) {
     try {
@@ -116,6 +151,16 @@ window.escapeHtml = function(str) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+};
+
+// Safe JS string literal escaper for inline onclick="fn('...')" attributes
+window.escapeJsStr = function(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/"/g, '&quot;')
+        .replace(/\r?\n/g, ' ');
 };
 
 window.getLocalTodayString = function(dateObj = new Date()) {
@@ -145,30 +190,131 @@ window.addDaysToTodayISO = function(days) {
     return window.getLocalTodayString(target);
 };
 
-window.haptic = function(ms = 18) {
-    try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {}
-};
+// No-op on Desktop to keep legacy calls clean
+window.haptic = function() {};
 
 window.showToast = function(msg, isError = false) {
     const toast = document.getElementById('custom-toast');
     if (!toast) return;
     toast.textContent = msg;
-    toast.className = `fixed top-5 right-5 left-5 sm:left-auto backdrop-blur-md border font-bold py-3 px-5 rounded-xl shadow-2xl z-[999] text-xs sm:text-sm text-center transition-opacity ${isError ? 'bg-red-900/95 border-red-500 text-red-100' : 'bg-emerald-900/95 border-emerald-500 text-emerald-100'}`;
+    toast.className = `fixed top-5 right-5 backdrop-blur-md border font-bold py-3 px-5 rounded-xl shadow-2xl z-[99999] text-sm text-center transition-opacity ${isError ? 'bg-red-900/95 border-red-500 text-red-100' : 'bg-emerald-900/95 border-emerald-500 text-emerald-100'}`;
     toast.classList.remove('hidden');
     clearTimeout(window._toastTimer);
     window._toastTimer = setTimeout(() => toast.classList.add('hidden'), 3200);
 };
 
-// 4. STRICT INNATE KEEP-SCREEN-ON ENGINE (Desktop + Android Bridge)
+// 4. EXTERNAL POMOAI STUDIO & HYBRID BOARD BRIDGE (FIREBASE + BROADCASTCHANNEL + IDB)
+window.PomoStudioBridge = {
+    _channel: (typeof BroadcastChannel !== 'undefined') ? new BroadcastChannel('pomo_studio_bridge_v1') : null,
+
+    async syncBookPageIndexToBridge(bookObj, pagesTextArray) {
+        if (!bookObj || !bookObj.id || !Array.isArray(pagesTextArray) || !pagesTextArray.length) return;
+        try {
+            // 1. Save full per-page text index into shared 16GB IndexedDB
+            await window.idbPut('pageTextIndex', {
+                bookId: bookObj.id,
+                title: bookObj.title,
+                shelfName: bookObj.shelfName || 'General Shelf',
+                readSeq: bookObj.readSeq || 1,
+                totalPages: bookObj.totalPages || pagesTextArray.length,
+                telegramFileId: bookObj.telegramFileId || '',
+                gdriveFileId: bookObj.gdriveFileId || '',
+                dropboxPath: bookObj.dropboxPath || '',
+                outline: bookObj.outline || [],
+                pagesText: pagesTextArray,
+                updatedAt: Date.now()
+            });
+
+            // 2. Broadcast live update to any open PomoAI Studio tab on the same desktop
+            if (this._channel) {
+                this._channel.postMessage({
+                    type: 'BOOK_INDEX_UPDATED',
+                    bookId: bookObj.id,
+                    title: bookObj.title,
+                    shelfName: bookObj.shelfName,
+                    totalPages: bookObj.totalPages
+                });
+            }
+
+            // 3. Push lightweight chunked page index to Firebase PomoCloud Room so external Studio can query page ranges wirelessly
+            const roomId = window.safeGet('pages_pomodoro_sync_room', '');
+            if (roomId && typeof firebase !== 'undefined' && firebase.apps?.length && navigator.onLine) {
+                const db = firebase.firestore();
+                const docRef = db.collection('artifacts').doc('neettimercloud')
+                    .collection('public').doc('data')
+                    .collection('sync_rooms').doc(roomId)
+                    .collection('reader_page_index').doc(bookObj.id);
+
+                // Store up to 120 pages per batch in compact JSON chunks
+                const batchSize = 50;
+                const totalBatches = Math.ceil(pagesTextArray.length / batchSize);
+                await docRef.set({
+                    bookId: bookObj.id,
+                    title: bookObj.title,
+                    shelfName: bookObj.shelfName || 'General Shelf',
+                    readSeq: bookObj.readSeq || 1,
+                    totalPages: bookObj.totalPages || pagesTextArray.length,
+                    totalBatches,
+                    telegramFileId: bookObj.telegramFileId || '',
+                    gdriveFileId: bookObj.gdriveFileId || '',
+                    dropboxPath: bookObj.dropboxPath || '',
+                    outlineJson: JSON.stringify(bookObj.outline || []),
+                    updatedAt: Date.now()
+                }, { merge: true });
+
+                for (let bIdx = 0; bIdx < Math.min(totalBatches, 12); bIdx++) {
+                    const slice = pagesTextArray.slice(bIdx * batchSize, (bIdx + 1) * batchSize).map(t => String(t || '').slice(0, 3500));
+                    await docRef.collection('page_batches').doc(String(bIdx)).set({
+                        batchIndex: bIdx,
+                        startPage: bIdx * batchSize + 1,
+                        pagesJson: JSON.stringify(slice)
+                    });
+                }
+            }
+        } catch (e) {}
+    },
+
+    async sendSelectionToExternalStudio(payload) {
+        if (!payload) return;
+        const item = {
+            id: 'clip_' + Date.now(),
+            bookId: payload.bookId || '',
+            bookTitle: payload.bookTitle || 'Book',
+            shelfName: payload.shelfName || 'General Shelf',
+            page: payload.page || 1,
+            text: payload.text || '',
+            createdAt: Date.now()
+        };
+
+        try {
+            if (this._channel) {
+                this._channel.postMessage({ type: 'SELECTION_CLIP', payload: item });
+            }
+            const citationText = `📘 [${item.shelfName}] ${item.bookTitle} (Page ${item.page}):\n"${item.text}"`;
+            try { await navigator.clipboard.writeText(citationText); } catch (e) {}
+
+            const roomId = window.safeGet('pages_pomodoro_sync_room', '');
+            if (roomId && typeof firebase !== 'undefined' && firebase.apps?.length && navigator.onLine) {
+                const db = firebase.firestore();
+                await db.collection('artifacts').doc('neettimercloud')
+                    .collection('public').doc('data')
+                    .collection('sync_rooms').doc(roomId)
+                    .collection('studio_inbox').doc('latest_clip').set(item);
+            }
+            window.showToast(`📤 Sent Page ${item.page} passage to External Studio Bridge & Clipboard!`);
+        } catch (e) {
+            window.showToast("📋 Copied passage citation to clipboard!");
+        }
+    }
+};
+
+// 5. STRICT KEEP-SCREEN-ON ENGINE & PRIVACY PIN SHIELD
 let wakeLockSentinel = null;
 let keepAwakeOsc = null;
 window.fallbackCtx = null;
 
 window.enforceKeepScreenOn = async function() {
     try {
-        if (window.AndroidBridge && typeof window.AndroidBridge.setKeepScreenOn === 'function') {
-            window.AndroidBridge.setKeepScreenOn(true);
-        }
         if ('wakeLock' in navigator && !wakeLockSentinel) {
             wakeLockSentinel = await navigator.wakeLock.request('screen');
             wakeLockSentinel.addEventListener('release', () => { wakeLockSentinel = null; });
@@ -202,9 +348,12 @@ setInterval(() => {
 }, 15000);
 window.enforceKeepScreenOn();
 
-// 5. PRIVACY PIN SHIELD & GLOBAL CRASH GUARD
 window.addEventListener('error', (e) => console.warn('[Steel Shield Intercepted]:', e.message));
 window.addEventListener('unhandledrejection', (e) => console.warn('[Steel Shield Promise]:', e.reason));
+
+window.triggerPrivacyLockShortcut = function() {
+    document.getElementById('privacy-lock-top-btn')?.click();
+};
 
 document.getElementById('privacy-lock-top-btn')?.addEventListener('click', () => {
     const savedPin = localStorage.getItem('pages_pomodoro_privacy_pin') || '';
@@ -215,7 +364,7 @@ document.getElementById('privacy-lock-top-btn')?.addEventListener('click', () =>
         if (!modal || !titleEl || !bodyEl) return;
         titleEl.textContent = "🛡️ Set Desktop Privacy PIN";
         bodyEl.innerHTML = `
-            <p class="text-xs text-slate-400">Protect your workspace with a personal Passcode/PIN.</p>
+            <p class="text-xs text-slate-400">Protect your desktop workspace with a personal Passcode/PIN (Shortcut: Alt + L).</p>
             <input type="password" id="new-privacy-pin-inp" placeholder="Create PIN / Passcode" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white">
             <button type="button" id="save-privacy-pin-btn" class="w-full bg-emerald-600 text-white font-bold py-2.5 rounded-xl text-xs">Save PIN & Lock Now</button>
         `;
@@ -230,6 +379,7 @@ document.getElementById('privacy-lock-top-btn')?.addEventListener('click', () =>
         };
     } else {
         document.getElementById('pomo-privacy-lock-overlay').classList.remove('hidden');
+        setTimeout(() => document.getElementById('privacy-unlock-pin-input')?.focus(), 60);
     }
 });
 
@@ -244,31 +394,272 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
         window.showToast("❌ Incorrect Passcode", true);
     }
 });
+document.getElementById('privacy-unlock-pin-input')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('privacy-unlock-submit-btn')?.click();
+});
 
-// 6. WINDOWS DESKTOP NATIVE PERMISSIONS, ALARMY MISSION ENGINE & MOON+ CLOUD CONNECTOR
-(function initDesktopNativeOSAndAlarmy() {
-    const st = document.createElement('style');
-    st.textContent = `
-        body.dim-mode #home-reader-widget-card,
-        body.dim-mode #home-omni-bento-strip { display: none !important; }
-        @keyframes sirenPulse {
-            0%, 100% { background-color: rgba(127, 29, 29, 0.96); box-shadow: inset 0 0 80px rgba(239, 68, 68, 0.85); }
-            50% { background-color: rgba(15, 23, 42, 0.98); box-shadow: inset 0 0 30px rgba(245, 158, 11, 0.5); }
+// 6. GRANULAR FORCE ACHIEVEMENT NOTIFICATION ENGINE (DESKTOP EDITION)
+(function initForceNotificationsAndDesktopControls() {
+    const HTTPS = 'https:' + '//';
+    window.unlockedAchievementsLog = JSON.parse(window.safeGet('pages_pomodoro_achievements_v15', '[]'));
+
+    const defaultForceNotifyCfg = {
+        masterEnabled: true,
+        channels: {
+            inAppBanner: true,
+            osNotification: true,
+            soundFanfare: true,
+            telegramPush: false
+        },
+        categories: {
+            level_up: true,
+            memory_beast: true,
+            reading_goal: true,
+            mcq_sniper: false,
+            study_streak: true,
+            wake_recheck: false
         }
-        .alarmy-siren-bg { animation: sirenPulse 1.1s infinite ease-in-out; }
-    `;
-    document.head.appendChild(st);
+    };
 
+    window.forceNotifyCfg = JSON.parse(window.safeGet('pages_pomodoro_force_notify_cfg_v15', 'null')) || defaultForceNotifyCfg;
+    if (!window.forceNotifyCfg.channels) window.forceNotifyCfg.channels = defaultForceNotifyCfg.channels;
+    if (!window.forceNotifyCfg.categories) window.forceNotifyCfg.categories = defaultForceNotifyCfg.categories;
+
+    window.saveForceNotifyCfg = function() {
+        window.safeSet('pages_pomodoro_force_notify_cfg_v15', JSON.stringify(window.forceNotifyCfg));
+    };
+
+    window.toggleForceNotifySetting = function(group, key) {
+        if (group === 'master') {
+            window.forceNotifyCfg.masterEnabled = !window.forceNotifyCfg.masterEnabled;
+        } else if (group === 'channels' && window.forceNotifyCfg.channels) {
+            window.forceNotifyCfg.channels[key] = !window.forceNotifyCfg.channels[key];
+        } else if (group === 'categories' && window.forceNotifyCfg.categories) {
+            window.forceNotifyCfg.categories[key] = !window.forceNotifyCfg.categories[key];
+        }
+        window.saveForceNotifyCfg();
+        window.openDeviceWidgetStudioModal();
+    };
+
+    function detectAchievementCategory(title = '', achKey = '') {
+        const hay = `${title} ${achKey}`.toLowerCase();
+        if (hay.includes('level up') || hay.includes('lv_up')) return 'level_up';
+        if (hay.includes('memory') || hay.includes('flashcard') || hay.includes('mem_beast')) return 'memory_beast';
+        if (hay.includes('reading') || hay.includes('read_goal')) return 'reading_goal';
+        if (hay.includes('mcq') || hay.includes('sniper')) return 'mcq_sniper';
+        if (hay.includes('wake') || hay.includes('riser')) return 'wake_recheck';
+        return 'study_streak';
+    }
+
+    window.playAchievementFanfare = function() {
+        if (!window.forceNotifyCfg?.channels?.soundFanfare) return;
+        try {
+            if (!window.fallbackCtx) window.fallbackCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const ctx = window.fallbackCtx;
+            if (ctx.state === 'suspended') ctx.resume();
+            const now = ctx.currentTime;
+            const notes = [523.25, 659.25, 783.99, 1046.50];
+            notes.forEach((freq, idx) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(freq, now + idx * 0.11);
+                gain.gain.setValueAtTime(0.28, now + idx * 0.11);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.11 + 0.55);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(now + idx * 0.11);
+                osc.stop(now + idx * 0.11 + 0.55);
+            });
+        } catch (e) {}
+    };
+
+    window.triggerForceAchievementNotification = async function(title, body, badgeIcon = '🏆', achKey = null, pushToTelegram = true, forcedCat = null) {
+        if (!window.forceNotifyCfg?.masterEnabled) return;
+
+        const catKey = forcedCat || detectAchievementCategory(title, achKey || '');
+        if (achKey !== 'test_alert' && window.forceNotifyCfg?.categories && window.forceNotifyCfg.categories[catKey] === false) {
+            return;
+        }
+
+        if (achKey && achKey !== 'test_alert' && window.unlockedAchievementsLog.some(a => a.key === achKey)) return;
+        if (achKey && achKey !== 'test_alert') {
+            window.unlockedAchievementsLog.unshift({ key: achKey, title, body, badgeIcon, category: catKey, date: new Date().toISOString() });
+            window.safeSet('pages_pomodoro_achievements_v15', JSON.stringify(window.unlockedAchievementsLog.slice(0, 100)));
+        }
+
+        const ch = window.forceNotifyCfg.channels || {};
+        if (ch.soundFanfare) window.playAchievementFanfare();
+
+        if (ch.osNotification) {
+            try {
+                if ('Notification' in window && Notification.permission === 'granted') {
+                    if ('serviceWorker' in navigator) {
+                        const reg = await navigator.serviceWorker.getRegistration();
+                        if (reg && reg.showNotification) {
+                            await reg.showNotification(`${badgeIcon} ${title}`, {
+                                body,
+                                icon: './icon.svg',
+                                badge: './icon.svg',
+                                tag: achKey || ('ach_' + Date.now()),
+                                requireInteraction: true
+                            });
+                        } else {
+                            new Notification(`${badgeIcon} ${title}`, { body, icon: './icon.svg', requireInteraction: true });
+                        }
+                    } else {
+                        new Notification(`${badgeIcon} ${title}`, { body, icon: './icon.svg', requireInteraction: true });
+                    }
+                }
+            } catch (e) {}
+        }
+
+        if (ch.inAppBanner) {
+            let banner = document.getElementById('force-achievement-popup-banner');
+            if (!banner) {
+                banner = document.createElement('div');
+                banner.id = 'force-achievement-popup-banner';
+                banner.className = "fixed top-16 left-1/2 -translate-x-1/2 z-[99998] w-[92vw] max-w-md bg-gradient-to-r from-amber-950/98 via-slate-900/98 to-emerald-950/98 border-2 border-amber-400 rounded-3xl p-4 shadow-[0_0_40px_rgba(245,158,11,0.5)] flex items-center justify-between gap-3 transition-all";
+                document.body.appendChild(banner);
+            }
+            banner.innerHTML = `
+                <div class="flex items-center gap-3 min-w-0">
+                    <div class="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-400 flex items-center justify-center text-2xl shrink-0 animate-bounce">${badgeIcon}</div>
+                    <div class="min-w-0">
+                        <span class="text-[9px] font-mono font-extrabold uppercase tracking-widest bg-amber-500 text-slate-950 px-2 py-0.5 rounded-full">⚡ ACHIEVEMENT UNLOCKED</span>
+                        <h4 class="text-sm font-extrabold text-white mt-1 truncate">${escapeHtml(title)}</h4>
+                        <p class="text-[11px] text-amber-200/90 leading-snug mt-0.5">${escapeHtml(body)}</p>
+                    </div>
+                </div>
+                <div class="flex flex-col gap-1 shrink-0">
+                    <button type="button" onclick="this.closest('#force-achievement-popup-banner').remove()" class="bg-slate-800 hover:bg-slate-700 text-amber-300 font-extrabold px-2.5 py-1 rounded-xl text-xs">OK</button>
+                    <button type="button" onclick="this.closest('#force-achievement-popup-banner').remove(); window.openDeviceWidgetStudioModal();" class="text-[9px] text-slate-400 hover:text-white underline">⚙️ Mute</button>
+                </div>
+            `;
+            clearTimeout(window._achBannerTimer);
+            window._achBannerTimer = setTimeout(() => banner?.remove(), 8000);
+        }
+
+        if (ch.telegramPush && pushToTelegram && navigator.onLine) {
+            const token = window.safeGet('pages_pomodoro_tg_token', '');
+            const chatId = window.safeGet('pages_pomodoro_tg_chatid', '');
+            if (token && chatId) {
+                try {
+                    await fetch(`${HTTPS}api.telegram.org/bot${token}/sendMessage`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            chat_id: chatId,
+                            text: `${badgeIcon} *DEENTIMER PRO ACHIEVEMENT ALERT* ${badgeIcon}\n\n*${title}*\n${body}`,
+                            parse_mode: 'Markdown'
+                        })
+                    });
+                } catch (e) {}
+            }
+        }
+    };
+
+    window.openDeviceWidgetStudioModal = function() {
+        const modal = document.getElementById('reader-suboptions-modal');
+        const titleEl = document.getElementById('suboptions-modal-title');
+        const bodyEl = document.getElementById('suboptions-modal-body');
+        if (!modal || !titleEl || !bodyEl) return;
+
+        const cfg = window.forceNotifyCfg;
+        const ch = cfg.channels || {};
+        const cat = cfg.categories || {};
+
+        const channelRows = [
+            { key: 'inAppBanner', icon: '🏆', label: 'In-App Gold Trophy Popup Banner' },
+            { key: 'osNotification', icon: '🔔', label: 'OS Desktop Notification' },
+            { key: 'soundFanfare', icon: '🔊', label: 'Victory Fanfare Chime Sound' },
+            { key: 'telegramPush', icon: '✈️', label: 'Telegram Bot Instant Push Alert' }
+        ];
+
+        const categoryRows = [
+            { key: 'level_up', icon: '⚔️', label: 'RPG Level-Up & World Rank Promotions' },
+            { key: 'memory_beast', icon: '🧬', label: 'Memory Beast 100% Retention & Flashcard Locks' },
+            { key: 'reading_goal', icon: '📖', label: 'Daily Book Reading Duration Target Reached' },
+            { key: 'mcq_sniper', icon: '🎯', label: 'High-Yield MCQ Sniper Batch Scores' },
+            { key: 'study_streak', icon: '⏱️', label: 'Pomodoro Deep Study Session Streaks' },
+            { key: 'wake_recheck', icon: '☀️', label: 'PomoWake 5-Minute Recheck Passed' }
+        ];
+
+        titleEl.textContent = "🔔 Granular Force Achievement Notification Controls";
+        bodyEl.innerHTML = `
+            <div class="flex flex-col gap-3 text-xs">
+                <div class="bg-slate-950 border border-amber-500/50 rounded-2xl p-3.5 flex flex-col gap-2.5">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                        <div>
+                            <span class="text-[10px] font-extrabold uppercase text-amber-400">🔔 Force Achievement Notifications</span>
+                            <p class="text-[10px] text-slate-400">Choose which channels & achievement types are allowed to notify you</p>
+                        </div>
+                        <button type="button" onclick="window.toggleForceNotifySetting('master')" class="px-3 py-1.5 rounded-xl text-xs font-extrabold ${cfg.masterEnabled ? 'bg-emerald-600 text-white shadow' : 'bg-slate-800 text-slate-400'}">
+                            ${cfg.masterEnabled ? 'MASTER ON ✓' : 'ALL MUTED 🔇'}
+                        </button>
+                    </div>
+
+                    ${cfg.masterEnabled ? `
+                        <span class="text-[10px] font-extrabold uppercase text-cyan-400 mt-1">1. Delivery Channels:</span>
+                        <div class="grid grid-cols-2 gap-1.5">
+                            ${channelRows.map(r => `
+                                <div class="flex items-center justify-between bg-slate-900 px-2.5 py-2 rounded-xl border border-slate-800">
+                                    <span class="text-[11px] font-bold text-slate-200">${r.icon} ${r.label}</span>
+                                    <button type="button" onclick="window.toggleForceNotifySetting('channels', '${r.key}')" class="px-2.5 py-1 rounded-lg text-[10px] font-extrabold ${ch[r.key] ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'}">${ch[r.key] ? 'ON' : 'OFF'}</button>
+                                </div>
+                            `).join('')}
+                        </div>
+
+                        <span class="text-[10px] font-extrabold uppercase text-purple-400 mt-1">2. Notification Categories:</span>
+                        <div class="flex flex-col gap-1.5">
+                            ${categoryRows.map(r => `
+                                <div class="flex items-center justify-between bg-slate-900 px-3 py-2 rounded-xl border border-slate-800">
+                                    <span class="text-[11px] font-bold text-slate-200">${r.icon} ${r.label}</span>
+                                    <button type="button" onclick="window.toggleForceNotifySetting('categories', '${r.key}')" class="px-3 py-1 rounded-lg text-[10px] font-extrabold ${cat[r.key] ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}">${cat[r.key] ? 'ON' : 'OFF'}</button>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : `<p class="text-[11px] text-slate-400 italic text-center py-2">All Force Achievement Notifications are currently muted.</p>`}
+
+                    <button type="button" onclick="window.requestAllDesktopPermissions && window.requestAllDesktopPermissions(false); window.triggerForceAchievementNotification('Test Force Notification!', 'Testing your currently enabled desktop notification channels.', '🏆', 'test_alert', true);" class="w-full bg-amber-600/25 hover:bg-amber-600 text-amber-300 hover:text-white border border-amber-500/40 font-extrabold py-2 rounded-xl text-xs mt-1">
+                        🔔 Test Active Notification Channels Now
+                    </button>
+                </div>
+            </div>
+        `;
+        modal.classList.remove('hidden');
+    };
+
+    document.getElementById('mobile-widget-hub-btn')?.addEventListener('click', window.openDeviceWidgetStudioModal);
+    document.getElementById('desktop-pip-top-btn')?.addEventListener('click', () => {
+        if (window.launchPipMiniCockpitWidget) window.launchPipMiniCockpitWidget();
+    });
+
+    window.addEventListener('DOMContentLoaded', () => {
+        setTimeout(() => {
+            const params = new URLSearchParams(window.location.search);
+            const wCmd = params.get('widget');
+            if (!wCmd) return;
+            if (wCmd === 'start50' && window.startTimer) {
+                window.startTimer();
+            } else if (wCmd === 'flashcards') {
+                if (window.switchPage) window.switchPage('page-vault');
+                if (window.activateVaultSubview) window.activateVaultSubview('neet');
+                document.querySelector('.task-tab[data-tab="revision"]')?.click();
+            } else if (wCmd === 'resume_book' && window.readerBooks?.length && window.openBookAtPage) {
+                const latest = [...window.readerBooks].sort((a, b) => (b.lastOpened || 0) - (a.lastOpened || 0))[0];
+                if (latest) window.openBookAtPage(latest.id, latest.currentPage || 1);
+            }
+        }, 700);
+    });
+})();
+
+// 7. POMOWAKE MISSION OS (WITH 60s/90s QUIET-SOLVE, ALGEBRA/ROOTS & 5-MIN WAKE RECHECK)
+(function initPomoWakeMissionOS() {
     window.sendDesktopNotification = function(title, body, tag = 'pomo-os', requireInteraction = false) {
         try {
             if ('Notification' in window && Notification.permission === 'granted') {
-                const n = new Notification(title, {
-                    body,
-                    icon: './icon.svg',
-                    badge: './icon.svg',
-                    tag,
-                    requireInteraction
-                });
+                const n = new Notification(title, { body, icon: './icon.svg', badge: './icon.svg', tag, requireInteraction });
                 n.onclick = () => { window.focus(); n.close(); };
             }
         } catch (e) {}
@@ -292,32 +683,20 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
             await window.enforceKeepScreenOn();
             grantedList.push('WakeLock');
         } catch (e) {}
-
-        updateDesktopPermBtnUI();
         if (interactive) {
-            window.showToast(`🖥️ Desktop Permissions Active: ${grantedList.join(' • ') || 'Ready'}`);
-            window.sendDesktopNotification("⚡ DeenTimeR Pro Desktop OS", "All Windows Desktop notifications, alarms & background locks are active!");
+            window.showToast(`🖥️ OS Permissions Active: ${grantedList.join(' • ') || 'Ready'}`);
         }
     };
 
-    function updateDesktopPermBtnUI() {
-        const btn = document.getElementById('desktop-perm-top-btn');
-        if (!btn) return;
-        const isGranted = ('Notification' in window && Notification.permission === 'granted');
-        btn.className = isGranted
-            ? "bg-slate-900/90 hover:bg-slate-800 text-cyan-400 border border-cyan-500/40 px-2.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1 active:scale-95"
-            : "bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/50 px-2.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1 animate-pulse active:scale-95";
-        btn.innerHTML = isGranted ? `<span>🔔</span><span class="hidden md:inline text-[10px]">OS Ready</span>` : `<span>🔔</span><span class="hidden md:inline text-[10px]">Allow Alerts</span>`;
-    }
-
-    // 7. ALARMY-KILLER MISSION ALARM ENGINE + CUSTOM MP3 RINGTONE + SIREN SYNTHESIZER
     window.pomoAlarms = JSON.parse(window.safeGet('pages_pomodoro_alarms_v1', 'null')) || [
-        { id: 'alm_fajr', time: '05:05', label: '🕋 Fajr & Tahajjud Wake-Up', mission: 'math', difficulty: 'medium', enabled: false, days: [0,1,2,3,4,5,6] },
-        { id: 'alm_study', time: '08:00', label: '🔥 Morning Deep Study Lock-In', mission: 'vault', difficulty: 'medium', enabled: false, days: [0,1,2,3,4,5,6] }
+        { id: 'alm_fajr', time: '05:05', label: '🕋 Fajr & Tahajjud Wake-Up', mission: 'math_algebra', muteWindowSec: 90, wakeRecheck: true, enabled: false, days: [0,1,2,3,4,5,6] },
+        { id: 'alm_study', time: '08:00', label: '🔥 Morning Deep Study Lock-In', mission: 'math_div_root', muteWindowSec: 90, wakeRecheck: true, enabled: false, days: [0,1,2,3,4,5,6] }
     ];
     window.firedAlarmKeys = {};
     window.activeSirenLoop = null;
     window.customAlarmAudioEl = null;
+    window.alarmMuteCountdownTimer = null;
+    window.alarmMuteSecondsLeft = 0;
 
     window.savePomoAlarms = function() {
         window.safeSet('pages_pomodoro_alarms_v1', JSON.stringify(window.pomoAlarms));
@@ -326,7 +705,7 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
     };
 
     window.startLoudSirenLoop = async function() {
-        window.stopLoudSirenLoop();
+        window.stopLoudSirenLoop(false);
         try {
             const customRing = await window.idbGet('steelSnapshots', 'custom_alarm_ringtone');
             if (customRing && customRing.dataUrl) {
@@ -353,7 +732,7 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
                 osc1.frequency.linearRampToValueAtTime(1180, now + 0.35);
                 osc2.frequency.setValueAtTime(370, now);
                 osc2.frequency.linearRampToValueAtTime(590, now + 0.35);
-                gain.gain.setValueAtTime(0.45, now);
+                gain.gain.setValueAtTime(0.42, now);
                 gain.gain.exponentialRampToValueAtTime(0.02, now + 0.72);
                 osc1.connect(gain);
                 osc2.connect(gain);
@@ -365,46 +744,107 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
             } catch (e) {}
         };
         fireSirenPulse();
-        window.activeSirenLoop = setInterval(fireSirenPulse, 820);
+        window.activeSirenLoop = setInterval(fireSirenPulse, 850);
     };
 
-    window.stopLoudSirenLoop = function() {
+    window.stopLoudSirenLoop = function(clearQuietTimer = true) {
         if (window.activeSirenLoop) { clearInterval(window.activeSirenLoop); window.activeSirenLoop = null; }
         if (window.customAlarmAudioEl) {
             try { window.customAlarmAudioEl.pause(); window.customAlarmAudioEl.currentTime = 0; } catch (e) {}
             window.customAlarmAudioEl = null;
         }
+        if (clearQuietTimer && window.alarmMuteCountdownTimer) {
+            clearInterval(window.alarmMuteCountdownTimer);
+            window.alarmMuteCountdownTimer = null;
+            window.alarmMuteSecondsLeft = 0;
+        }
+    };
+
+    window.activateAlarmQuietSolveWindow = function(seconds = 90) {
+        window.stopLoudSirenLoop(true);
+        window.alarmMuteSecondsLeft = parseInt(seconds) || 90;
+        const badge = document.getElementById('alarmy-quiet-solve-badge');
+        if (badge) {
+            badge.className = "text-[11px] font-mono font-extrabold bg-emerald-950/90 text-emerald-300 border border-emerald-500/50 px-3 py-1.5 rounded-xl";
+            badge.textContent = `🔇 Siren Muted (${window.alarmMuteSecondsLeft}s left to solve peacefully)`;
+        }
+        window.alarmMuteCountdownTimer = setInterval(() => {
+            if (!document.getElementById('alarmy-mission-active-overlay')) {
+                window.stopLoudSirenLoop(true);
+                return;
+            }
+            window.alarmMuteSecondsLeft--;
+            const b = document.getElementById('alarmy-quiet-solve-badge');
+            if (window.alarmMuteSecondsLeft > 0) {
+                if (b) b.textContent = `🔇 Siren Muted (${window.alarmMuteSecondsLeft}s left to solve peacefully)`;
+            } else {
+                clearInterval(window.alarmMuteCountdownTimer);
+                window.alarmMuteCountdownTimer = null;
+                if (b) {
+                    b.className = "text-[11px] font-mono font-extrabold bg-red-950/90 text-red-300 border border-red-500/50 px-3 py-1.5 rounded-xl animate-pulse";
+                    b.textContent = `🔊 Time Up! Siren Resumed — Click Mute 60s/90s or Type to Silence`;
+                }
+                window.startLoudSirenLoop();
+            }
+        }, 1000);
+    };
+
+    window.scheduleFiveMinuteWakeRecheck = function(alarmObj) {
+        if (alarmObj.wakeRecheck === false) return;
+        window.showToast("🛡️ 5-Min Wake-Up Recheck Armed!");
+        setTimeout(() => {
+            let responded = false;
+            let recheckModal = document.getElementById('pomowake-recheck-modal');
+            if (!recheckModal) {
+                recheckModal = document.createElement('div');
+                recheckModal.id = 'pomowake-recheck-modal';
+                recheckModal.className = "fixed inset-0 z-[99994] modal-backdrop flex items-center justify-center p-4";
+                document.body.appendChild(recheckModal);
+            }
+            if (window.playChime) window.playChime('salah');
+            recheckModal.innerHTML = `
+                <div class="bg-slate-900 border-2 border-emerald-500 rounded-3xl p-6 max-w-sm w-full text-center flex flex-col gap-3 shadow-2xl">
+                    <span class="text-4xl animate-bounce">☀️</span>
+                    <h3 class="text-base font-extrabold text-white">5-Minute Wake-Up Recheck!</h3>
+                    <p class="text-xs text-slate-300">Click below within <b>60 seconds</b> to confirm you didn't fall back asleep after "${escapeHtml(alarmObj.label)}"!</p>
+                    <button type="button" id="confirm-awake-recheck-btn" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-3 rounded-2xl text-xs uppercase shadow-lg">✅ I Am 100% Awake & Locked In!</button>
+                </div>
+            `;
+            recheckModal.classList.remove('hidden');
+            const failTimer = setTimeout(() => {
+                if (!responded) {
+                    recheckModal.remove();
+                    window.triggerMissionAlarmOverlay(alarmObj);
+                }
+            }, 60000);
+            document.getElementById('confirm-awake-recheck-btn').onclick = () => {
+                responded = true;
+                clearTimeout(failTimer);
+                recheckModal.remove();
+                window.triggerForceAchievementNotification('Early Riser Discipline!', `Passed 5-Minute Wake Recheck for "${alarmObj.label}" (+50 XP)!`, '☀️');
+            };
+        }, 5 * 60 * 1000);
     };
 
     function updateTopAlarmBtnBadge() {
         const btn = document.getElementById('alarmy-top-btn');
         if (!btn) return;
         const activeCount = (window.pomoAlarms || []).filter(a => a.enabled).length;
-        btn.innerHTML = `<span>⏰</span><span class="hidden sm:inline text-[10px]">${activeCount > 0 ? `${activeCount} Active` : 'Alarms'}</span>`;
+        btn.innerHTML = `<span>⏰</span><span class="text-[10px]">${activeCount > 0 ? `${activeCount} ON` : 'Wake'}</span>`;
         btn.className = activeCount > 0
             ? "bg-rose-600/25 hover:bg-rose-600/35 text-rose-300 border border-rose-500/50 px-2.5 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1 active:scale-95"
             : "bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-700/80 px-2.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1 active:scale-95";
     }
 
     const leftHeaderGrp = document.getElementById('dim-toggle-btn')?.parentElement;
-    if (leftHeaderGrp) {
-        if (!document.getElementById('desktop-perm-top-btn')) {
-            const permBtn = document.createElement('button');
-            permBtn.type = 'button';
-            permBtn.id = 'desktop-perm-top-btn';
-            permBtn.onclick = () => window.requestAllDesktopPermissions(true);
-            leftHeaderGrp.appendChild(permBtn);
-            updateDesktopPermBtnUI();
-        }
-        if (!document.getElementById('alarmy-top-btn')) {
-            const almBtn = document.createElement('button');
-            almBtn.type = 'button';
-            almBtn.id = 'alarmy-top-btn';
-            almBtn.title = "Open Built-In Alarmy Mission Alarms & Task Reminders";
-            almBtn.onclick = () => window.openAlarmyStudioModal();
-            leftHeaderGrp.appendChild(almBtn);
-            updateTopAlarmBtnBadge();
-        }
+    if (leftHeaderGrp && !document.getElementById('alarmy-top-btn')) {
+        const almBtn = document.createElement('button');
+        almBtn.type = 'button';
+        almBtn.id = 'alarmy-top-btn';
+        almBtn.title = "Open PomoWake Mission Alarms & Task Reminders";
+        almBtn.onclick = () => window.openAlarmyStudioModal();
+        leftHeaderGrp.appendChild(almBtn);
+        updateTopAlarmBtnBadge();
     }
 
     window.openAlarmyStudioModal = function() {
@@ -412,7 +852,7 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
         if (!modal) {
             modal = document.createElement('div');
             modal.id = 'alarmy-studio-modal';
-            modal.className = "hidden fixed inset-0 modal-backdrop z-[420] flex items-center justify-center p-3 sm:p-4";
+            modal.className = "hidden fixed inset-0 modal-backdrop z-[420] flex items-center justify-center p-4";
             document.body.appendChild(modal);
         }
         const dayNames = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
@@ -420,51 +860,57 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
             <div class="bg-slate-900 border border-rose-500/50 rounded-3xl p-5 w-full max-w-lg shadow-2xl flex flex-col gap-3.5 max-h-[92dvh] native-scroll">
                 <div class="flex justify-between items-center border-b border-slate-800 pb-2.5">
                     <div>
-                        <span class="text-[9px] font-extrabold uppercase tracking-widest bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-full border border-rose-500/30">⏰ Built-In Alarmy-Killer OS</span>
-                        <h3 class="text-base font-extrabold text-white mt-1">Mission Alarms & Wake-Up Studio</h3>
+                        <span class="text-[9px] font-extrabold uppercase tracking-widest bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-full border border-rose-500/30">⏰ PomoWake Mission OS (v16.0)</span>
+                        <h3 class="text-base font-extrabold text-white mt-1">Mission Alarms, 60s/90s Quiet-Solve & 5m Recheck</h3>
                     </div>
                     <button type="button" onclick="document.getElementById('alarmy-studio-modal').classList.add('hidden')" class="bg-slate-800 text-slate-300 px-3 py-1 rounded-xl text-xs font-bold">✕ Close</button>
                 </div>
 
-                <!-- Add New Mission Alarm -->
                 <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 flex flex-col gap-2.5">
-                    <p class="text-[10px] font-extrabold uppercase tracking-wider text-rose-400">➕ Create New Mission Alarm</p>
-                    <div class="grid grid-cols-2 gap-2">
+                    <p class="text-[10px] font-extrabold uppercase tracking-wider text-rose-400">➕ Create New PomoWake Alarm</p>
+                    <div class="grid grid-cols-3 gap-2">
                         <input type="time" id="new-alarm-time-inp" value="05:15" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-base font-mono font-extrabold text-white">
                         <select id="new-alarm-mission-sel" class="bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-2 text-xs font-bold text-amber-300">
-                            <option value="math">🧮 Math Brain-Wake (3 Equations)</option>
+                            <option value="math_algebra">📐 Algebra Equations (Linear & Quadratic x)</option>
+                            <option value="math_div_root">➗ Square Roots (√x), Powers & Division</option>
+                            <option value="math_master">🧠 Master Mix (Algebra + √x + Division)</option>
+                            <option value="math">🧮 Standard Arithmetic (3 Equations)</option>
                             <option value="vault">🧬 Study Vault Recall Mission</option>
                             <option value="typing">⌨️ Discipline Typing Mission</option>
                             <option value="standard">🔔 Standard 1-Click Dismiss</option>
                         </select>
+                        <select id="new-alarm-mute-sel" class="bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-2 text-xs font-bold text-emerald-300">
+                            <option value="60">🔇 60s Quiet-Solve Mute</option>
+                            <option value="90" selected>🔇 90s Quiet-Solve Mute</option>
+                            <option value="120">🔇 120s Quiet-Solve Mute</option>
+                        </select>
                     </div>
                     <div class="flex gap-2">
-                        <input type="text" id="new-alarm-label-inp" placeholder="Alarm Label (e.g. Fajr + Biology Revision)..." class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white">
+                        <input type="text" id="new-alarm-label-inp" placeholder="Alarm Label (e.g. Fajr + Anatomy Revision)..." class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white">
                         <button type="button" onclick="window.addNewMissionAlarm()" class="bg-rose-600 hover:bg-rose-500 text-white font-extrabold px-4 py-2 rounded-xl text-xs shadow">＋ Add Alarm</button>
                     </div>
                 </div>
 
-                <!-- Custom MP3 Ringtone Uploader -->
                 <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3 flex items-center justify-between gap-2">
                     <div>
                         <p class="text-xs font-bold text-white">🎵 Custom Alarm Ringtone (Optional MP3/WAV)</p>
-                        <p class="text-[10px] text-slate-400">Stored 100% offline in AppData, or uses built-in High-Decibel Siren</p>
+                        <p class="text-[10px] text-slate-400">Siren auto-pauses for 60s/90s when you type + 5-min anti-back-to-sleep recheck!</p>
                     </div>
                     <div class="flex gap-1.5 shrink-0">
                         <input type="file" id="custom-alarm-audio-inp" accept="audio/*" class="hidden">
-                        <button type="button" onclick="document.getElementById('custom-alarm-audio-inp').click()" class="bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 px-2.5 py-1.5 rounded-xl text-[10px] font-bold">📂 Upload Audio</button>
-                        <button type="button" onclick="window.triggerMissionAlarmOverlay({id:'test', time:'NOW', label:'Test Mission Alarm', mission: document.getElementById('new-alarm-mission-sel')?.value || 'math'})" class="bg-amber-600/25 hover:bg-amber-600 text-amber-300 hover:text-white border border-amber-500/40 px-2.5 py-1.5 rounded-xl text-[10px] font-extrabold">🔊 Test Mission</button>
+                        <button type="button" onclick="document.getElementById('custom-alarm-audio-inp').click()" class="bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 px-2.5 py-1.5 rounded-xl text-[10px] font-bold">📂 Audio</button>
+                        <button type="button" onclick="window.triggerMissionAlarmOverlay({id:'test', time:'NOW', label:'Test PomoWake Mission', mission: document.getElementById('new-alarm-mission-sel')?.value || 'math_algebra', muteWindowSec: parseInt(document.getElementById('new-alarm-mute-sel')?.value)||90, wakeRecheck: true})" class="bg-amber-600/25 hover:bg-amber-600 text-amber-300 hover:text-white border border-amber-500/40 px-2.5 py-1.5 rounded-xl text-[10px] font-extrabold">🔊 Test</button>
                     </div>
                 </div>
 
-                <!-- Alarms List -->
                 <div class="flex flex-col gap-2 max-h-64 native-scroll">
                     ${window.pomoAlarms.map((a, idx) => `
                         <div class="flex items-center justify-between bg-slate-950 p-3 rounded-2xl border ${a.enabled ? 'border-rose-500/50 bg-rose-950/10' : 'border-slate-800 opacity-60'}">
                             <div class="min-w-0 flex-1 pr-2">
-                                <div class="flex items-center gap-2">
+                                <div class="flex items-center gap-2 flex-wrap">
                                     <span class="text-lg font-mono font-extrabold text-white">${escapeHtml(a.time)}</span>
-                                    <span class="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded bg-slate-900 text-amber-300 border border-slate-700">Mission: ${escapeHtml(a.mission.toUpperCase())}</span>
+                                    <span class="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded bg-slate-900 text-amber-300 border border-slate-700">${escapeHtml(a.mission.toUpperCase())}</span>
+                                    <span class="text-[9px] font-mono text-emerald-400">🔇 ${a.muteWindowSec || 90}s Mute • 🛡️ 5m Recheck</span>
                                 </div>
                                 <p class="text-xs font-bold text-slate-200 truncate mt-0.5">${escapeHtml(a.label)}</p>
                                 <p class="text-[9px] text-slate-500 font-mono mt-0.5">${(a.days || [0,1,2,3,4,5,6]).map(d => dayNames[d]).join(' • ')}</p>
@@ -494,19 +940,16 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
 
     window.addNewMissionAlarm = function() {
         const time = document.getElementById('new-alarm-time-inp')?.value || '06:00';
-        const mission = document.getElementById('new-alarm-mission-sel')?.value || 'math';
+        const mission = document.getElementById('new-alarm-mission-sel')?.value || 'math_algebra';
+        const muteWindowSec = parseInt(document.getElementById('new-alarm-mute-sel')?.value) || 90;
         const label = (document.getElementById('new-alarm-label-inp')?.value || '').trim() || 'Wake-Up & Focus Mission';
         window.pomoAlarms.unshift({
             id: 'alm_' + Date.now(),
-            time,
-            label,
-            mission,
-            enabled: true,
-            days: [0,1,2,3,4,5,6]
+            time, label, mission, muteWindowSec, wakeRecheck: true, enabled: true, days: [0,1,2,3,4,5,6]
         });
         window.savePomoAlarms();
         window.openAlarmyStudioModal();
-        window.showToast(`⏰ Alarm set for ${time} (${mission.toUpperCase()} Mission)!`);
+        window.showToast(`⏰ PomoWake set for ${time} (${mission.toUpperCase()} • ${muteWindowSec}s Quiet-Solve)!`);
     };
 
     window.toggleMissionAlarm = function(idx) {
@@ -523,7 +966,6 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
         window.openAlarmyStudioModal();
     };
 
-    // Full-Screen Unstoppable Mission Alarm Overlay
     window.triggerMissionAlarmOverlay = function(alarmObj) {
         let ov = document.getElementById('alarmy-mission-active-overlay');
         if (!ov) {
@@ -533,27 +975,60 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
             document.body.appendChild(ov);
         }
         window.startLoudSirenLoop();
-        window.sendDesktopNotification(`⏰ ALARM: ${alarmObj.label}`, `Complete your ${alarmObj.mission.toUpperCase()} mission to stop the siren!`, 'alarmy-ring', true);
+        window.sendDesktopNotification(`⏰ POMOWAKE: ${alarmObj.label}`, `Complete your ${alarmObj.mission.toUpperCase()} mission!`, 'alarmy-ring', true);
 
         let missionPrompt = '';
         let expectedAnswer = '';
-        let stepCount = alarmObj.mission === 'math' ? 3 : 1;
+        const isMathMission = String(alarmObj.mission || '').startsWith('math');
+        let stepCount = isMathMission ? 3 : 1;
         let currentStep = 1;
+        const defaultMuteSec = alarmObj.muteWindowSec || 90;
 
         function generateChallenge() {
-            if (alarmObj.mission === 'math') {
+            const mType = alarmObj.mission === 'math_master'
+                ? ['math_algebra', 'math_div_root', 'math'][currentStep % 3]
+                : alarmObj.mission;
+
+            if (mType === 'math_algebra') {
+                if (currentStep % 2 === 1) {
+                    const xVal = Math.floor(Math.random() * 14) + 3;
+                    const a = Math.floor(Math.random() * 7) + 3;
+                    const b = Math.floor(Math.random() * 25) + 8;
+                    const c = a * xVal + b;
+                    missionPrompt = `📐 Linear Algebra (${currentStep}/${stepCount}):\nSolve for x:   ${a}x + ${b} = ${c}`;
+                    expectedAnswer = String(xVal);
+                } else {
+                    const r1 = Math.floor(Math.random() * 5) + 2;
+                    const r2 = r1 + Math.floor(Math.random() * 5) + 2;
+                    const sumB = r1 + r2;
+                    const prodC = r1 * r2;
+                    missionPrompt = `📐 Quadratic Algebra (${currentStep}/${stepCount}):\nFind the LARGER root (x) of:   x² - ${sumB}x + ${prodC} = 0`;
+                    expectedAnswer = String(r2);
+                }
+            } else if (mType === 'math_div_root') {
+                const roots = [49, 64, 81, 100, 121, 144, 169, 196, 225, 256, 289, 324, 400];
+                const pickedSq = roots[Math.floor(Math.random() * roots.length)];
+                const rootVal = Math.round(Math.sqrt(pickedSq));
+                const divisor = Math.floor(Math.random() * 8) + 3;
+                const quotient = Math.floor(Math.random() * 9) + 4;
+                const dividend = divisor * quotient;
+                const pwrBase = Math.floor(Math.random() * 4) + 2;
+                const ans = rootVal + quotient + (pwrBase * pwrBase);
+                missionPrompt = `➗ Roots & Division (${currentStep}/${stepCount}):\nSolve:   √${pickedSq} + (${dividend} ÷ ${divisor}) + ${pwrBase}² = ?`;
+                expectedAnswer = String(ans);
+            } else if (mType === 'math') {
                 const a = Math.floor(Math.random() * 14) + 6;
                 const b = Math.floor(Math.random() * 9) + 4;
                 const c = Math.floor(Math.random() * 25) + 10;
-                missionPrompt = `Solve Equation (${currentStep}/${stepCount}):  ${a} × ${b} + ${c} = ?`;
+                missionPrompt = `🧮 Equation (${currentStep}/${stepCount}):  (${a} × ${b}) + ${c} = ?`;
                 expectedAnswer = String((a * b) + c);
-            } else if (alarmObj.mission === 'vault') {
+            } else if (mType === 'vault') {
                 const vTasks = JSON.parse(window.safeGet('pages_pomodoro_tasks_v8', '[]')).filter(t => !t.completed);
-                const pick = vTasks[0]?.title || 'BIOLOGY MASTER';
+                const pick = vTasks[0]?.title || 'MEDICAL SCIENCE MASTER';
                 const cleanTarget = pick.slice(0, 22).trim();
                 missionPrompt = `🧬 Vault Recall: Type "${cleanTarget}" below to prove you're awake:`;
                 expectedAnswer = cleanTarget.toLowerCase();
-            } else if (alarmObj.mission === 'typing') {
+            } else if (mType === 'typing') {
                 const phrases = [
                     "LOCK IN AND PROTECT MY DEEN AND GOALS",
                     "DISCIPLINE OVER SLEEP SUCCESS IS EARNED",
@@ -563,7 +1038,7 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
                 missionPrompt = `⌨️ Type this phrase exactly:\n"${p}"`;
                 expectedAnswer = p.toLowerCase();
             } else {
-                missionPrompt = `🔔 Tap Dismiss below to wake up & start your day!`;
+                missionPrompt = `🔔 Click Dismiss below to wake up & start your day!`;
                 expectedAnswer = '';
             }
         }
@@ -571,16 +1046,22 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
 
         function renderMissionCard() {
             ov.innerHTML = `
-                <div class="bg-slate-950/95 border-2 border-red-500 rounded-3xl p-6 w-full max-w-md shadow-2xl text-center flex flex-col gap-4">
-                    <span class="text-5xl animate-bounce">⏰</span>
-                    <div>
-                        <span class="text-[10px] font-mono font-extrabold uppercase tracking-widest bg-red-600 text-white px-3 py-1 rounded-full">${escapeHtml(alarmObj.time)} • MISSION ALARM ACTIVE</span>
-                        <h2 class="text-xl font-extrabold text-white mt-2">${escapeHtml(alarmObj.label)}</h2>
+                <div class="bg-slate-950/95 border-2 border-red-500 rounded-3xl p-6 w-full max-w-md shadow-2xl text-center flex flex-col gap-3.5">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[10px] font-mono font-extrabold uppercase tracking-widest bg-red-600 text-white px-3 py-1 rounded-full">${escapeHtml(alarmObj.time)} • POMOWAKE ACTIVE</span>
+                        <div class="flex gap-1.5">
+                            <button type="button" onclick="window.activateAlarmQuietSolveWindow(60)" class="bg-emerald-600/30 hover:bg-emerald-600 text-emerald-200 border border-emerald-500/50 px-2.5 py-1 rounded-lg text-[10px] font-extrabold">🔇 Mute 60s</button>
+                            <button type="button" onclick="window.activateAlarmQuietSolveWindow(90)" class="bg-cyan-600/30 hover:bg-cyan-600 text-cyan-200 border border-cyan-500/50 px-2.5 py-1 rounded-lg text-[10px] font-extrabold">🔇 Mute 90s</button>
+                        </div>
+                    </div>
+                    <h2 class="text-xl font-extrabold text-white">${escapeHtml(alarmObj.label)}</h2>
+                    <div id="alarmy-quiet-solve-badge" class="text-[11px] font-mono font-bold bg-amber-950/80 text-amber-300 border border-amber-500/40 px-3 py-1.5 rounded-xl">
+                        💡 Start typing or click "Mute 60s / 90s" above to silence siren while solving!
                     </div>
                     <div class="bg-slate-900 border border-amber-500/50 rounded-2xl p-4">
-                        <p class="text-sm font-mono font-extrabold text-amber-300 whitespace-pre-wrap">${escapeHtml(missionPrompt)}</p>
+                        <p class="text-base font-mono font-extrabold text-amber-300 whitespace-pre-wrap">${escapeHtml(missionPrompt)}</p>
                         ${expectedAnswer ? `
-                            <input type="text" id="alarmy-mission-ans-inp" placeholder="Type answer here..." class="w-full mt-3 bg-slate-950 border-2 border-blue-500 rounded-xl px-4 py-3 text-center font-mono text-base font-extrabold text-white focus:outline-none" autocomplete="off">
+                            <input type="text" id="alarmy-mission-ans-inp" placeholder="Type answer (auto-mutes siren for ${defaultMuteSec}s)..." class="w-full mt-3 bg-slate-950 border-2 border-blue-500 rounded-xl px-4 py-3 text-center font-mono text-base font-extrabold text-white focus:outline-none" autocomplete="off">
                         ` : ''}
                     </div>
                     <button type="button" id="alarmy-submit-mission-btn" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-3.5 rounded-2xl text-sm uppercase tracking-wider shadow-lg">
@@ -591,11 +1072,17 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
             const inp = document.getElementById('alarmy-mission-ans-inp');
             setTimeout(() => inp?.focus(), 60);
 
+            inp?.addEventListener('input', () => {
+                if (window.activeSirenLoop || window.customAlarmAudioEl) {
+                    window.activateAlarmQuietSolveWindow(defaultMuteSec);
+                }
+            });
+
             const checkFn = () => {
                 if (!expectedAnswer) {
-                    window.stopLoudSirenLoop();
+                    window.stopLoudSirenLoop(true);
                     ov.remove();
-                    window.showToast("☀️ Alhamdulillah! Alarm dismissed — have a blessed & productive day!");
+                    window.scheduleFiveMinuteWakeRecheck(alarmObj);
                     return;
                 }
                 const userVal = (inp?.value || '').trim().toLowerCase();
@@ -604,13 +1091,14 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
                         currentStep++;
                         generateChallenge();
                         renderMissionCard();
+                        window.activateAlarmQuietSolveWindow(defaultMuteSec);
                     } else {
-                        window.stopLoudSirenLoop();
+                        window.stopLoudSirenLoop(true);
                         ov.remove();
-                        window.showToast("🔥 Brain-Wake Mission Complete! Siren stopped.");
+                        window.scheduleFiveMinuteWakeRecheck(alarmObj);
                     }
                 } else {
-                    window.showToast("❌ Incorrect! Keep trying to stop the siren!", true);
+                    window.showToast("❌ Incorrect! Keep trying!", true);
                     if (inp) { inp.value = ''; inp.focus(); }
                 }
             };
@@ -620,14 +1108,12 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
         renderMissionCard();
     };
 
-    // Background Clock Watcher (Checks Mission Alarms & Per-Task Reminders Every 12 Seconds)
     setInterval(() => {
         const now = new Date();
         const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
         const todayIso = window.getLocalTodayString(now);
         const dayIdx = now.getDay();
 
-        // 1. Check Alarmy Mission Alarms
         (window.pomoAlarms || []).forEach(alm => {
             if (!alm.enabled) return;
             if (Array.isArray(alm.days) && !alm.days.includes(dayIdx)) return;
@@ -638,7 +1124,6 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
             }
         });
 
-        // 2. Check Per-Task To-Do & Study Vault Reminders
         (window.todos || []).forEach(t => {
             if (t.completed || !t.reminderTime) return;
             if (t.dueDate && t.dueDate !== todayIso && t.myDayDate !== todayIso) return;
@@ -646,7 +1131,7 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
             if (t.reminderTime === hhmm && !window.firedAlarmKeys[rKey]) {
                 window.firedAlarmKeys[rKey] = true;
                 if (window.playChime) window.playChime('salah');
-                window.sendDesktopNotification(`🔔 Task Reminder: ${t.title}`, `Scheduled for ${hhmm}. Click to launch on Timer!`, rKey, true);
+                window.sendDesktopNotification(`🔔 PomoTask Reminder: ${t.title}`, `Scheduled for ${hhmm}. Click to launch on Timer!`, rKey, true);
                 window.showTaskReminderBanner(t);
             }
         });
@@ -657,180 +1142,679 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
         if (!b) {
             b = document.createElement('div');
             b.id = 'live-task-reminder-popup';
-            b.className = "fixed bottom-20 right-4 left-4 sm:left-auto sm:w-96 z-[450] bg-slate-900 border-2 border-amber-500 rounded-2xl p-4 shadow-2xl flex flex-col gap-2.5";
+            b.className = "fixed bottom-20 right-4 w-96 z-[450] bg-slate-900 border-2 border-amber-500 rounded-2xl p-4 shadow-2xl flex flex-col gap-2.5";
             document.body.appendChild(b);
         }
         b.innerHTML = `
             <div class="flex justify-between items-start gap-2">
                 <div>
                     <span class="text-[9px] font-extrabold uppercase tracking-widest bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full">🔔 Scheduled Task Reminder (${escapeHtml(taskObj.reminderTime || 'NOW')})</span>
-                    <h4 class="text-xs sm:text-sm font-extrabold text-white mt-1">${escapeHtml(taskObj.title)}</h4>
+                    <h4 class="text-sm font-extrabold text-white mt-1">${escapeHtml(taskObj.title)}</h4>
                 </div>
                 <button type="button" onclick="this.closest('#live-task-reminder-popup').remove()" class="text-slate-400 hover:text-white text-xs font-bold">✕</button>
             </div>
             <div class="flex gap-2">
-                <button type="button" onclick="document.getElementById('live-task-reminder-popup')?.remove(); window.openProtocolRunModal && window.openProtocolRunModal('todo', '${taskObj.id}')" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-2 rounded-xl text-xs shadow">▶️ Run Now on Timer</button>
+                <button type="button" onclick="document.getElementById('live-task-reminder-popup')?.remove(); window.openProtocolRunModal && window.openProtocolRunModal('todo', '${escapeJsStr(taskObj.id)}')" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-2 rounded-xl text-xs shadow">▶️ Run Now on Timer</button>
                 <button type="button" onclick="document.getElementById('live-task-reminder-popup')?.remove()" class="bg-slate-800 text-slate-300 font-bold px-3 py-2 rounded-xl text-xs">Later</button>
             </div>
         `;
     };
+})();
 
-    // 8. MOON+ READER STYLE DIRECT CLOUD CONNECTOR (Google Drive, Dropbox API, WebDAV/URL & Local Folder)
-    setTimeout(() => {
-        const origConnect = window.connectOrConfigureCloud;
-        window.connectOrConfigureCloud = function(cloudKey) {
-            if (cloudKey === 'local' && origConnect) return origConnect('local');
-            const cfg = window.readerSettings?.clouds?.[cloudKey];
-            if (!cfg) return;
+// 8. POMOLEXICON 4-LANGUAGE MASTER DICTIONARY (ARABIC • URDU • ENGLISH • HINDI — FIXED CLEAN URLS)
+(function initFourLanguageScholarDictionary() {
+    const HTTPS = 'https:' + '//';
+    const MEDICAL_ROOTS = {
+        hyper: 'Greek: Over / Excessive / Above normal',
+        hypo: 'Greek: Under / Deficient / Below normal',
+        tachy: 'Greek: Fast / Rapid',
+        brady: 'Greek: Slow',
+        cardio: 'Greek (Kardia): Heart',
+        neuro: 'Greek (Neuron): Nerve / Nervous system',
+        hema: 'Greek (Haima): Blood',
+        itis: 'Suffix: Inflammation',
+        ectomy: 'Suffix: Surgical removal',
+        pathy: 'Suffix: Disease or disorder',
+        lysis: 'Suffix: Breakdown or dissolution',
+        genesis: 'Suffix: Origin / Production / Formation',
+        cyte: 'Suffix: Cell',
+        blast: 'Suffix: Immature / Precursor cell',
+        trophy: 'Suffix: Growth or nourishment'
+    };
 
-            const modal = document.getElementById('reader-suboptions-modal');
-            const titleEl = document.getElementById('suboptions-modal-title');
-            const bodyEl = document.getElementById('suboptions-modal-body');
-            if (!modal || !titleEl || !bodyEl) {
-                if (origConnect) return origConnect(cloudKey);
+    let savedVocabBank = JSON.parse(window.safeGet('pages_pomodoro_vocab_bank_v12', '[]'));
+
+    function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
+        return new Promise((resolve, reject) => {
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => { ctrl.abort(); reject(new Error('Timeout')); }, timeoutMs);
+            fetch(url, { ...options, signal: ctrl.signal })
+                .then(res => { clearTimeout(timer); resolve(res); })
+                .catch(err => { clearTimeout(timer); reject(err); });
+        });
+    }
+
+    window.openReaderDictionaryModal = function(initialWord = '') {
+        const modal = document.getElementById('reader-dictionary-modal');
+        const inp = document.getElementById('dict-search-word-inp');
+        if (!modal) return;
+        modal.classList.remove('hidden');
+        if (inp) {
+            const cleanedInit = String(initialWord || '').replace(/\s+/g, ' ').trim().slice(0, 110);
+            inp.value = cleanedInit;
+            if (cleanedInit) window.lookupWordIn4Languages(cleanedInit);
+            else setTimeout(() => inp.focus(), 60);
+        }
+    };
+
+    document.getElementById('close-dictionary-modal-btn')?.addEventListener('click', () => {
+        document.getElementById('reader-dictionary-modal')?.classList.add('hidden');
+    });
+    document.getElementById('reader-open-dict-top-btn')?.addEventListener('click', () => {
+        window.openReaderDictionaryModal('');
+    });
+    document.getElementById('dict-lookup-run-btn')?.addEventListener('click', () => {
+        const w = document.getElementById('dict-search-word-inp')?.value || '';
+        window.lookupWordIn4Languages(w);
+    });
+    document.getElementById('dict-search-word-inp')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') window.lookupWordIn4Languages(e.target.value);
+    });
+
+    window.lookupWordIn4Languages = async function(rawQuery) {
+        const query = String(rawQuery || '').replace(/\s+/g, ' ').trim();
+        const body = document.getElementById('dict-results-body');
+        if (!query || !body) return;
+
+        const firstWordClean = query.split(/\s+/)[0].replace(/^[^a-zA-Z0-9\u0600-\u06FF\u0900-\u097F]+|[^a-zA-Z0-9\u0600-\u06FF\u0900-\u097F]+$/g, '') || query;
+        body.innerHTML = `<p class="text-xs text-slate-400 p-4 text-center">⏳ Looking up "<b class="text-white">${escapeHtml(query)}</b>" across English, Arabic (العربية), Urdu (اردو) & Hindi (हिन्दी)...</p>`;
+
+        const qLow = firstWordClean.toLowerCase();
+        const matchedRoots = Object.entries(MEDICAL_ROOTS)
+            .filter(([k]) => qLow.includes(k))
+            .map(([k, v]) => `<span class="bg-purple-950/80 text-purple-300 border border-purple-500/40 px-2 py-0.5 rounded text-[10px] font-mono"><b>-${k}-</b>: ${escapeHtml(v)}</span>`);
+
+        let engDef = '', phonetic = '', partOfSpeech = '', example = '', synonyms = [];
+        let arTrans = '', urTrans = '', hiTrans = '';
+
+        if (navigator.onLine) {
+            try {
+                const dictUrl = `${HTTPS}api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(firstWordClean)}`;
+                const dRes = await fetchWithTimeout(dictUrl, {}, 6500);
+                if (dRes.ok) {
+                    const dJson = await dRes.json();
+                    const entry = dJson?.[0];
+                    phonetic = entry?.phonetic || entry?.phonetics?.find(p => p.text)?.text || '';
+                    const m = entry?.meanings?.[0];
+                    partOfSpeech = m?.partOfSpeech || '';
+                    engDef = m?.definitions?.[0]?.definition || '';
+                    example = m?.definitions?.[0]?.example || '';
+                    synonyms = (m?.synonyms || []).slice(0, 5);
+                }
+            } catch (e) {}
+
+            // Fixed Clean URL (Zero Markdown corruption)
+            const fetchTrans = async (langCode) => {
+                try {
+                    const transUrl = `${HTTPS}translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${langCode}&dt=t&q=${encodeURIComponent(query)}`;
+                    const r = await fetchWithTimeout(transUrl, {}, 6500);
+                    if (r.ok) {
+                        const j = await r.json();
+                        return (j?.[0] || []).map(x => x?.[0]).join('') || '';
+                    }
+                } catch (e) {}
+                return '';
+            };
+
+            [arTrans, urTrans, hiTrans] = await Promise.all([fetchTrans('ar'), fetchTrans('ur'), fetchTrans('hi')]);
+        }
+
+        window.lastDictLookupObj = { word: firstWordClean, engDef: engDef || query, arTrans, urTrans, hiTrans };
+
+        body.innerHTML = `
+            <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 flex flex-col gap-2.5">
+                <div class="flex items-baseline justify-between border-b border-slate-800 pb-2 gap-2 flex-wrap">
+                    <div class="min-w-0">
+                        <span class="text-base font-extrabold text-white">${escapeHtml(firstWordClean)}</span>
+                        ${phonetic ? `<span class="text-xs font-mono text-cyan-400 ml-2">${escapeHtml(phonetic)}</span>` : ''}
+                        ${partOfSpeech ? `<span class="text-[10px] font-bold uppercase bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded ml-2">${escapeHtml(partOfSpeech)}</span>` : ''}
+                    </div>
+                    <div class="flex gap-1.5 shrink-0">
+                        <button type="button" onclick="window.saveCurrentWordToVocabBank()" class="bg-amber-600/25 hover:bg-amber-600 text-amber-300 hover:text-white border border-amber-500/40 px-2.5 py-1 rounded-lg text-xs font-bold">⭐ Save Word (${savedVocabBank.length})</button>
+                        <button type="button" onclick="window.speechSynthesis && window.speechSynthesis.speak(new SpeechSynthesisUtterance('${escapeJsStr(firstWordClean)}'))" class="bg-slate-800 hover:bg-slate-700 text-emerald-300 px-2.5 py-1 rounded-lg text-xs font-bold">🔊 Pronounce</button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="bg-slate-900 border border-blue-500/30 rounded-xl p-2.5">
+                        <span class="text-[10px] font-extrabold uppercase text-blue-400">🇬🇧 English Meaning</span>
+                        <p class="text-xs text-slate-100 mt-1 leading-relaxed">${escapeHtml(engDef || `Term: "${query}"`)}</p>
+                        ${example ? `<p class="text-[11px] italic text-slate-400 mt-1">"${escapeHtml(example)}"</p>` : ''}
+                        ${synonyms.length ? `<p class="text-[10px] text-cyan-300 mt-1 font-mono">Synonyms: ${escapeHtml(synonyms.join(', '))}</p>` : ''}
+                    </div>
+                    <div class="bg-slate-900 border border-emerald-500/30 rounded-xl p-2.5 text-right" dir="rtl">
+                        <span class="text-[10px] font-extrabold uppercase text-emerald-400 block" dir="ltr">🇸🇦 Arabic (العربية)</span>
+                        <p class="text-base font-bold text-white mt-1">${escapeHtml(arTrans || '—')}</p>
+                    </div>
+                    <div class="bg-slate-900 border border-amber-500/30 rounded-xl p-2.5 text-right" dir="rtl">
+                        <span class="text-[10px] font-extrabold uppercase text-amber-400 block" dir="ltr">🇵🇰🇮🇳 Urdu (اردو)</span>
+                        <p class="text-base font-bold text-white mt-1">${escapeHtml(urTrans || '—')}</p>
+                    </div>
+                    <div class="bg-slate-900 border border-purple-500/30 rounded-xl p-2.5">
+                        <span class="text-[10px] font-extrabold uppercase text-purple-400 block">🇮🇳 Hindi (हिन्दी)</span>
+                        <p class="text-base font-bold text-white mt-1">${escapeHtml(hiTrans || '—')}</p>
+                    </div>
+                </div>
+
+                ${matchedRoots.length ? `<div class="flex flex-wrap gap-1.5 pt-1">${matchedRoots.join('')}</div>` : ''}
+            </div>
+        `;
+    };
+
+    window.saveCurrentWordToVocabBank = function() {
+        if (!window.lastDictLookupObj) return;
+        savedVocabBank = savedVocabBank.filter(x => x.word.toLowerCase() !== window.lastDictLookupObj.word.toLowerCase());
+        savedVocabBank.unshift({ ...window.lastDictLookupObj, savedAt: Date.now() });
+        window.safeSet('pages_pomodoro_vocab_bank_v12', JSON.stringify(savedVocabBank));
+
+        // Also add to FSRS Flashcards Deck automatically!
+        const cards = JSON.parse(window.safeGet('pages_pomodoro_fsrs_cards_v15', '[]'));
+        cards.unshift({
+            id: 'fc_vocab_' + Date.now(),
+            front: `Define "${window.lastDictLookupObj.word}" (English / Arabic / Urdu / Hindi):`,
+            back: `${window.lastDictLookupObj.engDef}\n• AR: ${window.lastDictLookupObj.arTrans || '—'} | UR: ${window.lastDictLookupObj.urTrans || '—'} | HI: ${window.lastDictLookupObj.hiTrans || '—'}`,
+            topic: 'Lexicon Vocab',
+            intervalDays: 1,
+            stabilityPct: 95
+        });
+        window.safeSet('pages_pomodoro_fsrs_cards_v15', JSON.stringify(cards));
+        window.showToast(`⭐ Saved "${window.lastDictLookupObj.word}" to Vocab Bank & Memory Beast Flashcards!`);
+    };
+})();
+
+// 9. MASTER 15-PRO COMMAND HUB + 40HZ GAMMA SYNTH + OMR & SRS + DESKTOP SHORTCUTS ENGINE
+(function initMaster15UpgradesAndDesktopShortcuts() {
+    var audioNodes = { playing: false, mode: 'off', ctx: null, gain: null, sources: [] };
+    window.toggleOfflineFocusAudio = function(mode = '40hz') {
+        try {
+            if (!audioNodes.ctx) audioNodes.ctx = window.fallbackCtx || new (window.AudioContext || window.webkitAudioContext)();
+            const ctx = audioNodes.ctx;
+            if (ctx.state === 'suspended') ctx.resume();
+
+            audioNodes.sources.forEach(s => { try { s.stop(); s.disconnect(); } catch (e) {} });
+            audioNodes.sources = [];
+
+            if (mode === 'off' || (audioNodes.playing && audioNodes.mode === mode)) {
+                audioNodes.playing = false;
+                audioNodes.mode = 'off';
+                window.showToast("🔇 Focus Audio Synthesizer Muted");
                 return;
             }
 
-            titleEl.textContent = `${cfg.icon} ${cfg.name} — Moon+ Cloud Connector`;
-            bodyEl.innerHTML = `
-                <p class="text-xs text-slate-400">Connect <b class="text-white">${escapeHtml(cfg.name)}</b> via Direct Cloud Link/API (works on PC & Smartphone) or link a local synced folder.</p>
+            const masterGain = ctx.createGain();
+            masterGain.gain.setValueAtTime(0.18, ctx.currentTime);
+            masterGain.connect(ctx.destination);
+            audioNodes.gain = masterGain;
 
-                ${cloudKey === 'dropbox' ? `
-                    <div class="bg-slate-950 border border-blue-500/40 rounded-2xl p-3.5 flex flex-col gap-2">
-                        <label class="text-[10px] font-extrabold uppercase text-blue-400">📦 Dropbox Direct Cloud API Token (Moon+ Net Library)</label>
-                        <input type="password" id="cloud-dbx-token-inp" value="${escapeHtml(cfg.token || '')}" placeholder="Paste Dropbox Access Token (sl.u...)" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono">
-                        <div class="flex gap-2">
-                            <button type="button" id="save-dbx-token-btn" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 rounded-xl text-xs">💾 Save Dropbox Token</button>
-                            <button type="button" id="browse-dbx-cloud-btn" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded-xl text-xs">☁️ Browse / Pull /PomoReader</button>
-                        </div>
-                        <div id="dbx-cloud-files-list" class="flex flex-col gap-1.5 max-h-40 native-scroll mt-1"></div>
-                    </div>
-                ` : ''}
+            if (mode === '40hz') {
+                const panL = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain();
+                const panR = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain();
+                if (panL.pan) panL.pan.value = -1;
+                if (panR.pan) panR.pan.value = 1;
+                const oscL = ctx.createOscillator();
+                const oscR = ctx.createOscillator();
+                oscL.type = 'sine'; oscL.frequency.value = 200;
+                oscR.type = 'sine'; oscR.frequency.value = 240;
+                oscL.connect(panL); panL.connect(masterGain);
+                oscR.connect(panR); panR.connect(masterGain);
+                oscL.start(); oscR.start();
+                audioNodes.sources.push(oscL, oscR);
+                window.showToast("🎧 40Hz Gamma Binaural Beats Active (Memory Beast Focus Wave)");
+            } else if (mode === 'brown' || mode === 'rain') {
+                const bufSize = ctx.sampleRate * 3;
+                const buffer = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                let lastOut = 0.0;
+                for (let i = 0; i < bufSize; i++) {
+                    const white = Math.random() * 2 - 1;
+                    if (mode === 'brown') {
+                        data[i] = (lastOut + (0.02 * white)) / 1.02;
+                        lastOut = data[i];
+                        data[i] *= 3.2;
+                    } else {
+                        data[i] = (lastOut + (0.12 * white)) / 1.12;
+                        lastOut = data[i];
+                        data[i] *= 1.5;
+                    }
+                }
+                const noise = ctx.createBufferSource();
+                noise.buffer = buffer;
+                noise.loop = true;
+                noise.connect(masterGain);
+                noise.start();
+                audioNodes.sources.push(noise);
+                window.showToast(mode === 'brown' ? "🌊 Deep Synthetic Brown Noise Active" : "🌧️ Forest Rainfall Soundscape Active");
+            }
+            audioNodes.playing = true;
+            audioNodes.mode = mode;
+        } catch (e) { window.showToast("Click anywhere first to enable Web Audio", true); }
+    };
 
-                <!-- Direct Cloud URL / Google Drive Link Downloader -->
-                <div class="bg-slate-950 border border-emerald-500/40 rounded-2xl p-3.5 flex flex-col gap-2">
-                    <label class="text-[10px] font-extrabold uppercase text-emerald-400">🌐 Direct ${escapeHtml(cfg.name)} Share Link / Direct Book URL Import</label>
-                    <input type="text" id="cloud-direct-url-inp" placeholder="Paste Google Drive Share Link, Dropbox Link, or Direct .pdf / .epub URL..." class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white">
-                    <div class="flex gap-2">
-                        <input type="text" id="cloud-direct-name-inp" placeholder="Book Filename (e.g. Biology_Notes.pdf)" class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white">
-                        <button type="button" id="cloud-direct-download-btn" class="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold px-4 py-2 rounded-xl text-xs shadow">⬇️ Pull to Shelf</button>
+    window.scheduleChapterSpacedRepetition = function(chapterTitle, subj = 'Medical Science') {
+        const intervals = [1, 3, 7, 14, 30];
+        intervals.forEach((days, idx) => {
+            const dueIso = window.addDaysToTodayISO(days);
+            window.todos.unshift({
+                id: Date.now() + idx + Math.floor(Math.random() * 999),
+                title: `🔁 [SRS Stage ${idx + 1}/5 • +${days}d] ${subj}: ${chapterTitle}`,
+                completed: false,
+                important: idx <= 1,
+                myDayDate: days === 1 ? dueIso : '',
+                createdDate: window.getLocalTodayString(),
+                dueDate: dueIso,
+                durationMins: 30,
+                repeat: { type: 'none' },
+                steps: [],
+                note: `Memory Beast 1-3-7-14-30 Spaced Repetition Review #${idx + 1}`,
+                listId: 'tasks'
+            });
+        });
+        if (window.saveTodos) window.saveTodos();
+        if (window.renderTodos) window.renderTodos();
+        window.showToast(`🔁 Scheduled 1-3-7-14-30 Day Memory Beast Reviews for "${chapterTitle}"!`);
+    };
+
+    var streamerHudActive = false;
+    window.toggleObsStreamerHudMode = function() {
+        streamerHudActive = !streamerHudActive;
+        const hideIds = ['home-omni-bento-strip', 'home-reader-widget-card', 'ai-coach-card'];
+        hideIds.forEach(id => document.getElementById(id)?.classList.toggle('hidden', streamerHudActive));
+        window.showToast(streamerHudActive ? "🎥 OBS Broadcast HUD Active (Clean Streamer Layout)" : "🎥 Standard Workspace Restored");
+    };
+
+    window.autoPackPomodoroCycles = function(cycles = 4, subjTitle = 'High-Yield Medical & Polymath Lock-In') {
+        if (!Array.isArray(window.schedule)) return;
+        for (let c = 1; c <= cycles; c++) {
+            const studyBlk = {
+                id: Date.now() + c * 10,
+                type: 'work',
+                category: 'study',
+                title: `🧠 Cycle ${c}/${cycles}: ${subjTitle} (50m Deep Focus)`,
+                duration: 50 * 60
+            };
+            window.schedule.push(studyBlk);
+            if (window.ensureProtocolBlockSyncedToTodo) window.ensureProtocolBlockSyncedToTodo(studyBlk);
+            window.schedule.push({
+                id: Date.now() + c * 10 + 1,
+                type: 'break',
+                category: 'break',
+                title: c % 3 === 0 ? `💧 Extended Recovery Break (15m)` : `💧 Short Pomodoro Break (10m)`,
+                duration: (c % 3 === 0 ? 15 : 10) * 60
+            });
+        }
+        window.safeSet('pages_pomodoro_schedule_v8', JSON.stringify(window.schedule));
+        if (window.renderSchedule) window.renderSchedule();
+        window.showToast(`🗓️ Auto-Packed ${cycles} Pomodoro Cycles (50m/10m) into Live Protocol!`);
+    };
+
+    window.mistakeAutopsyList = JSON.parse(window.safeGet('pages_pomodoro_autopsy_v12', '[]'));
+    window.formulaCheatBank = JSON.parse(window.safeGet('pages_pomodoro_formulas_v12', '[]'));
+
+    window.openMaster15UpgradesHub = function() {
+        let modal = document.getElementById('master-15-upgrades-modal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'master-15-upgrades-modal';
+            modal.className = "hidden fixed inset-0 modal-backdrop z-[9995] flex items-center justify-center p-4";
+            document.body.appendChild(modal);
+        }
+
+        const vocabList = JSON.parse(window.safeGet('pages_pomodoro_vocab_bank_v12', '[]'));
+
+        modal.innerHTML = `
+            <div class="bg-slate-900 border-2 border-cyan-500/60 rounded-3xl w-full max-w-4xl max-h-[92dvh] shadow-2xl flex flex-col overflow-hidden">
+                <div class="flex flex-wrap items-center justify-between gap-2 px-5 py-3.5 bg-slate-950 border-b border-slate-800 shrink-0">
+                    <div>
+                        <span class="text-[9px] font-extrabold uppercase tracking-widest bg-cyan-500/20 text-cyan-300 px-2.5 py-0.5 rounded-full border border-cyan-500/40">🚀 Polymath Command Center (Ctrl + K)</span>
+                        <h3 class="text-base font-extrabold text-white mt-0.5">Master 15-Pro Hub • 40Hz Synth • (+4/-1) OMR • SRS & Formula Vault</h3>
                     </div>
+                    <button type="button" onclick="document.getElementById('master-15-upgrades-modal').classList.add('hidden')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-3 py-1.5 rounded-xl text-xs">✕ Close</button>
                 </div>
 
-                <!-- Local Synced Cloud Folder / File Picker -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-slate-800">
-                    <button type="button" id="cloud-link-pc-folder-btn" class="bg-slate-950 hover:bg-slate-800 border border-slate-700 text-cyan-300 font-bold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5">📂 Link Synced PC Folder</button>
-                    <button type="button" id="cloud-pick-files-btn" class="bg-slate-950 hover:bg-slate-800 border border-slate-700 text-amber-300 font-bold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5">📥 Select Files From Device</button>
+                <div class="flex-1 p-4 native-scroll flex flex-col gap-3.5">
+                    <div class="bg-slate-950 border-2 border-cyan-500/60 rounded-2xl p-3 flex items-center gap-2">
+                        <span class="text-base">⌨️</span>
+                        <input type="text" id="ctrlk-cmd-inp" placeholder="Spotlight: Type 'dict word', 'pomo' to start timer, 'keys' for shortcuts..." class="flex-1 bg-transparent text-xs font-mono text-white focus:outline-none">
+                        <button type="button" onclick="document.getElementById('master-15-upgrades-modal').classList.add('hidden'); window.openDesktopShortcutsModal();" class="bg-slate-900 hover:bg-blue-600 text-cyan-300 hover:text-white border border-slate-700 px-3 py-1 rounded-lg text-xs font-extrabold">⌨️ All Shortcuts (?)</button>
+                    </div>
+
+                    <div class="bg-slate-950 border border-emerald-500/40 rounded-2xl p-3.5 flex flex-col gap-2.5">
+                        <span class="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400">⚡ Pack A — 40Hz Gamma Binaural • Brown Noise • Forest Rain • PiP • OBS HUD</span>
+                        <div class="grid grid-cols-4 gap-2">
+                            <button type="button" onclick="window.toggleOfflineFocusAudio('40hz')" class="bg-emerald-600/25 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/40 p-2.5 rounded-xl text-xs font-extrabold">🧠 Play 40Hz Gamma</button>
+                            <button type="button" onclick="window.toggleOfflineFocusAudio('brown')" class="bg-amber-600/25 hover:bg-amber-600 text-amber-300 hover:text-white border border-amber-500/40 p-2.5 rounded-xl text-xs font-extrabold">🌊 Play Brown Noise</button>
+                            <button type="button" onclick="window.toggleOfflineFocusAudio('rain')" class="bg-cyan-600/25 hover:bg-cyan-600 text-cyan-300 hover:text-white border border-cyan-500/40 p-2.5 rounded-xl text-xs font-extrabold">🌧️ Play Forest Rain</button>
+                            <button type="button" onclick="window.toggleOfflineFocusAudio('off')" class="bg-slate-900 hover:bg-red-950 text-red-300 border border-slate-800 p-2.5 rounded-xl text-xs font-bold">🔇 Stop Audio</button>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 pt-1">
+                            <button type="button" onclick="document.getElementById('master-15-upgrades-modal').classList.add('hidden'); window.launchPipMiniCockpitWidget && window.launchPipMiniCockpitWidget();" class="bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-slate-700 p-2.5 rounded-xl text-xs font-bold">🖼️ Pop Out Mini-PiP Window</button>
+                            <button type="button" onclick="window.toggleObsStreamerHudMode()" class="bg-slate-900 hover:bg-slate-800 text-purple-300 border border-slate-700 p-2.5 rounded-xl text-xs font-bold">🎥 Toggle OBS Streamer HUD</button>
+                            <button type="button" onclick="window.autoPackPomodoroCycles(4, 'Medical & Polymath Deep Block'); document.getElementById('master-15-upgrades-modal').classList.add('hidden');" class="bg-blue-600 hover:bg-blue-500 text-white p-2.5 rounded-xl text-xs font-extrabold shadow">🗓️ Auto-Pack 4× (50m/10m) Cycles</button>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-950 border border-amber-500/40 rounded-2xl p-3.5 flex flex-col gap-2.5">
+                        <span class="text-[10px] font-extrabold uppercase tracking-wider text-amber-400">🎯 Pack B — 1-3-7-14-30 SRS • Mistake Autopsy • Formula Sheet • (+4/-1) OMR Simulator</span>
+                        <div class="flex gap-2">
+                            <input type="text" id="srs-quick-chap-inp" placeholder="Type chapter/topic completed today (e.g. Cardiac Cycle / French Revolution)..." class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white">
+                            <button type="button" onclick="const v=document.getElementById('srs-quick-chap-inp').value.trim(); if(v) window.scheduleChapterSpacedRepetition(v, window.activeTaskSubj||'Medical Science');" class="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold px-4 py-2 rounded-xl text-xs shadow">🔁 Schedule 1-3-7-14-30 SRS</button>
+                        </div>
+                        <div class="grid grid-cols-4 gap-2 pt-1">
+                            <button type="button" onclick="window.openDigitalOmrSimulatorModal()" class="bg-rose-600 hover:bg-rose-500 text-white p-2.5 rounded-xl text-xs font-extrabold shadow">📝 (+4/-1) OMR Sheet</button>
+                            <button type="button" onclick="window.renderMistakeAutopsySection()" class="bg-slate-900 hover:bg-slate-800 text-rose-300 border border-slate-700 p-2.5 rounded-xl text-xs font-bold">🩺 Mistake Autopsy (${window.mistakeAutopsyList.length})</button>
+                            <button type="button" onclick="window.renderFormulaCheatSheetSection()" class="bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-slate-700 p-2.5 rounded-xl text-xs font-bold">🧮 Formula Sheet (${window.formulaCheatBank.length})</button>
+                            <button type="button" onclick="window.renderVocabFlashcardsSection()" class="bg-slate-900 hover:bg-slate-800 text-amber-300 border border-slate-700 p-2.5 rounded-xl text-xs font-bold">🃏 Vocab Cards (${vocabList.length})</button>
+                        </div>
+                        <div id="pack-c-dynamic-viewer" class="mt-2"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+        modal.classList.remove('hidden');
+
+        const cmdInp = document.getElementById('ctrlk-cmd-inp');
+        setTimeout(() => cmdInp?.focus(), 60);
+        cmdInp?.addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter') return;
+            const val = cmdInp.value.trim();
+            modal.classList.add('hidden');
+            if (/^dict\s+(.+)/i.test(val)) {
+                window.openReaderDictionaryModal(val.replace(/^dict\s+/i, ''));
+            } else if (/^keys/i.test(val)) {
+                window.openDesktopShortcutsModal();
+            } else if (/^pomo/i.test(val)) {
+                window.startTimer && window.startTimer();
+            }
+        });
+    };
+
+    window.openDigitalOmrSimulatorModal = function() {
+        const box = document.getElementById('pack-c-dynamic-viewer');
+        if (!box) return;
+        let rowsHtml = '';
+        for (let q = 1; q <= 20; q++) {
+            rowsHtml += `
+                <div class="flex items-center justify-between bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
+                    <span class="font-mono text-xs font-extrabold text-slate-300">Q.${String(q).padStart(2, '0')}</span>
+                    <div class="flex gap-1.5">
+                        ${['A', 'B', 'C', 'D'].map(opt => `<label class="cursor-pointer"><input type="radio" name="omr_q_${q}" value="${opt}" class="peer hidden"><span class="w-7 h-7 rounded-full border border-slate-700 flex items-center justify-center text-[11px] font-mono font-bold text-slate-400 peer-checked:bg-rose-600 peer-checked:text-white peer-checked:border-rose-400">${opt}</span></label>`).join('')}
+                    </div>
+                    <select id="omr_res_${q}" class="bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-[10px] font-bold text-slate-300">
+                        <option value="un">⚪ Skip (0)</option>
+                        <option value="cor">✅ Correct (+4)</option>
+                        <option value="wro">❌ Wrong (-1)</option>
+                    </select>
                 </div>
             `;
-            modal.classList.remove('hidden');
+        }
+        box.innerHTML = `
+            <div class="bg-slate-900 border border-rose-500/40 rounded-2xl p-3.5 flex flex-col gap-2.5">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-extrabold text-rose-300">📝 Digital OMR Bubble Sheet (+4 Correct / -1 Wrong / 0 Skip)</span>
+                    <button type="button" onclick="window.calculateOmrSheetNetScore()" class="bg-emerald-600 text-white font-extrabold px-3 py-1 rounded-lg text-xs">⚡ Calculate +4/-1 Score</button>
+                </div>
+                <div id="omr-net-score-banner" class="hidden bg-slate-950 border border-emerald-500/50 rounded-xl p-2.5 text-center font-mono text-xs font-extrabold text-emerald-300"></div>
+                <div class="grid grid-cols-2 gap-2 max-h-60 native-scroll">${rowsHtml}</div>
+            </div>
+        `;
+    };
 
-            document.getElementById('save-dbx-token-btn')?.addEventListener('click', () => {
-                const tk = (document.getElementById('cloud-dbx-token-inp')?.value || '').trim();
-                cfg.token = tk;
-                cfg.connected = Boolean(tk);
-                cfg.status = tk ? 'Connected via Direct Dropbox API' : 'Not Connected';
-                window.saveReaderMeta();
-                window.showToast("✅ Dropbox Cloud API Token Saved!");
-            });
+    window.calculateOmrSheetNetScore = function() {
+        let cor = 0, wro = 0, skip = 0;
+        for (let q = 1; q <= 20; q++) {
+            const v = document.getElementById(`omr_res_${q}`)?.value || 'un';
+            if (v === 'cor') cor++;
+            else if (v === 'wro') wro++;
+            else skip++;
+        }
+        const net = (cor * 4) - (wro * 1);
+        const banner = document.getElementById('omr-net-score-banner');
+        if (banner) {
+            banner.classList.remove('hidden');
+            banner.textContent = `🎯 NET OMR SCORE: ${net} / 80 Marks  (✅ ${cor} Correct [+${cor * 4}] • ❌ ${wro} Wrong [-${wro}] • ⚪ ${skip} Skipped)`;
+        }
+    };
 
-            document.getElementById('browse-dbx-cloud-btn')?.addEventListener('click', async () => {
-                const tk = (document.getElementById('cloud-dbx-token-inp')?.value || cfg.token || '').trim();
-                if (!tk) { window.showToast("Paste your Dropbox Token first!", true); return; }
-                cfg.token = tk; cfg.connected = true; window.saveReaderMeta();
-                const listBox = document.getElementById('dbx-cloud-files-list');
-                if (listBox) listBox.innerHTML = `<p class="text-[11px] text-slate-400">⏳ Scanning Dropbox /PomoReader folder...</p>`;
-                try {
-                    const res = await fetch('https://api.dropboxapi.com/2/files/list_folder', {
-                        method: 'POST',
-                        headers: { 'Authorization': `Bearer ${tk}`, 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ path: '/PomoReader' })
-                    });
-                    const data = await res.json();
-                    const entries = (data.entries || []).filter(e => e['.tag'] === 'file');
-                    if (!entries.length) {
-                        listBox.innerHTML = `<p class="text-[11px] text-slate-400">No books in /PomoReader yet. Click "☁️ Push" on any book card to upload!</p>`;
-                        return;
-                    }
-                    listBox.innerHTML = entries.map(e => `
-                        <div class="flex items-center justify-between bg-slate-900 px-2.5 py-1.5 rounded-lg border border-slate-800">
-                            <span class="text-xs text-white truncate pr-2">📘 ${escapeHtml(e.name)}</span>
-                            <button type="button" onclick="window.pullSingleDropboxFile('${escapeHtml(e.path_display || e.path_lower)}', '${escapeHtml(e.name)}')" class="bg-emerald-600 text-white text-[10px] font-bold px-2.5 py-1 rounded">⬇️ Pull</button>
+    window.renderMistakeAutopsySection = function() {
+        const box = document.getElementById('pack-c-dynamic-viewer');
+        if (!box) return;
+        box.innerHTML = `
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3 flex flex-col gap-2">
+                <div class="flex gap-2">
+                    <input type="text" id="new-autopsy-q-inp" placeholder="Question / Concept you got wrong..." class="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white">
+                    <input type="text" id="new-autopsy-a-inp" placeholder="Correct Mechanism / Fact..." class="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-emerald-300">
+                    <button type="button" onclick="const q=document.getElementById('new-autopsy-q-inp').value.trim(), a=document.getElementById('new-autopsy-a-inp').value.trim(); if(q){window.mistakeAutopsyList.unshift({id:Date.now(),subj:window.activeTaskSubj||'Medical',q,ans:a,explanation:'',date:window.getLocalTodayString()}); window.safeSet('pages_pomodoro_autopsy_v12',JSON.stringify(window.mistakeAutopsyList)); window.renderMistakeAutopsySection();}" class="bg-rose-600 text-white font-bold px-3 py-1.5 rounded-xl text-xs">＋ Log</button>
+                </div>
+                <div class="flex flex-col gap-1.5 max-h-48 native-scroll">
+                    ${window.mistakeAutopsyList.length ? window.mistakeAutopsyList.map(m => `
+                        <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-xs">
+                            <span class="text-[10px] font-mono text-amber-400">[${escapeHtml(m.subj)} • ${escapeHtml(m.date)}]</span>
+                            <p class="font-bold text-white mt-0.5">${escapeHtml(m.q)}</p>
+                            <p class="text-emerald-400 text-[11px] mt-0.5">✓ ${escapeHtml(m.ans)}</p>
                         </div>
-                    `).join('');
-                } catch (err) {
-                    if (listBox) listBox.innerHTML = `<p class="text-[11px] text-red-400">Could not list /PomoReader (Push a book first to create the folder).</p>`;
-                }
-            });
+                    `).join('') : `<p class="text-xs text-slate-400 italic">No mistakes logged yet. Add one above!</p>`}
+                </div>
+            </div>
+        `;
+    };
 
-            document.getElementById('cloud-direct-download-btn')?.addEventListener('click', async () => {
-                let rawUrl = (document.getElementById('cloud-direct-url-inp')?.value || '').trim();
-                let fName = (document.getElementById('cloud-direct-name-inp')?.value || '').trim() || `Cloud_Book_${Date.now()}.pdf`;
-                if (!rawUrl) { window.showToast("Paste a cloud share link or direct URL first", true); return; }
-                if (!/\.(pdf|epub|txt|md|docx)$/i.test(fName)) fName += '.pdf';
+    window.renderFormulaCheatSheetSection = function() {
+        const box = document.getElementById('pack-c-dynamic-viewer');
+        if (!box) return;
+        box.innerHTML = `
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3 flex flex-col gap-2">
+                <div class="flex gap-2">
+                    <input type="text" id="new-formula-inp" placeholder="Add formula, constant, historical date, or clinical pearl..." class="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white font-mono">
+                    <button type="button" onclick="const v=document.getElementById('new-formula-inp').value.trim(); if(v){window.formulaCheatBank.unshift({txt:v,subj:window.activeTaskSubj||'Medical Science'}); window.safeSet('pages_pomodoro_formulas_v12',JSON.stringify(window.formulaCheatBank)); window.renderFormulaCheatSheetSection();}" class="bg-cyan-600 text-white font-bold px-3 py-1.5 rounded-xl text-xs">＋ Pin</button>
+                </div>
+                <div class="flex flex-col gap-1.5 max-h-48 native-scroll">
+                    ${window.formulaCheatBank.map(f => `<div class="bg-slate-950 p-2 rounded-lg border border-slate-800 font-mono text-xs text-cyan-200"><b class="text-amber-300">[${escapeHtml(f.subj)}]</b> ${escapeHtml(f.txt)}</div>`).join('') || `<p class="text-xs text-slate-400 italic">No pinned formulas yet.</p>`}
+                </div>
+            </div>
+        `;
+    };
 
-                // Convert Google Drive Share Link or Dropbox Share Link into direct download stream
-                const gdMatch = rawUrl.match(/\/d\/([a-zA-Z0-9_-]+)/) || rawUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-                if (gdMatch && gdMatch[1]) {
-                    rawUrl = `https://drive.google.com/uc?export=download&id=${gdMatch[1]}`;
-                } else if (rawUrl.includes('dropbox.com') && rawUrl.includes('dl=0')) {
-                    rawUrl = rawUrl.replace('dl=0', 'dl=1');
-                }
+    window.renderVocabFlashcardsSection = function() {
+        const box = document.getElementById('pack-c-dynamic-viewer');
+        if (!box) return;
+        const list = JSON.parse(window.safeGet('pages_pomodoro_vocab_bank_v12', '[]'));
+        box.innerHTML = `
+            <div class="grid grid-cols-2 gap-2 max-h-60 native-scroll">
+                ${list.length ? list.map(v => `
+                    <div class="bg-slate-900 p-3 rounded-xl border border-amber-500/40 flex flex-col gap-1">
+                        <span class="text-sm font-extrabold text-amber-300">${escapeHtml(v.word)}</span>
+                        <p class="text-xs text-slate-200">${escapeHtml(v.engDef)}</p>
+                        <p class="text-xs text-emerald-300 font-bold">${escapeHtml(v.arTrans)} • ${escapeHtml(v.urTrans)} • ${escapeHtml(v.hiTrans)}</p>
+                    </div>
+                `).join('') : `<p class="text-xs text-slate-400 italic col-span-2">Look up any word in the 📖 PomoLexicon Dictionary and click "⭐ Save Word" to build your flashcard deck!</p>`}
+            </div>
+        `;
+    };
 
-                try {
-                    window.showToast(`☁️ Downloading "${fName}" from ${cfg.name}...`);
-                    const res = await fetch(rawUrl);
-                    if (!res.ok) throw new Error('CORS or private link');
-                    const blob = await res.blob();
-                    const fileObj = new File([blob], fName, { type: blob.type || 'application/pdf' });
-                    cfg.connected = true;
-                    cfg.status = `Connected (${fName})`;
-                    window.saveReaderMeta();
-                    modal.classList.add('hidden');
-                    if (window.handleMultipleBookImport) await window.handleMultipleBookImport([fileObj], cloudKey, null);
-                } catch (e) {
-                    window.showToast("Direct fetch blocked by Google CORS — opening link in browser to save & drop onto shelf!", true);
-                    window.open(rawUrl, '_blank');
-                }
-            });
+    // DESKTOP KEYBOARD SHORTCUTS CHEAT-SHEET MODAL
+    window.openDesktopShortcutsModal = function() {
+        const modal = document.getElementById('reader-suboptions-modal');
+        const titleEl = document.getElementById('suboptions-modal-title');
+        const bodyEl = document.getElementById('suboptions-modal-body');
+        if (!modal || !titleEl || !bodyEl) return;
 
-            document.getElementById('cloud-link-pc-folder-btn')?.addEventListener('click', () => {
-                modal.classList.add('hidden');
-                if (origConnect) origConnect(cloudKey);
-            });
+        titleEl.textContent = "⌨️ Desktop Pro Keyboard Shortcuts Cheat-Sheet";
+        const shortcuts = [
+            { key: 'Alt + 1 … 6', desc: 'Switch tabs: 1 Timer • 2 Plan • 3 Tasks • 4 Vault • 5 Reader • 6 Profile' },
+            { key: 'Ctrl + K', desc: 'Open Master 15-Pro Command Center & Spotlight' },
+            { key: '? or Alt + K', desc: 'Open this Keyboard Shortcuts Cheat-Sheet' },
+            { key: 'Alt + L', desc: 'Lock Workspace immediately with Privacy PIN Shield' },
+            { key: 'Space', desc: 'Start / Pause Pomodoro Timer (when on Timer page)' },
+            { key: 'C / S / U', desc: 'Complete Session (C) • Skip Session (S) • Undo Session (U)' },
+            { key: 'D / W', desc: 'Toggle OLED Dim Mode (D) • Pop Out Mini-PiP Window (W)' },
+            { key: 'N', desc: 'Focus New PomoTask / New Vault Chapter Input' },
+            { key: '← / → or J / K', desc: 'Previous / Next Book Page in Reader Pro' },
+            { key: '+ / - or Ctrl+Wheel', desc: 'Zoom In / Zoom Out isolated to Book Page' },
+            { key: 'B / P / T / F / L', desc: 'Reader: Bookmark (B) • Pencil Studio (P) • TOC (T) • Search (F) • Lexicon (L)' },
+            { key: 'Ctrl + Z', desc: 'Undo last Highlight, Image Occlusion Mask, or Drawing in Reader' }
+        ];
 
-            document.getElementById('cloud-pick-files-btn')?.addEventListener('click', () => {
-                modal.classList.add('hidden');
-                const inp = document.getElementById('reader-book-file-input');
-                if (inp) {
-                    inp.onchange = (ev) => {
-                        cfg.connected = true;
-                        cfg.status = 'Connected (Files Imported)';
-                        window.saveReaderMeta();
-                        if (window.handleMultipleBookImport) window.handleMultipleBookImport(ev.target.files, cloudKey, null);
-                    };
-                    inp.click();
-                }
-            });
-        };
+        bodyEl.innerHTML = `
+            <div class="grid grid-cols-1 gap-1.5 text-xs">
+                ${shortcuts.map(s => `
+                    <div class="flex items-center justify-between bg-slate-950 px-3 py-2 rounded-xl border border-slate-800">
+                        <span class="text-slate-300 font-medium">${escapeHtml(s.desc)}</span>
+                        <kbd class="bg-slate-900 border border-cyan-500/40 text-cyan-300 font-mono font-extrabold px-2.5 py-1 rounded-lg text-[11px] shrink-0 ml-2">${escapeHtml(s.key)}</kbd>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        modal.classList.remove('hidden');
+    };
 
-        window.pullSingleDropboxFile = async function(dbxPath, fileName) {
-            const tk = window.readerSettings?.clouds?.dropbox?.token?.trim();
-            if (!tk) return;
-            try {
-                window.showToast(`📲 Pulling "${fileName}" from Dropbox...`);
-                const res = await fetch('https://content.dropboxapi.com/2/files/download', {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${tk}`, 'Dropbox-API-Arg': JSON.stringify({ path: dbxPath }) }
-                });
-                if (res.ok) {
-                    const blob = await res.blob();
-                    const fileObj = new File([blob], fileName, { type: 'application/pdf' });
-                    document.getElementById('reader-suboptions-modal')?.classList.add('hidden');
-                    if (window.handleMultipleBookImport) await window.handleMultipleBookImport([fileObj], 'dropbox', null);
-                }
-            } catch (e) { window.showToast("Dropbox download failed", true); }
-        };
-    }, 600);
+    document.getElementById('desktop-keys-top-btn')?.addEventListener('click', window.openDesktopShortcutsModal);
+
+    const topHeaderLeft = document.getElementById('dim-toggle-btn')?.parentElement;
+    if (topHeaderLeft && !document.getElementById('master-15-pro-top-btn')) {
+        const proBtn = document.createElement('button');
+        proBtn.type = 'button';
+        proBtn.id = 'master-15-pro-top-btn';
+        proBtn.className = "bg-gradient-to-r from-cyan-600 to-purple-600 text-white px-2.5 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1 shadow active:scale-95";
+        proBtn.title = "Open Polymath Command Center (Shortcut: Ctrl+K)";
+        proBtn.innerHTML = `<span>🚀</span><span class="text-[10px]">15-Pro</span>`;
+        proBtn.onclick = () => window.openMaster15UpgradesHub();
+        topHeaderLeft.appendChild(proBtn);
+    }
+
+    // GLOBAL DESKTOP KEYBOARD SHORTCUTS ROUTER
+    window.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+            e.preventDefault();
+            window.openMaster15UpgradesHub();
+            return;
+        }
+        if (e.altKey && e.key.toLowerCase() === 'l') {
+            e.preventDefault();
+            window.triggerPrivacyLockShortcut();
+            return;
+        }
+        if (e.altKey && e.key.toLowerCase() === 'k') {
+            e.preventDefault();
+            window.openDesktopShortcutsModal();
+            return;
+        }
+
+        // Alt + 1..6 Page Navigation
+        if (e.altKey && ['1', '2', '3', '4', '5', '6'].includes(e.key)) {
+            e.preventDefault();
+            const pageMap = {
+                '1': 'page-timer',
+                '2': 'page-schedule',
+                '3': 'page-todo',
+                '4': 'page-vault',
+                '5': 'page-reader',
+                '6': 'page-settings'
+            };
+            const readerOv = document.getElementById('reader-fullscreen-overlay');
+            if (readerOv && !readerOv.classList.contains('hidden') && e.key !== '5') {
+                document.getElementById('reader-back-to-shelf-btn')?.click();
+            }
+            if (window.switchPage) window.switchPage(pageMap[e.key]);
+            return;
+        }
+
+        // Pause single-key shortcuts when typing inside inputs, textareas, selects, or contentEditable
+        const tag = (e.target?.tagName || '').toLowerCase();
+        if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target?.isContentEditable) {
+            return;
+        }
+
+        if (e.key === '?') {
+            e.preventDefault();
+            window.openDesktopShortcutsModal();
+            return;
+        }
+
+        const readerOv = document.getElementById('reader-fullscreen-overlay');
+        const isReaderOpen = readerOv && !readerOv.classList.contains('hidden');
+
+        // Reader Pro Active Book Shortcuts
+        if (isReaderOpen) {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+                e.preventDefault();
+                if (window.undoLastReaderAnnotation) window.undoLastReaderAnnotation();
+                return;
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+                e.preventDefault();
+                document.getElementById('reader-bottom-search-btn')?.click();
+                return;
+            }
+            if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'j') {
+                e.preventDefault();
+                document.getElementById('reader-prev-page-btn')?.click();
+            } else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'k') {
+                e.preventDefault();
+                document.getElementById('reader-next-page-btn')?.click();
+            } else if (e.key === '+' || e.key === '=') {
+                e.preventDefault();
+                document.getElementById('reader-zoom-in-btn')?.click();
+            } else if (e.key === '-') {
+                e.preventDefault();
+                document.getElementById('reader-zoom-out-btn')?.click();
+            } else if (e.key.toLowerCase() === 'b') {
+                e.preventDefault();
+                document.getElementById('reader-quick-bookmark-btn')?.click();
+            } else if (e.key.toLowerCase() === 'p') {
+                e.preventDefault();
+                document.getElementById('reader-pencil-toggle-btn')?.click();
+            } else if (e.key.toLowerCase() === 't') {
+                e.preventDefault();
+                document.getElementById('reader-bottom-toc-btn')?.click();
+            } else if (e.key.toLowerCase() === 'f') {
+                e.preventDefault();
+                document.getElementById('reader-bottom-search-btn')?.click();
+            } else if (e.key.toLowerCase() === 'l') {
+                e.preventDefault();
+                document.getElementById('reader-open-dict-top-btn')?.click();
+            }
+            return;
+        }
+
+        // Timer Cockpit Shortcuts
+        if (window.currentPageId === 'page-timer') {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                if (window.isRunning) window.stopTimer();
+                else window.startTimer();
+            } else if (e.key.toLowerCase() === 'c') {
+                e.preventDefault();
+                if (window.completeSession) window.completeSession();
+            } else if (e.key.toLowerCase() === 's') {
+                e.preventDefault();
+                document.getElementById('skip-btn')?.click();
+            } else if (e.key.toLowerCase() === 'u') {
+                e.preventDefault();
+                document.getElementById('undo-btn')?.click();
+            } else if (e.key.toLowerCase() === 'd') {
+                e.preventDefault();
+                document.body.classList.toggle('dim-mode');
+            } else if (e.key.toLowerCase() === 'w') {
+                e.preventDefault();
+                if (window.launchPipMiniCockpitWidget) window.launchPipMiniCockpitWidget();
+            }
+        } else if (window.currentPageId === 'page-todo' && e.key.toLowerCase() === 'n') {
+            e.preventDefault();
+            document.getElementById('todo-new-input')?.focus();
+        } else if (window.currentPageId === 'page-vault' && e.key.toLowerCase() === 'n') {
+            e.preventDefault();
+            document.getElementById('task-title-input')?.focus();
+        }
+    });
 })();
-// ✅ END OF FILE (01-core-bus.js v9.0) — 100% UNCUT
+// ✅ END OF FILE (01-core-bus.js v16.0 Desktop) — 100% COMPLETE & UNCUT

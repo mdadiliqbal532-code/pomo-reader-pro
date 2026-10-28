@@ -1,10 +1,10 @@
 /* =========================================================================
-   02-POMO-CORE.JS (v16.0 PURE DESKTOP EDITION) — UNIFIED TIMER, OVERTIME
-   GUARDRAIL, 5-WAY POMOCLOUD FIREBASE SYNC, PROTOCOL LAUNCHER, WINDOW-AWARE
-   SALAH FREEZE LOCK, POMOTASKS, 4-GRAPH STUDIO & DESKTOP HOTKEYS
+   02-POMO-CORE.JS (v17.0 ENTERPRISE DESKTOP EDITION) — UNIFIED TIMER,
+   OVERTIME GUARDRAIL, RACE-FREE POMOCLOUD FIREBASE SYNC, PROTOCOL LAUNCHER,
+   SALAH FREEZE LOCK, POMOTASKS, 4-GRAPH STUDIO, MASTER 15-PRO HUB & HOTKEYS
    ========================================================================= */
 
-// 0. DEFENSIVE DESKTOP COMPATIBILITY SHIM (Guarantees 100% sync with 01-core-bus.js)
+// 0. DEFENSIVE DESKTOP COMPATIBILITY SHIM
 window.haptic = window.haptic || function() {};
 window.escapeJsStr = window.escapeJsStr || function(str) {
     if (str === null || str === undefined) return '';
@@ -99,7 +99,7 @@ window.saveExtConfig = function() {
 };
 
 /* =========================================================================
-   1. POMOCLOUD FIREBASE OMNI-SYNC & EXTERNAL STUDIO BRIDGE
+   1. POMOCLOUD FIREBASE OMNI-SYNC (WITH RACE-CONDITION MUTATION GUARD)
    ========================================================================= */
 const firebaseConfig = {
     apiKey: "AIza" + "SyAbi9-V0S3DOtOAgBirMxrvV6J-XdwLf3Q",
@@ -134,15 +134,17 @@ let savedPlainPass = safeGet('pages_pomodoro_sync_pass', '');
 let unsubscribeSnapshot = null;
 let isInternalSyncUpdate = false;
 let lastCloudReceiveTime = 0;
+let lastLocalMutationTime = 0;
 let cloudBroadcastTimer = null;
 
 window.getCurrentSyncRoom = function() { return currentSyncRoom; };
 
 window.broadcastToCloud = function() {
-    if (!currentSyncRoom || isInternalSyncUpdate || (Date.now() - lastCloudReceiveTime < 900) || !db) return;
+    lastLocalMutationTime = Date.now();
+    if (!currentSyncRoom || isInternalSyncUpdate || (Date.now() - lastCloudReceiveTime < 850) || !db) return;
     clearTimeout(cloudBroadcastTimer);
     cloudBroadcastTimer = setTimeout(async () => {
-        if (!currentSyncRoom || isInternalSyncUpdate || (Date.now() - lastCloudReceiveTime < 900) || !db) return;
+        if (!currentSyncRoom || isInternalSyncUpdate || !db) return;
         try {
             const roomDoc = db.collection('artifacts').doc('neettimercloud').collection('public').doc('data').collection('sync_rooms').doc(currentSyncRoom);
             await roomDoc.set({
@@ -160,7 +162,7 @@ window.broadcastToCloud = function() {
                 timestamp: Date.now()
             }, { merge: true });
         } catch (e) {}
-    }, 380);
+    }, 360);
 };
 
 async function connectToCloud(roomId) {
@@ -172,6 +174,9 @@ async function connectToCloud(roomId) {
         const roomDoc = db.collection('artifacts').doc('neettimercloud').collection('public').doc('data').collection('sync_rooms').doc(roomId);
         unsubscribeSnapshot = roomDoc.onSnapshot((docSnap) => {
             if (!docSnap.exists) return;
+            // Ignore incoming echo if user just mutated local timer state within the last 1,100ms
+            if (Date.now() - lastLocalMutationTime < 1100) return;
+
             const data = docSnap.data();
             isInternalSyncUpdate = true;
             lastCloudReceiveTime = Date.now();
@@ -301,7 +306,7 @@ document.getElementById('import-backup-btn')?.addEventListener('click', () => {
 });
 
 /* =========================================================================
-   2. NAVIGATION, ESC HANDLER, DIM MODE & DESKTOP SHORTCUTS ENGINE
+   2. NAVIGATION, ESC HANDLER, CENTERED DIM MODE & DESKTOP SHORTCUTS ENGINE
    ========================================================================= */
 window.currentPageId = 'page-timer';
 window.switchPage = function(targetId) {
@@ -348,17 +353,18 @@ window.openDesktopKeysModal = window.openDesktopKeysModal || function() {
     titleEl.textContent = "⌨️ Desktop Pro Keyboard Shortcuts Cheat-Sheet";
     const rows = [
         ['Alt + 1 … Alt + 6', 'Switch Tabs: 1 Timer • 2 Plan • 3 Tasks • 4 Vault • 5 Reader • 6 Profile'],
-        ['Ctrl + K / Cmd + K', 'Open Master 15-Pro Command Center & Audio Synth'],
+        ['Ctrl + K / Cmd + K', 'Open Master 15-Pro Command Center & 40Hz Audio Synth'],
         ['? or Alt + K', 'Open this Keyboard Shortcuts Cheat-Sheet'],
         ['Alt + L', 'Lock Workspace with Steel Privacy PIN Shield'],
         ['Space (on Timer)', 'Start / Pause active Pomodoro Focus Session'],
         ['C / S / U (on Timer)', 'C: Complete Session • S: Skip Session • U: Undo Session'],
-        ['D / W (on Timer)', 'D: Toggle OLED Dim Mode • W: Pop Out Mini-PiP Window'],
+        ['D / W (on Timer)', 'D: Toggle Centered OLED Dim Mode • W: Pop Out Mini-PiP'],
         ['N (on Tasks / Vault)', 'Focus New PomoTask or New Vault Chapter input box'],
         ['← / → or J / K (Reader)', 'Previous Page / Next Page in active book'],
+        ['N (in Reader)', 'Toggle True 50/50 Split-Screen OneNote & Rough Studio'],
         ['+ / - or Ctrl+Wheel', 'Zoom In / Zoom Out isolated to book page'],
         ['B / P / T / F (Reader)', 'B: Bookmark • P: Pencil Studio • T: Chapters • F: Search Book'],
-        ['L / Ctrl + Z (Reader)', 'L: 4-Language Dictionary • Ctrl+Z: Undo Last Highlight/Drawing']
+        ['L / Ctrl + Z (Reader)', 'L: 4-Language Dictionary • Ctrl+Z: Undo Last Highlight/Mask']
     ];
     bodyEl.innerHTML = `
         <div class="flex flex-col gap-1.5 text-xs">
@@ -431,6 +437,9 @@ if (!window._desktopHotkeysBound) {
             } else if (e.key.toLowerCase() === 'l') {
                 e.preventDefault();
                 document.getElementById('reader-open-dict-top-btn')?.click();
+            } else if (e.key.toLowerCase() === 'n') {
+                e.preventDefault();
+                window.toggleSplitScreenScratchpad && window.toggleSplitScreenScratchpad();
             }
             return;
         }
@@ -470,7 +479,7 @@ window.handleAndroidBack = function() {
     const openModals = [
         'salah-freeze-active-overlay', 'critical-overtime-modal', 'pomowake-recheck-modal',
         'master-15-upgrades-modal', 'alarmy-studio-modal', 'protocol-run-modal', 'todo-analytics-modal',
-        'reader-dictionary-modal', 'ilovepdf-studio-modal',
+        'reader-dictionary-modal', 'ilovepdf-studio-modal', 'pomodoc-semantic-style-modal',
         'v4-canvas-text-modal', 'v45-manual-import-modal', 'line-item-viewer-modal',
         'reader-suboptions-modal', 'reader-toc-bookmarks-drawer', 'reader-fullsearch-drawer',
         'book-corner-modal', 'reader-master-settings-modal', 'goal-date-modal',
@@ -2963,7 +2972,336 @@ window.openTodoAnalyticsModal = function(rangeOverride = null) {
 };
 
 /* =========================================================================
-   9. STATS, TELEGRAM REPORT & BOOTSTRAP
+   9. MASTER 15-PRO COMMAND HUB (CTRL + K) + 40HZ AUDIO SYNTH + OMR & SRS
+   ========================================================================= */
+(function initMaster15UpgradesAndPacksABC() {
+    var audioNodes = { playing: false, mode: 'off', ctx: null, gain: null, sources: [] };
+    window.toggleOfflineFocusAudio = function(mode = '40hz') {
+        try {
+            if (!audioNodes.ctx) audioNodes.ctx = window.fallbackCtx || new (window.AudioContext || window.webkitAudioContext)();
+            const ctx = audioNodes.ctx;
+            if (ctx.state === 'suspended') ctx.resume();
+
+            audioNodes.sources.forEach(s => { try { s.stop(); s.disconnect(); } catch (e) {} });
+            audioNodes.sources = [];
+
+            if (mode === 'off' || (audioNodes.playing && audioNodes.mode === mode)) {
+                audioNodes.playing = false;
+                audioNodes.mode = 'off';
+                window.showToast("🔇 Focus Audio Synthesizer Muted");
+                return;
+            }
+
+            const masterGain = ctx.createGain();
+            masterGain.gain.setValueAtTime(0.18, ctx.currentTime);
+            masterGain.connect(ctx.destination);
+            audioNodes.gain = masterGain;
+
+            if (mode === '40hz') {
+                const panL = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain();
+                const panR = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain();
+                if (panL.pan) panL.pan.value = -1;
+                if (panR.pan) panR.pan.value = 1;
+                const oscL = ctx.createOscillator();
+                const oscR = ctx.createOscillator();
+                oscL.type = 'sine'; oscL.frequency.value = 200;
+                oscR.type = 'sine'; oscR.frequency.value = 240;
+                oscL.connect(panL); panL.connect(masterGain);
+                oscR.connect(panR); panR.connect(masterGain);
+                oscL.start(); oscR.start();
+                audioNodes.sources.push(oscL, oscR);
+                window.showToast("🎧 40Hz Gamma Binaural Beats Active (Memory Beast Focus Wave)");
+            } else if (mode === 'brown' || mode === 'rain') {
+                const bufSize = ctx.sampleRate * 3;
+                const buffer = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                let lastOut = 0.0;
+                for (let i = 0; i < bufSize; i++) {
+                    const white = Math.random() * 2 - 1;
+                    if (mode === 'brown') {
+                        data[i] = (lastOut + (0.02 * white)) / 1.02;
+                        lastOut = data[i];
+                        data[i] *= 3.2;
+                    } else {
+                        data[i] = (lastOut + (0.12 * white)) / 1.12;
+                        lastOut = data[i];
+                        data[i] *= 1.5;
+                    }
+                }
+                const noise = ctx.createBufferSource();
+                noise.buffer = buffer;
+                noise.loop = true;
+                noise.connect(masterGain);
+                noise.start();
+                audioNodes.sources.push(noise);
+                window.showToast(mode === 'brown' ? "🌊 Deep Synthetic Brown Noise Active" : "🌧️ Forest Rainfall Soundscape Active");
+            }
+            audioNodes.playing = true;
+            audioNodes.mode = mode;
+        } catch (e) { window.showToast("Click anywhere first to enable Web Audio", true); }
+    };
+
+    window.scheduleChapterSpacedRepetition = function(chapterTitle, subj = 'Medical Science') {
+        const intervals = [1, 3, 7, 14, 30];
+        intervals.forEach((days, idx) => {
+            const dueIso = window.addDaysToTodayISO(days);
+            window.todos.unshift({
+                id: Date.now() + idx + Math.floor(Math.random() * 999),
+                title: `🔁 [SRS Stage ${idx + 1}/5 • +${days}d] ${subj}: ${chapterTitle}`,
+                completed: false,
+                important: idx <= 1,
+                myDayDate: days === 1 ? dueIso : '',
+                createdDate: window.getLocalTodayString(),
+                dueDate: dueIso,
+                durationMins: 30,
+                repeat: { type: 'none' },
+                steps: [],
+                note: `Memory Beast 1-3-7-14-30 Spaced Repetition Review #${idx + 1}`,
+                listId: 'tasks'
+            });
+        });
+        if (window.saveTodos) window.saveTodos();
+        if (window.renderTodos) window.renderTodos();
+        window.showToast(`🔁 Scheduled 1-3-7-14-30 Day Memory Beast Reviews for "${chapterTitle}"!`);
+    };
+
+    var streamerHudActive = false;
+    window.toggleObsStreamerHudMode = function() {
+        streamerHudActive = !streamerHudActive;
+        const hideIds = ['home-omni-bento-strip', 'home-reader-widget-card', 'ai-coach-card'];
+        hideIds.forEach(id => document.getElementById(id)?.classList.toggle('hidden', streamerHudActive));
+        window.showToast(streamerHudActive ? "🎥 Clean Streamer HUD Active" : "🎥 Standard Workspace Restored");
+    };
+
+    window.autoPackPomodoroCycles = function(cycles = 4, subjTitle = 'High-Yield Medical & Polymath Lock-In') {
+        if (!Array.isArray(window.schedule)) return;
+        for (let c = 1; c <= cycles; c++) {
+            const studyBlk = {
+                id: Date.now() + c * 10,
+                type: 'work',
+                category: 'study',
+                title: `🧠 Cycle ${c}/${cycles}: ${subjTitle} (50m Deep Focus)`,
+                duration: 50 * 60
+            };
+            window.schedule.push(studyBlk);
+            if (window.ensureProtocolBlockSyncedToTodo) window.ensureProtocolBlockSyncedToTodo(studyBlk);
+            window.schedule.push({
+                id: Date.now() + c * 10 + 1,
+                type: 'break',
+                category: 'break',
+                title: c % 3 === 0 ? `💧 Extended Recovery Break (15m)` : `💧 Short Pomodoro Break (10m)`,
+                duration: (c % 3 === 0 ? 15 : 10) * 60
+            });
+        }
+        window.safeSet('pages_pomodoro_schedule_v8', JSON.stringify(window.schedule));
+        if (window.renderSchedule) window.renderSchedule();
+        window.showToast(`🗓️ Auto-Packed ${cycles} Pomodoro Cycles (50m/10m) into Live Protocol!`);
+    };
+
+    window.mistakeAutopsyList = JSON.parse(window.safeGet('pages_pomodoro_autopsy_v12', '[]'));
+    window.formulaCheatBank = JSON.parse(window.safeGet('pages_pomodoro_formulas_v12', '[]'));
+
+    window.openMaster15UpgradesHub = function() {
+        let modal = document.getElementById('master-15-upgrades-modal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'master-15-upgrades-modal';
+            modal.className = "hidden fixed inset-0 modal-backdrop z-[9995] flex items-center justify-center p-4";
+            document.body.appendChild(modal);
+        }
+
+        const vocabList = JSON.parse(window.safeGet('pages_pomodoro_vocab_bank_v12', '[]'));
+
+        modal.innerHTML = `
+            <div class="bg-slate-900 border-2 border-cyan-500/60 rounded-3xl w-full max-w-4xl max-h-[92dvh] shadow-2xl flex flex-col overflow-hidden">
+                <div class="flex flex-wrap items-center justify-between gap-2 px-5 py-3.5 bg-slate-950 border-b border-slate-800 shrink-0">
+                    <div>
+                        <span class="text-[9px] font-extrabold uppercase tracking-widest bg-cyan-500/20 text-cyan-300 px-2.5 py-0.5 rounded-full border border-cyan-500/40">🚀 Desktop Command Center (Ctrl + K)</span>
+                        <h3 class="text-base font-extrabold text-white mt-0.5">Master 15-Pro Hub • 40Hz Synth • OMR Sheet • 1-3-7-14-30 SRS</h3>
+                    </div>
+                    <button type="button" onclick="document.getElementById('master-15-upgrades-modal').classList.add('hidden')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-3 py-1.5 rounded-xl text-xs">✕ Close</button>
+                </div>
+
+                <div class="flex-1 p-4 native-scroll flex flex-col gap-3.5">
+                    <div class="bg-slate-950 border-2 border-cyan-500/60 rounded-2xl p-3 flex flex-wrap items-center gap-2">
+                        <span class="text-base">⌨️</span>
+                        <input type="text" id="ctrlk-cmd-inp" placeholder="Spotlight: Type 'dict word', 'pomo' (start timer), or press ? for Keyboard Shortcuts..." class="flex-1 min-w-[200px] bg-transparent text-xs font-mono text-white focus:outline-none">
+                        <button type="button" onclick="document.getElementById('master-15-upgrades-modal').classList.add('hidden'); window.openDesktopKeysModal && window.openDesktopKeysModal();" class="bg-slate-900 hover:bg-blue-600 text-cyan-300 hover:text-white border border-slate-700 px-3 py-1.5 rounded-lg text-[10px] font-extrabold">⌨️ All Shortcuts</button>
+                    </div>
+
+                    <div class="bg-slate-950 border border-emerald-500/40 rounded-2xl p-3.5 flex flex-col gap-2.5">
+                        <span class="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400">⚡ Pack A — 40Hz Gamma Binaural • Brown Noise • Forest Rain • Mini-PiP • Clean HUD</span>
+                        <div class="grid grid-cols-4 gap-2">
+                            <button type="button" onclick="window.toggleOfflineFocusAudio('40hz')" class="bg-emerald-600/25 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/40 p-2.5 rounded-xl text-xs font-extrabold">🧠 Play 40Hz Gamma</button>
+                            <button type="button" onclick="window.toggleOfflineFocusAudio('brown')" class="bg-amber-600/25 hover:bg-amber-600 text-amber-300 hover:text-white border border-amber-500/40 p-2.5 rounded-xl text-xs font-extrabold">🌊 Play Brown Noise</button>
+                            <button type="button" onclick="window.toggleOfflineFocusAudio('rain')" class="bg-cyan-600/25 hover:bg-cyan-600 text-cyan-300 hover:text-white border border-cyan-500/40 p-2.5 rounded-xl text-xs font-extrabold">🌧️ Play Forest Rain</button>
+                            <button type="button" onclick="window.toggleOfflineFocusAudio('off')" class="bg-slate-900 hover:bg-red-950 text-red-300 border border-slate-800 p-2.5 rounded-xl text-xs font-bold">🔇 Stop Audio</button>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 pt-1">
+                            <button type="button" onclick="document.getElementById('master-15-upgrades-modal').classList.add('hidden'); window.openDeviceWidgetStudioModal && window.openDeviceWidgetStudioModal();" class="bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-slate-700 p-2.5 rounded-xl text-xs font-bold">🔔 Notification Matrix & PiP</button>
+                            <button type="button" onclick="window.toggleObsStreamerHudMode()" class="bg-slate-900 hover:bg-slate-800 text-purple-300 border border-slate-700 p-2.5 rounded-xl text-xs font-bold">🎥 Toggle Clean HUD</button>
+                            <button type="button" onclick="window.autoPackPomodoroCycles(4, 'Medical & Polymath Deep Block'); document.getElementById('master-15-upgrades-modal').classList.add('hidden');" class="bg-blue-600 hover:bg-blue-500 text-white p-2.5 rounded-xl text-xs font-extrabold shadow">🗓️ Auto-Pack 4× (50m/10m) Cycles</button>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-950 border border-amber-500/40 rounded-2xl p-3.5 flex flex-col gap-2.5">
+                        <span class="text-[10px] font-extrabold uppercase tracking-wider text-amber-400">🎯 Pack B — 1-3-7-14-30 SRS • Mistake Autopsy • Formula Sheet • (+4/-1) OMR Simulator</span>
+                        <div class="flex flex-wrap gap-2">
+                            <input type="text" id="srs-quick-chap-inp" placeholder="Type chapter/topic completed today (e.g. Cardiac Cycle / French Revolution)..." class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white">
+                            <button type="button" onclick="const v=document.getElementById('srs-quick-chap-inp').value.trim(); if(v) window.scheduleChapterSpacedRepetition(v, window.activeTaskSubj||'Medical Science');" class="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold px-4 py-2 rounded-xl text-xs shadow">🔁 Schedule 1-3-7-14-30 SRS</button>
+                        </div>
+                        <div class="grid grid-cols-4 gap-2 pt-1">
+                            <button type="button" onclick="window.openDigitalOmrSimulatorModal()" class="bg-rose-600 hover:bg-rose-500 text-white p-2.5 rounded-xl text-xs font-extrabold shadow">📝 (+4/-1) OMR Sheet</button>
+                            <button type="button" onclick="window.renderMistakeAutopsySection()" class="bg-slate-900 hover:bg-slate-800 text-rose-300 border border-slate-700 p-2.5 rounded-xl text-xs font-bold">🩺 Mistake Autopsy (${window.mistakeAutopsyList.length})</button>
+                            <button type="button" onclick="window.renderFormulaCheatSheetSection()" class="bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-slate-700 p-2.5 rounded-xl text-xs font-bold">🧮 Formula Sheet (${window.formulaCheatBank.length})</button>
+                            <button type="button" onclick="window.renderVocabFlashcardsSection()" class="bg-slate-900 hover:bg-slate-800 text-amber-300 border border-slate-700 p-2.5 rounded-xl text-xs font-bold">🃏 Vocab Cards (${vocabList.length})</button>
+                        </div>
+                        <div id="pack-c-dynamic-viewer" class="mt-2"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+        modal.classList.remove('hidden');
+
+        const cmdInp = document.getElementById('ctrlk-cmd-inp');
+        setTimeout(() => cmdInp?.focus(), 60);
+        cmdInp?.addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter') return;
+            const val = cmdInp.value.trim();
+            modal.classList.add('hidden');
+            if (/^dict\s+(.+)/i.test(val)) {
+                window.openReaderDictionaryModal(val.replace(/^dict\s+/i, ''));
+            } else if (/^pomo/i.test(val)) {
+                window.startTimer && window.startTimer();
+            }
+        });
+    };
+
+    window.openDigitalOmrSimulatorModal = function() {
+        const box = document.getElementById('pack-c-dynamic-viewer');
+        if (!box) return;
+        let rowsHtml = '';
+        for (let q = 1; q <= 20; q++) {
+            rowsHtml += `
+                <div class="flex items-center justify-between bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
+                    <span class="font-mono text-xs font-extrabold text-slate-300">Q.${String(q).padStart(2, '0')}</span>
+                    <div class="flex gap-1.5">
+                        ${['A', 'B', 'C', 'D'].map(opt => `<label class="cursor-pointer"><input type="radio" name="omr_q_${q}" value="${opt}" class="peer hidden"><span class="w-7 h-7 rounded-full border border-slate-700 flex items-center justify-center text-[11px] font-mono font-bold text-slate-400 peer-checked:bg-rose-600 peer-checked:text-white peer-checked:border-rose-400">${opt}</span></label>`).join('')}
+                    </div>
+                    <select id="omr_res_${q}" class="bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-[10px] font-bold text-slate-300">
+                        <option value="un">⚪ Skip (0)</option>
+                        <option value="cor">✅ Correct (+4)</option>
+                        <option value="wro">❌ Wrong (-1)</option>
+                    </select>
+                </div>
+            `;
+        }
+        box.innerHTML = `
+            <div class="bg-slate-900 border border-rose-500/40 rounded-2xl p-3.5 flex flex-col gap-2.5">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-extrabold text-rose-300">📝 Digital OMR Bubble Sheet (+4 Correct / -1 Wrong / 0 Skip)</span>
+                    <button type="button" onclick="window.calculateOmrSheetNetScore()" class="bg-emerald-600 text-white font-extrabold px-3 py-1 rounded-lg text-xs">⚡ Calculate +4/-1 Score</button>
+                </div>
+                <div id="omr-net-score-banner" class="hidden bg-slate-950 border border-emerald-500/50 rounded-xl p-2.5 text-center font-mono text-xs font-extrabold text-emerald-300"></div>
+                <div class="grid grid-cols-2 gap-2 max-h-60 native-scroll">${rowsHtml}</div>
+            </div>
+        `;
+    };
+
+    window.calculateOmrSheetNetScore = function() {
+        let cor = 0, wro = 0, skip = 0;
+        for (let q = 1; q <= 20; q++) {
+            const v = document.getElementById(`omr_res_${q}`)?.value || 'un';
+            if (v === 'cor') cor++;
+            else if (v === 'wro') wro++;
+            else skip++;
+        }
+        const net = (cor * 4) - (wro * 1);
+        const banner = document.getElementById('omr-net-score-banner');
+        if (banner) {
+            banner.classList.remove('hidden');
+            banner.textContent = `🎯 NET OMR SCORE: ${net} / 80 Marks  (✅ ${cor} Correct [+${cor * 4}] • ❌ ${wro} Wrong [-${wro}] • ⚪ ${skip} Skipped)`;
+        }
+    };
+
+    window.renderMistakeAutopsySection = function() {
+        const box = document.getElementById('pack-c-dynamic-viewer');
+        if (!box) return;
+        box.innerHTML = `
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3 flex flex-col gap-2">
+                <div class="flex gap-2">
+                    <input type="text" id="new-autopsy-q-inp" placeholder="Question / Concept you got wrong..." class="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white">
+                    <input type="text" id="new-autopsy-a-inp" placeholder="Correct Answer & Takeaway..." class="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-emerald-300">
+                    <button type="button" onclick="const q=document.getElementById('new-autopsy-q-inp').value.trim(), a=document.getElementById('new-autopsy-a-inp').value.trim(); if(q&&a){window.mistakeAutopsyList.unshift({id:Date.now(),subj:window.activeTaskSubj||'Medical Science',q,ans:a,explanation:'',date:window.getLocalTodayString()}); window.safeSet('pages_pomodoro_autopsy_v12',JSON.stringify(window.mistakeAutopsyList)); window.renderMistakeAutopsySection();}" class="bg-rose-600 text-white font-bold px-3 py-1.5 rounded-xl text-xs">＋ Log</button>
+                </div>
+                <div class="flex flex-col gap-1.5 max-h-48 native-scroll">
+                    ${window.mistakeAutopsyList.length ? window.mistakeAutopsyList.map(m => `
+                        <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-xs">
+                            <span class="text-[10px] font-mono text-amber-400">[${escapeHtml(m.subj)} • ${escapeHtml(m.date)}]</span>
+                            <p class="font-bold text-white mt-0.5">${escapeHtml(m.q)}</p>
+                            <p class="text-emerald-400 text-[11px] mt-0.5">✓ Fix: ${escapeHtml(m.ans)} ${escapeHtml(m.explanation || '')}</p>
+                        </div>
+                    `).join('') : `<p class="text-xs text-slate-400 italic">Log any MCQ mistake above to build your Mistake Autopsy Vault.</p>`}
+                </div>
+            </div>
+        `;
+    };
+
+    window.renderFormulaCheatSheetSection = function() {
+        const box = document.getElementById('pack-c-dynamic-viewer');
+        if (!box) return;
+        box.innerHTML = `
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3 flex flex-col gap-2">
+                <div class="flex gap-2">
+                    <input type="text" id="new-formula-inp" placeholder="Add formula, constant, historical date, or clinical pearl..." class="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white font-mono">
+                    <button type="button" onclick="const v=document.getElementById('new-formula-inp').value.trim(); if(v){window.formulaCheatBank.unshift({txt:v,subj:window.activeTaskSubj||'Medical Science'}); window.safeSet('pages_pomodoro_formulas_v12',JSON.stringify(window.formulaCheatBank)); window.renderFormulaCheatSheetSection();}" class="bg-cyan-600 text-white font-bold px-3 py-1.5 rounded-xl text-xs">＋ Pin</button>
+                </div>
+                <div class="flex flex-col gap-1.5 max-h-48 native-scroll">
+                    ${window.formulaCheatBank.map(f => `<div class="bg-slate-950 p-2 rounded-lg border border-slate-800 font-mono text-xs text-cyan-200"><b class="text-amber-300">[${escapeHtml(f.subj)}]</b> ${escapeHtml(f.txt)}</div>`).join('') || `<p class="text-xs text-slate-400 italic">No pinned formulas yet.</p>`}
+                </div>
+            </div>
+        `;
+    };
+
+    window.renderVocabFlashcardsSection = function() {
+        const box = document.getElementById('pack-c-dynamic-viewer');
+        if (!box) return;
+        const list = JSON.parse(window.safeGet('pages_pomodoro_vocab_bank_v12', '[]'));
+        box.innerHTML = `
+            <div class="grid grid-cols-2 gap-2 max-h-60 native-scroll">
+                ${list.length ? list.map(v => `
+                    <div class="bg-slate-900 p-3 rounded-xl border border-amber-500/40 flex flex-col gap-1">
+                        <span class="text-sm font-extrabold text-amber-300">${escapeHtml(v.word)}</span>
+                        <p class="text-xs text-slate-200">${escapeHtml(v.engDef)}</p>
+                        <p class="text-xs text-emerald-300 font-bold">${escapeHtml(v.arTrans)} • ${escapeHtml(v.urTrans)} • ${escapeHtml(v.hiTrans)}</p>
+                    </div>
+                `).join('') : `<p class="text-xs text-slate-400 italic col-span-2">Look up any word in the 📖 PomoLexicon Dictionary and click "⭐ Save Word" to build your flashcard deck!</p>`}
+            </div>
+        `;
+    };
+
+    const topHeaderLeft = document.getElementById('dim-toggle-btn')?.parentElement;
+    if (topHeaderLeft && !document.getElementById('master-15-pro-top-btn')) {
+        const proBtn = document.createElement('button');
+        proBtn.type = 'button';
+        proBtn.id = 'master-15-pro-top-btn';
+        proBtn.className = "bg-gradient-to-r from-cyan-600 to-purple-600 text-white px-2.5 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1 shadow active:scale-95";
+        proBtn.title = "Open Desktop Command Center (Ctrl+K)";
+        proBtn.innerHTML = `<span>🚀</span><span class="text-[10px]">15-Pro</span>`;
+        proBtn.onclick = () => window.openMaster15UpgradesHub();
+        topHeaderLeft.appendChild(proBtn);
+    }
+
+    window.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+            e.preventDefault();
+            window.openMaster15UpgradesHub();
+        }
+    });
+})();
+
+/* =========================================================================
+   10. STATS, TELEGRAM REPORT & BOOTSTRAP
    ========================================================================= */
 window.renderStats = function() {
     const stats = JSON.parse(safeGet('pages_pomodoro_stats_v8', '{"history":{}}'));
@@ -3060,4 +3398,4 @@ renderSalahStrip();
 renderTodoListsBar();
 renderTodos();
 evaluateDriftAndAlerts();
-// ✅ END OF FILE (02-pomo-core.js v16.0 Desktop) — 100% COMPLETE & UNCUT
+// ✅ END OF FILE (02-pomo-core.js v17.0 Enterprise Desktop Edition) — 100% COMPLETE & UNCUT

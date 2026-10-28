@@ -1,8 +1,7 @@
 /* =========================================================================
-   04-READER-PRO.JS (v16.0 PURE DESKTOP EDITION — PART 1 OF 2)
-   3D WOODEN BOOKSHELF, ANTI-CUTOFF GENRE SLIDER, POMOCLOUD 0MB OFFLOAD,
-   CROSS-APP STUDIO BRIDGE (FIREBASE + TELEGRAM FILE_ID + GDRIVE + FOLDER),
-   INTERACTIVE PIP MINI-COCKPIT & SMART CHAPTER AUTO-DETECTOR
+   04-READER-PRO.JS (v16.1 PURE DESKTOP EDITION — PART 1 OF 2)
+   6–8 BOOKS PER ROW EXACT-FIT WOODEN BOOKSHELF, AUTO-ADAPTIVE RAM/SSD TIER
+   SCALER, ANTI-CUTOFF GENRE SLIDER, POMOCLOUD 0MB OFFLOAD & STUDIO BRIDGE
    ========================================================================= */
 (function() {
     document.getElementById('reader-floating-thumb-dock')?.remove();
@@ -19,7 +18,7 @@
     };
 
     /* =========================================================================
-       1. UNIFIED READER STATE, POLYMATH GENRES & SHARED MODULE VARIABLES
+       1. UNIFIED READER STATE, POLYMATH GENRES & AUTO-ADAPTIVE HARDWARE SCALER
        ========================================================================= */
     window.readerBooks = JSON.parse(safeGet('pages_pomodoro_reader_books_v1', '[]'));
     window.readerReadingLog = JSON.parse(safeGet('pages_pomodoro_reader_log_v1', '{}'));
@@ -33,6 +32,10 @@
     window.readerSettings = JSON.parse(safeGet('pages_pomodoro_reader_cfg_v1', 'null')) || {
         woodStyle: 'walnut',
         sortBy: 'sequence',
+        booksPerRow: 'auto', // 'auto' (6-8 exact fit) or 6, 7, 8
+        txtBgTheme: 'default', // 'default' | 'black' | 'blue' | 'green' | 'sepia' | 'paper'
+        txtSelColor: 'rgba(37, 99, 235, 0.55)',
+        pdfSelColor: 'rgba(37, 99, 235, 0.32)',
         autoFolderImport: true,
         mainFolderName: '',
         viewMode: 'scroll',
@@ -55,9 +58,58 @@
         }
     };
 
+    if (!readerSettings.booksPerRow) readerSettings.booksPerRow = 'auto';
+    if (!readerSettings.txtBgTheme) readerSettings.txtBgTheme = 'default';
+    if (!readerSettings.txtSelColor) readerSettings.txtSelColor = 'rgba(37, 99, 235, 0.55)';
+    if (!readerSettings.pdfSelColor) readerSettings.pdfSelColor = 'rgba(37, 99, 235, 0.32)';
+
     readerBooks.forEach((b, idx) => {
         if (typeof b.readSeq !== 'number') b.readSeq = idx + 1;
     });
+
+    // 4-Tier Auto-Adaptive Hardware Telemetry (Supports 32GB+ RAM & 1TB SSD down to 4GB Laptops)
+    async function detectAndApplyReaderHardwareTier() {
+        const rawRam = navigator.deviceMemory || 8;
+        const cores = navigator.hardwareConcurrency || 8;
+        const heapLimitBytes = window.performance?.memory?.jsHeapSizeLimit || 0;
+        const heapLimitGb = heapLimitBytes / (1024 * 1024 * 1024);
+
+        let quotaGb = 0;
+        try {
+            if (navigator.storage && navigator.storage.estimate) {
+                const est = await navigator.storage.estimate();
+                if (est && est.quota) quotaGb = Math.round(est.quota / (1024 * 1024 * 1024));
+            }
+        } catch (e) {}
+
+        // Tier 1: Ultra Workstation (e.g. 32GB RAM + 1TB SSD -> High core count or large heap/SSD quota)
+        if ((rawRam >= 8 && cores >= 12) || heapLimitGb >= 3.5 || quotaGb >= 200) {
+            window.pomoHardwareTier = 1;
+            window.pomoMaxPageBufferWindow = 40;
+            window.pomoOptimalPdfScale = 2.0;
+        } else if (rawRam >= 8 && cores >= 8) {
+            // Tier 2: Performance Desktop (16GB RAM)
+            window.pomoHardwareTier = 2;
+            window.pomoMaxPageBufferWindow = 22;
+            window.pomoOptimalPdfScale = 1.75;
+        } else if (rawRam >= 6) {
+            // Tier 3: Standard Laptop (8GB RAM)
+            window.pomoHardwareTier = 3;
+            window.pomoMaxPageBufferWindow = 12;
+            window.pomoOptimalPdfScale = 1.45;
+        } else {
+            // Tier 4: Low-Spec / Survival Mode (4GB RAM)
+            window.pomoHardwareTier = 4;
+            window.pomoMaxPageBufferWindow = 5;
+            window.pomoOptimalPdfScale = 1.15;
+        }
+
+        const badge = document.getElementById('reader-folder-sync-badge');
+        if (badge && window.pomoHardwareTier === 1) {
+            badge.innerHTML = `🛡️ Tier-1 Ultra (${quotaGb > 0 ? quotaGb + 'GB SSD' : '1TB+ Ready'} • ${window.pomoMaxPageBufferWindow}p RAM Window)`;
+        }
+    }
+    detectAndApplyReaderHardwareTier();
 
     // Shared Module State across Part 1 & Part 2
     let mainDirectoryHandle = null;
@@ -99,13 +151,10 @@
 
     /* =========================================================================
        1B. CROSS-APP "POMO STUDIO BRIDGE" (FOR EXTERNAL POMOAI STUDIO APP)
-           Syncs Books, Shelves, Page-Range Text Indexes, Telegram file_id,
-           Google Drive IDs & Live Passages via Firebase, BroadcastChannel & Disk
        ========================================================================= */
     const studioBroadcastChan = ('BroadcastChannel' in window) ? new BroadcastChannel('pomo_studio_bridge_v1') : null;
 
     window.PomoStudioBridge = {
-        // 1. Pushes a book's per-page text index to Firebase so external PomoAI Studio can query any page range (e.g. p.10-25)
         async syncBookPageIndexToCloud(bookId, pagesTextArray = []) {
             const b = readerBooks.find(x => x.id === bookId);
             if (!b || !Array.isArray(pagesTextArray) || !pagesTextArray.length) return false;
@@ -119,7 +168,6 @@
                     .collection('sync_rooms').doc(roomId)
                     .collection('reader_page_index').doc(b.id);
 
-                // Batch pages into 25-page chunks so each Firestore document stays well under 1MB
                 const pagesPerChunk = 25;
                 const totalChunks = Math.ceil(pagesTextArray.length / pagesPerChunk);
                 await indexRef.set({
@@ -156,7 +204,6 @@
             }
         },
 
-        // 2. Sends a highlighted passage or book/page-range payload directly to the external Studio app
         async sendSelectionToExternalStudio(payload) {
             const packet = {
                 id: 'bridge_' + Date.now(),
@@ -172,19 +219,14 @@
                 timestamp: Date.now()
             };
 
-            // Channel A: Instant Desktop BroadcastChannel (0ms to open PomoAI Studio tab)
-            try {
-                studioBroadcastChan?.postMessage({ type: 'STUDIO_IMPORT_PASSAGE', packet });
-            } catch (e) {}
+            try { studioBroadcastChan?.postMessage({ type: 'STUDIO_IMPORT_PASSAGE', packet }); } catch (e) {}
 
-            // Channel B: Shared LocalStorage Bridge Inbox
             try {
                 const inbox = JSON.parse(safeGet('pages_pomodoro_studio_bridge_inbox_v1', '[]'));
                 inbox.unshift(packet);
                 safeSet('pages_pomodoro_studio_bridge_inbox_v1', JSON.stringify(inbox.slice(0, 30)));
             } catch (e) {}
 
-            // Channel C: Firebase Cloud Studio Inbox (Works across separate domains/devices)
             const roomId = safeGet('pages_pomodoro_sync_room', '');
             if (roomId && typeof firebase !== 'undefined' && firebase.apps?.length) {
                 try {
@@ -197,13 +239,11 @@
                 } catch (e) {}
             }
 
-            // Channel D: Clipboard Citation Copy
             const citationStr = `📘 [${packet.shelfName}] ${packet.bookTitle} (Page ${packet.startPage}${packet.endPage > packet.startPage ? `–${packet.endPage}` : ''}):\n"${packet.selectedText}"`;
             try { await navigator.clipboard.writeText(citationStr); } catch (e) {}
             showToast(`📤 Sent to External Studio Bridge & Copied Citation (p.${packet.startPage})!`);
         },
 
-        // 3. Writes pomo-library-index.json into linked Main Desktop Folder so standalone apps can mount the folder directly
         async writeDesktopFolderLibraryIndex() {
             if (!mainDirectoryHandle) return;
             try {
@@ -220,7 +260,6 @@
         }
     };
 
-    // Listen for live requests from the separate PomoAI Studio app over BroadcastChannel
     if (studioBroadcastChan) {
         studioBroadcastChan.onmessage = async (ev) => {
             const msg = ev.data || {};
@@ -512,7 +551,6 @@
             return;
         }
 
-        // Always sync the lightweight per-page text index to Firebase so external PomoAI Studio can read any page range!
         if (Array.isArray(stored.extractedPagesText) && stored.extractedPagesText.length > 0) {
             window.PomoStudioBridge.syncBookPageIndexToCloud(b.id, stored.extractedPagesText);
         }
@@ -878,7 +916,6 @@
                 }
             } catch (e) {}
 
-            // Scan up to 45 pages for Chapters + cache extracted page texts for Cross-App Studio Bridge
             const scanLimit = Math.min(info.totalPages, 45);
             const seenKeys = new Set();
             for (let p = 1; p <= scanLimit; p++) {
@@ -930,6 +967,7 @@
                             }
                         });
                     }
+                    try { pg.cleanup(); } catch (e) {}
                 } catch (e) {}
             }
 
@@ -1096,7 +1134,6 @@
         readerBooks.unshift(newBook);
         saveReaderMeta();
 
-        // Automatically sync extracted page-text index to Firebase for external Studio Bridge
         if (extractedPagesText.length > 0) {
             window.PomoStudioBridge.syncBookPageIndexToCloud(bookId, extractedPagesText);
         }
@@ -1204,7 +1241,7 @@
     });
 
     /* =========================================================================
-       5. 3D WOODEN BOOKSHELF & FIXED SMOOTH-SLIDING / WRAP-GRID SHELF BAR
+       5. 3D WOODEN BOOKSHELF (DYNAMIC 6, 7, OR 8 BOOKS PER ROW EXACT FIT)
        ========================================================================= */
     function applyWoodThemeStyle() {
         const wrap = document.getElementById('wooden-bookshelf-wrapper');
@@ -1217,6 +1254,59 @@
         };
         wrap.style.background = styles[readerSettings.woodStyle] || styles.walnut;
     }
+
+    // Computes Exact-Fit Books Per Shelf Row (6, 7, or 8 on Desktop)
+    function computeExactShelfBooksPerRow() {
+        const pref = readerSettings.booksPerRow || 'auto';
+        if (pref !== 'auto') {
+            const manualCols = Math.max(4, Math.min(8, parseInt(pref) || 7));
+            document.documentElement.style.setProperty('--shelf-cols', String(manualCols));
+            return manualCols;
+        }
+        const rowsEl = document.getElementById('wooden-bookshelf-rows');
+        const availW = rowsEl?.clientWidth || window.innerWidth || 1366;
+        let autoCols = 7;
+        if (availW >= 1580) autoCols = 8;
+        else if (availW >= 1220) autoCols = 7;
+        else if (availW >= 920) autoCols = 6;
+        else autoCols = 4;
+
+        document.documentElement.style.setProperty('--shelf-cols', String(autoCols));
+        return autoCols;
+    }
+
+    function mountShelfBooksPerRowSelector() {
+        const sortSel = document.getElementById('shelf-sort-select');
+        if (!sortSel || document.getElementById('shelf-cols-density-select')) return;
+        const colsSel = document.createElement('select');
+        colsSel.id = 'shelf-cols-density-select';
+        colsSel.className = "bg-slate-950 border border-amber-500/50 rounded-xl px-2.5 py-1.5 text-xs text-amber-300 font-extrabold focus:outline-none";
+        colsSel.title = "Choose how many books fit on each wooden shelf line (Auto 6–8, or lock to 6, 7, or 8)";
+        const curVal = String(readerSettings.booksPerRow || 'auto');
+        colsSel.innerHTML = `
+            <option value="auto" ${curVal === 'auto' ? 'selected' : ''}>📐 Shelf Fit: Auto (6–8 Books)</option>
+            <option value="6" ${curVal === '6' ? 'selected' : ''}>📐 6 Books / Shelf Line</option>
+            <option value="7" ${curVal === '7' ? 'selected' : ''}>📐 7 Books / Shelf Line</option>
+            <option value="8" ${curVal === '8' ? 'selected' : ''}>📐 8 Books / Shelf Line</option>
+        `;
+        colsSel.onchange = (e) => {
+            readerSettings.booksPerRow = e.target.value;
+            saveReaderMeta(true);
+            renderWoodenShelf();
+            showToast(`🪵 Wooden Shelf set to ${e.target.value === 'auto' ? 'Auto Exact-Fit (6–8 Books/Line)' : e.target.value + ' Books per Shelf Line'}!`);
+        };
+        sortSel.parentElement?.insertBefore(colsSel, sortSel);
+    }
+
+    let shelfResizeTimer = null;
+    window.addEventListener('resize', () => {
+        clearTimeout(shelfResizeTimer);
+        shelfResizeTimer = setTimeout(() => {
+            if (window.currentPageId === 'page-reader' && readerSettings.booksPerRow === 'auto') {
+                renderWoodenShelf();
+            }
+        }, 180);
+    });
 
     window.moveBookInShelfSequence = function(bookId, delta) {
         const target = readerBooks.find(b => b.id === bookId);
@@ -1402,6 +1492,7 @@
 
     window.renderWoodenShelf = function() {
         applyWoodThemeStyle();
+        mountShelfBooksPerRowSelector();
         renderCustomShelvesBar();
         const rowsContainer = document.getElementById('wooden-bookshelf-rows');
         if (!rowsContainer) return;
@@ -1437,7 +1528,7 @@
 
         rowsContainer.innerHTML = '';
         if (!filtered.length) {
-            rowsContainer.innerHTML = `<div class="wood-shelf-row py-12 text-center flex flex-col items-center justify-center gap-2"><span class="text-4xl">📚</span><p class="text-sm font-bold text-amber-200">No books in this genre view yet.</p><p class="text-xs text-amber-100/60">Click "➕ Import Books" above (or drag & drop any PDF/EPUB file onto this shelf) to add books!</p></div>`;
+            rowsContainer.innerHTML = `<div class="py-12 text-center flex flex-col items-center justify-center gap-2 border-b-[15px] border-[#5c3a21]"><span class="text-4xl">📚</span><p class="text-sm font-bold text-amber-200">No books in this genre view yet.</p><p class="text-xs text-amber-100/60">Click "➕ Import Books" above (or drag & drop any PDF/EPUB file onto this shelf) to add books!</p></div>`;
             return;
         }
 
@@ -1462,7 +1553,7 @@
                 const safeFirstBookId = escapeJsStr(gBooks[0].id);
 
                 const sec = document.createElement('div');
-                sec.className = "mb-4";
+                sec.className = "mb-3";
                 sec.innerHTML = `
                     <div class="shelf-genre-header">
                         <div class="flex items-center gap-2">
@@ -1490,61 +1581,63 @@
     };
 
     function renderPlankCards(parentEl, list) {
-        const perRow = window.innerWidth >= 900 ? 4 : 3;
+        const perRow = computeExactShelfBooksPerRow();
         for (let i = 0; i < list.length; i += perRow) {
             const slice = list.slice(i, i + perRow);
             const rowEl = document.createElement('div');
-            rowEl.className = "wood-shelf-row grid grid-cols-3 md:grid-cols-4 gap-5 px-2 pt-2";
+            rowEl.className = "wood-shelf-row";
+            rowEl.style.gridTemplateColumns = `repeat(${perRow}, minmax(0, 1fr))`;
+
             slice.forEach((book, idxInSlice) => {
                 const seqNum = book.readSeq || (i + idxInSlice + 1);
                 const curP = Math.max(1, book.currentPage || 1);
                 const totP = Math.max(1, book.totalPages || 1);
                 const pct = Math.min(100, Math.round((curP / totP) * 100));
                 const catBadge = book.category === 'deen' ? '🕌' : (book.category === 'study' ? '🧠' : '🚀');
-                const fmtLabel = book.format === 'pbook' ? '📖 BOOK-OS' : (book.format || 'pdf').toUpperCase();
+                const fmtLabel = book.format === 'pbook' ? 'BOOK' : (book.format || 'pdf').toUpperCase();
                 const coverUrl = coverMemoryCache[book.id] || book.coverDataUrl || '';
                 const safeBookId = escapeJsStr(book.id);
 
                 const card = document.createElement('div');
                 card.className = "book-card-3d group";
                 if (coverUrl) {
-                    card.style.backgroundImage = `linear-gradient(180deg, rgba(2,6,23,0.28) 0%, rgba(2,6,23,0.95) 82%), url('${coverUrl}')`;
+                    card.style.backgroundImage = `linear-gradient(180deg, rgba(2,6,23,0.22) 0%, rgba(2,6,23,0.94) 84%), url('${coverUrl}')`;
                     card.style.backgroundSize = 'cover';
                     card.style.backgroundPosition = 'center';
                 }
                 card.onclick = () => openBookInReader(book.id);
                 card.innerHTML = `
                     <button class="book-corner-menu-btn" title="Book Details, Cover & PomoCloud Offload" onclick="event.stopPropagation(); window.openBookCornerModal('${safeBookId}')">⋮</button>
-                    <div class="p-2.5 flex flex-col gap-1">
-                        <div class="flex items-center gap-1 flex-wrap pr-7">
-                            <div class="inline-flex items-center bg-slate-950/95 border border-amber-500/60 rounded-md overflow-hidden shadow">
-                                <button type="button" onclick="event.stopPropagation(); window.moveBookInShelfSequence('${safeBookId}', -1)" class="px-1 py-0.5 text-[9px] text-amber-300 hover:bg-amber-600 hover:text-slate-950 font-bold" title="Move Book Earlier in Reading Sequence">◀</button>
-                                <button type="button" onclick="event.stopPropagation(); window.promptBookExactSequence('${safeBookId}')" class="px-1.5 py-0.5 text-[9px] font-mono font-extrabold text-amber-300 hover:bg-slate-800" title="Click to set exact Reading Sequence #">#${seqNum}</button>
-                                <button type="button" onclick="event.stopPropagation(); window.moveBookInShelfSequence('${safeBookId}', 1)" class="px-1 py-0.5 text-[9px] text-amber-300 hover:bg-amber-600 hover:text-slate-950 font-bold" title="Move Book Later in Reading Sequence">▶</button>
+                    <div class="p-1.5 flex flex-col gap-0.5">
+                        <div class="flex items-center gap-1 flex-wrap pr-5">
+                            <div class="inline-flex items-center bg-slate-950/95 border border-amber-500/60 rounded overflow-hidden shadow">
+                                <button type="button" onclick="event.stopPropagation(); window.moveBookInShelfSequence('${safeBookId}', -1)" class="px-1 py-0.5 text-[8px] text-amber-300 hover:bg-amber-600 hover:text-slate-950 font-bold" title="Move Book Earlier">◀</button>
+                                <button type="button" onclick="event.stopPropagation(); window.promptBookExactSequence('${safeBookId}')" class="px-1 py-0.5 text-[8px] font-mono font-extrabold text-amber-300 hover:bg-slate-800" title="Set Exact Sequence #">#${seqNum}</button>
+                                <button type="button" onclick="event.stopPropagation(); window.moveBookInShelfSequence('${safeBookId}', 1)" class="px-1 py-0.5 text-[8px] text-amber-300 hover:bg-amber-600 hover:text-slate-950 font-bold" title="Move Book Later">▶</button>
                             </div>
-                            <span class="bg-slate-950/90 text-[10px] font-extrabold px-1.5 py-0.5 rounded border ${book.format === 'pbook' ? 'border-emerald-400 text-emerald-300' : 'border-slate-700 text-white'}">${catBadge} ${fmtLabel}</span>
-                            ${book.isOffloadedZeroStorage ? '<span class="bg-cyan-950 text-cyan-300 border border-cyan-500/40 text-[8px] font-mono px-1 rounded" title="0MB Local Cloud-Only Mode">☁️0MB</span>' : ''}
-                            ${book.favorite ? '<span class="text-xs">❤️</span>' : ''}
+                            <span class="bg-slate-950/90 text-[8px] font-extrabold px-1 py-0.5 rounded border ${book.format === 'pbook' ? 'border-emerald-400 text-emerald-300' : 'border-slate-700 text-white'}">${catBadge}${fmtLabel}</span>
+                            ${book.isOffloadedZeroStorage ? '<span class="bg-cyan-950 text-cyan-300 border border-cyan-500/40 text-[7px] font-mono px-1 rounded" title="0MB Local Cloud-Only Mode">☁️0MB</span>' : ''}
+                            ${book.favorite ? '<span class="text-[10px]">❤️</span>' : ''}
                         </div>
-                        <button type="button" onclick="event.stopPropagation(); window.openAssignShelfModal('${safeBookId}')" class="bg-amber-950/90 hover:bg-amber-700 text-amber-300 hover:text-white border border-amber-500/50 text-[9px] font-extrabold px-2 py-0.5 rounded-md w-fit max-w-full truncate flex items-center gap-1">
-                            <span>🪵 ${escapeHtml(book.shelfName || 'General Shelf')}</span> <span>⇄</span>
+                        <button type="button" onclick="event.stopPropagation(); window.openAssignShelfModal('${safeBookId}')" class="bg-amber-950/90 hover:bg-amber-700 text-amber-300 hover:text-white border border-amber-500/50 text-[8px] font-extrabold px-1.5 py-0.5 rounded w-fit max-w-full truncate flex items-center gap-0.5">
+                            <span class="truncate">🪵 ${escapeHtml(book.shelfName || 'Shelf')}</span> <span>⇄</span>
                         </button>
                     </div>
-                    <div class="p-2.5 bg-gradient-to-t from-slate-950 via-slate-950/95 to-transparent flex flex-col gap-1">
-                        <h4 class="text-xs font-extrabold text-white line-clamp-2 leading-snug">${escapeHtml(book.title)}</h4>
-                        <p class="text-[10px] text-slate-300 truncate">${escapeHtml(book.author || 'Unknown Author')}</p>
-                        <div class="flex items-center justify-between text-[10px] font-mono mt-0.5">
+                    <div class="p-1.5 bg-gradient-to-t from-slate-950 via-slate-950/95 to-transparent flex flex-col gap-0.5">
+                        <h4 class="text-[11px] font-extrabold text-white line-clamp-2 leading-tight" title="${escapeHtml(book.title)}">${escapeHtml(book.title)}</h4>
+                        <p class="text-[9px] text-slate-300 truncate">${escapeHtml(book.author || 'Unknown Author')}</p>
+                        <div class="flex items-center justify-between text-[9px] font-mono">
                             <span class="text-emerald-400 font-bold">${pct}%</span>
                             <span class="text-slate-400">p.${curP}/${totP}</span>
                         </div>
-                        <div class="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
+                        <div class="w-full h-1 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
                             <div class="h-full bg-gradient-to-r from-blue-500 to-emerald-400 rounded-full" style="width: ${pct}%"></div>
                         </div>
-                        <div class="grid grid-cols-4 gap-1 mt-1.5 pt-1 border-t border-slate-800/80">
-                            <button type="button" onclick="event.stopPropagation(); window.startBookFocusSession('${safeBookId}')" class="bg-emerald-600/25 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/40 text-[9px] font-bold py-1 rounded" title="Start Reading Focus Session">⏱️</button>
-                            <button type="button" onclick="event.stopPropagation(); window.openILovePdfStudioModal('${safeBookId}')" class="bg-rose-600/25 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/40 text-[9px] font-bold py-1 rounded" title="PomoDoc Forge & True-Layout Book Converter">🛠️</button>
-                            <button type="button" onclick="event.stopPropagation(); window.quickAddBookToTodo('${safeBookId}')" class="bg-blue-600/25 hover:bg-blue-600 text-blue-300 hover:text-white border border-blue-500/40 text-[9px] font-bold py-1 rounded" title="Add Book to PomoTasks">☑️</button>
-                            <button type="button" onclick="event.stopPropagation(); window.uploadBookBinaryToWirelessCloud('${safeBookId}')" class="bg-cyan-600/25 hover:bg-cyan-600 text-cyan-300 hover:text-white border border-cyan-500/40 text-[9px] font-bold py-1 rounded" title="Push Book & Page-Index to PomoCloud / External Studio Bridge">☁️</button>
+                        <div class="grid grid-cols-4 gap-0.5 mt-1 pt-1 border-t border-slate-800/80">
+                            <button type="button" onclick="event.stopPropagation(); window.startBookFocusSession('${safeBookId}')" class="bg-emerald-600/25 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/40 text-[8px] font-bold py-0.5 rounded" title="Start Reading Focus Session">⏱️</button>
+                            <button type="button" onclick="event.stopPropagation(); window.openILovePdfStudioModal('${safeBookId}')" class="bg-rose-600/25 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/40 text-[8px] font-bold py-0.5 rounded" title="PomoDoc Forge & True-Layout Book Converter">🛠️</button>
+                            <button type="button" onclick="event.stopPropagation(); window.quickAddBookToTodo('${safeBookId}')" class="bg-blue-600/25 hover:bg-blue-600 text-blue-300 hover:text-white border border-blue-500/40 text-[8px] font-bold py-0.5 rounded" title="Add Book to PomoTasks">☑️</button>
+                            <button type="button" onclick="event.stopPropagation(); window.uploadBookBinaryToWirelessCloud('${safeBookId}')" class="bg-cyan-600/25 hover:bg-cyan-600 text-cyan-300 hover:text-white border border-cyan-500/40 text-[8px] font-bold py-0.5 rounded" title="Push Book & Page-Index to PomoCloud / External Studio Bridge">☁️</button>
                         </div>
                     </div>
                 `;
@@ -1990,11 +2083,105 @@
         for (const b of pending) await window.syncSingleBookToAllSources(b.id, true);
         showToast(`✅ Synced ${pending.length} book(s)!`);
     });
-// ⬇️ PASTE BATCH 3B PART 2 DIRECTLY BELOW THIS LINE ⬇️
+// ⬇️ PASTE PART 2 OF 04-READER-PRO.JS DIRECTLY BELOW THIS LINE ⬇️
  /* =========================================================================
-       7. FULL-SCREEN 16GB-UNLEASHED READER, CALIBRATED SUB-PIXEL BLUE-LINE
-          TEXT SELECTION LAYER, SINGLE-LINE SYMBOL DOCK & 60FPS VECTOR STUDIO
+       7. FULL-SCREEN HARDWARE-ADAPTIVE READER, TXT/PBOOK COLOR STUDIO,
+          CALIBRATED SUB-PIXEL TEXT SELECTION & 60FPS VECTOR STUDIO
        ========================================================================= */
+    window.applyTxtAndSelectionColors = function() {
+        const root = document.documentElement;
+        root.style.setProperty('--txt-sel-bg', readerSettings.txtSelColor || 'rgba(37, 99, 235, 0.55)');
+        root.style.setProperty('--pdf-sel-bg', readerSettings.pdfSelColor || 'rgba(37, 99, 235, 0.32)');
+        const bgTheme = readerSettings.txtBgTheme || 'default';
+        document.querySelectorAll('.pbook-page-sheet').forEach(sheet => {
+            sheet.classList.remove('txt-bg-black', 'txt-bg-blue', 'txt-bg-green', 'txt-bg-sepia', 'txt-bg-paper');
+            if (bgTheme !== 'default') {
+                sheet.setAttribute('data-custom-bg', 'true');
+                sheet.classList.add(`txt-bg-${bgTheme}`);
+            } else {
+                sheet.removeAttribute('data-custom-bg');
+            }
+        });
+    };
+
+    window.setTxtSheetBackgroundTheme = function(themeKey) {
+        readerSettings.txtBgTheme = themeKey || 'default';
+        saveReaderMeta(true);
+        window.applyTxtAndSelectionColors();
+        window.openTxtAndSelectionColorStudio();
+        showToast(`🎨 Book/TXT Sheet Background set to ${themeKey.toUpperCase()}!`);
+    };
+
+    window.setTxtSelectionHighlightColor = function(rgbaTxt, rgbaPdf, label) {
+        readerSettings.txtSelColor = rgbaTxt;
+        readerSettings.pdfSelColor = rgbaPdf;
+        saveReaderMeta(true);
+        window.applyTxtAndSelectionColors();
+        window.openTxtAndSelectionColorStudio();
+        showToast(`🖍️ Text Selection Color set to ${label}!`);
+    };
+
+    window.openTxtAndSelectionColorStudio = function() {
+        const modal = document.getElementById('reader-suboptions-modal');
+        const titleEl = document.getElementById('suboptions-modal-title');
+        const bodyEl = document.getElementById('suboptions-modal-body');
+        if (!modal || !titleEl || !bodyEl) return;
+
+        const curBg = readerSettings.txtBgTheme || 'default';
+        const curSel = readerSettings.txtSelColor || 'rgba(37, 99, 235, 0.55)';
+
+        const bgOptions = [
+            { id: 'default', label: '🔄 Match Reader Theme', preview: 'bg-slate-800 text-slate-200 border-slate-600' },
+            { id: 'black', label: '🖤 Pitch Black (#050505)', preview: 'bg-black text-gray-200 border-slate-700' },
+            { id: 'blue', label: '🌌 Deep Navy Blue (#0a192f)', preview: 'bg-[#0a192f] text-blue-100 border-blue-500/50' },
+            { id: 'green', label: '🌲 Forest Green (#06281e)', preview: 'bg-[#06281e] text-emerald-100 border-emerald-500/50' },
+            { id: 'sepia', label: '📜 Warm Sepia (#f4ecd8)', preview: 'bg-[#f4ecd8] text-[#3b2f2f] border-amber-600/50' },
+            { id: 'paper', label: '☀️ Crisp White Paper (#ffffff)', preview: 'bg-white text-slate-900 border-slate-400' }
+        ];
+
+        const selOptions = [
+            { name: 'Royal Blue', txt: 'rgba(37, 99, 235, 0.55)', pdf: 'rgba(37, 99, 235, 0.32)', dot: '#2563eb' },
+            { name: 'Emerald Green', txt: 'rgba(16, 185, 129, 0.55)', pdf: 'rgba(16, 185, 129, 0.32)', dot: '#10b981' },
+            { name: 'Amber Gold', txt: 'rgba(217, 119, 6, 0.55)', pdf: 'rgba(245, 158, 11, 0.34)', dot: '#f59e0b' },
+            { name: 'Royal Purple', txt: 'rgba(147, 51, 234, 0.55)', pdf: 'rgba(147, 51, 234, 0.32)', dot: '#9333ea' },
+            { name: 'Crimson Rose', txt: 'rgba(225, 29, 72, 0.55)', pdf: 'rgba(225, 29, 72, 0.32)', dot: '#e11d48' },
+            { name: 'Obsidian Black', txt: 'rgba(15, 23, 42, 0.82)', pdf: 'rgba(15, 23, 42, 0.38)', dot: '#0f172a' }
+        ];
+
+        titleEl.textContent = "🎨 TXT / Book-OS Background & Selection Color Studio";
+        bodyEl.innerHTML = `
+            <div class="flex flex-col gap-3 text-xs">
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 flex flex-col gap-2">
+                    <span class="text-[10px] font-extrabold uppercase text-cyan-400">1. .TXT / .PBOOK / .MD Page Sheet Background</span>
+                    <div class="grid grid-cols-2 gap-2">
+                        ${bgOptions.map(o => `
+                            <button type="button" onclick="window.setTxtSheetBackgroundTheme('${o.id}')" class="p-2.5 rounded-xl border text-left font-bold flex items-center justify-between ${o.preview} ${curBg === o.id ? 'ring-2 ring-cyan-400' : ''}">
+                                <span>${o.label}</span>
+                                <span>${curBg === o.id ? '✓' : ''}</span>
+                            </button>
+                        `).join('')}
+                    </div>
+                </div>
+
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 flex flex-col gap-2">
+                    <span class="text-[10px] font-extrabold uppercase text-amber-400">2. Active Text Selection Highlight Color (Never Hides Text!)</span>
+                    <div class="grid grid-cols-2 gap-2">
+                        ${selOptions.map(s => `
+                            <button type="button" onclick="window.setTxtSelectionHighlightColor('${s.txt}', '${s.pdf}', '${s.name}')" class="p-2.5 rounded-xl border border-slate-800 bg-slate-900 hover:bg-slate-800 text-left font-bold flex items-center justify-between text-white ${curSel === s.txt ? 'ring-2 ring-amber-400' : ''}">
+                                <span class="flex items-center gap-2">
+                                    <span class="w-4 h-4 rounded-full border border-white/60 inline-block" style="background:${s.dot}"></span>
+                                    <span>${s.name}</span>
+                                </span>
+                                <span>${curSel === s.txt ? '✓' : ''}</span>
+                            </button>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+        modal.classList.remove('hidden');
+    };
+
     function syncBottomBarVisibilityUI() {
         const botBar = document.getElementById('reader-bottom-bar');
         const toggleBtn = document.getElementById('reader-toggle-bottom-bar-btn');
@@ -2024,6 +2211,7 @@
         dock.className = "flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5 shrink-0";
         dock.innerHTML = `
             <button type="button" id="v14-sel-mode-btn" onclick="window.toggleOfficialVsBoxSelectionMode()" class="v13-bot-sym-btn text-cyan-300" title="🔤 Official Native Blue Text Selection Mode (Click to switch to 📐 Box-Draw Mode)">🔤</button>
+            <button type="button" onclick="window.openTxtAndSelectionColorStudio()" class="v13-bot-sym-btn text-emerald-300" title="🎨 Change .TXT / Book Background (Black, Blue, Green, Sepia) & Selection Highlight Color">🎨</button>
             <button type="button" id="v14-occlude-btn" onclick="window.toggleImageOcclusionTool()" class="v13-bot-sym-btn text-amber-300" title="🎭 Image Occlusion Mask Tool (Drag to mask diagram label, Ctrl+Z to Undo)">🎭</button>
             <button type="button" onclick="window.snipCurrentPageDiagram()" class="v13-bot-sym-btn text-emerald-300" title="📸 Snip Diagram / Figure from Page">📸</button>
             <button type="button" onclick="window.openDualBookSplitViewer()" class="v13-bot-sym-btn text-blue-300" title="◫ Dual-Book Split-Screen View">◫</button>
@@ -2072,7 +2260,7 @@
         }
         syncSvgAndTextLayerModes();
         showToast(readerSelectionMode === 'official'
-            ? "🔤 Official Native Blue Text Selection Active (Drag or Right-Click exact words)"
+            ? "🔤 Official Native Text Selection Active (Drag or Right-Click exact words)"
             : "📐 Rectangular Box-Draw Selection Active (Drag box on page)");
     };
 
@@ -2266,7 +2454,6 @@
         };
     };
 
-    // 100% OFFLINE SELF-GRADED FEYNMAN BLUR-THE-PAGE ACTIVE RECALL CHECK
     window.openRealFeynmanBlurTest = function() {
         const stage = document.getElementById('reader-pages-stage');
         if (stage) stage.style.filter = 'blur(14px)';
@@ -2333,23 +2520,44 @@
         };
     };
 
+    // FIXED HARDWARE-ADAPTIVE RAM CLEANER (Zero ReferenceError + Automatic Sliding Window Eviction)
     window.runTurboRamCleaner = function(silent = false) {
-        if (!activeReaderBook) { if (!silent) showToast(`🚀 Dynamic RAM Buffer Ready (${winSize}-Page Window)`); return; }
+        const winSize = window.pomoMaxPageBufferWindow || 12;
+        if (!activeReaderBook) {
+            if (!silent) showToast(`🚀 Dynamic RAM Buffer Ready (${winSize}-Page Window)`);
+            return;
+        }
         const curP = activeReaderBook.currentPage || 1;
         let freed = 0;
         document.querySelectorAll('.v4-page-card').forEach(card => {
             const p = parseInt(card.getAttribute('data-page')) || 1;
-            if (Math.abs(p - curP) > 12 && renderedCanvasPages.has(p)) {
+            if (Math.abs(p - curP) > winSize && renderedCanvasPages.has(p)) {
                 const c = card.querySelector('canvas.v4-pdf-canvas');
-                if (c) { c.width = 1; c.height = 1; renderedCanvasPages.delete(p); freed++; }
+                if (c) {
+                    c.width = 1;
+                    c.height = 1;
+                    renderedCanvasPages.delete(p);
+                    freed++;
+                }
             }
         });
-        if (!silent) showToast(`🧹 Cleaned ${freed} distant page buffers (12-Page Window Active)!`);
+        if (!silent && freed > 0) {
+            showToast(`🧹 Cleaned ${freed} distant page buffers (${winSize}-Page Window Active)!`);
+        }
     };
 
     function buildStudioToolbarAndTopUndo() {
         const topRight = document.getElementById('reader-pencil-toggle-btn')?.parentElement;
         if (topRight && !document.getElementById('reader-top-quick-undo-btn')) {
+            const colorBtn = document.createElement('button');
+            colorBtn.id = 'reader-top-color-studio-btn';
+            colorBtn.type = 'button';
+            colorBtn.className = "bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 px-2 py-1.5 rounded-xl text-xs font-bold active:scale-95";
+            colorBtn.title = "Change .TXT / Book Sheet Background (Black, Blue, Green, Sepia) & Selection Highlight Color";
+            colorBtn.innerHTML = "🎨";
+            colorBtn.onclick = () => window.openTxtAndSelectionColorStudio();
+            topRight.insertBefore(colorBtn, document.getElementById('reader-pencil-toggle-btn'));
+
             const undoTopBtn = document.createElement('button');
             undoTopBtn.id = 'reader-top-quick-undo-btn';
             undoTopBtn.type = 'button';
@@ -2446,7 +2654,7 @@
         if (!bar) {
             bar = document.createElement('div');
             bar.id = 'v5-clicked-ann-inspector';
-            bar.className = "fixed z-[295] rounded-2xl shadow-2xl p-1.5 flex items-center gap-1.5";
+            bar.className = "fixed z-[295] rounded-2xl p-1 flex items-center gap-1.5";
             document.getElementById('reader-fullscreen-overlay')?.appendChild(bar);
         }
         const colors = ['#facc15', '#34d399', '#60a5fa', '#f472b6', '#fb923c', '#ef4444'];
@@ -2455,17 +2663,17 @@
         const safeText = escapeJsStr((ann.text || '').slice(0, 50));
 
         bar.innerHTML = `
-            <div class="flex items-center gap-1 border-r border-slate-700/60 pr-1.5">
-                ${colors.map(c => `<button type="button" onclick="window.recolorSelectedAnnotation('${safeAnnId}', '${c}')" class="w-4 h-4 rounded-full border ${ann.color === c ? 'border-white scale-110' : 'border-transparent'}" style="background:${c}"></button>`).join('')}
+            <div class="flex items-center gap-1 pr-1">
+                ${colors.map(c => `<button type="button" onclick="window.recolorSelectedAnnotation('${safeAnnId}', '${c}')" class="w-4 h-4 rounded-full border ${ann.color === c ? 'border-white scale-110' : 'border-transparent'} shadow" style="background:${c}"></button>`).join('')}
             </div>
             <button type="button" onclick="window.openReaderDictionaryModal('${safeText}')" class="sym-dock-btn text-emerald-300" title="📖 4-Language Dictionary">📖</button>
             <button type="button" onclick="window.openSelectedAnnNoteModal('${safeAnnId}')" class="sym-dock-btn text-blue-300" title="📝 Edit Note">📝</button>
             <button type="button" onclick="window.deleteAnnotationTwoWay('${safeBookId}', '${safeAnnId}')" class="sym-dock-btn text-red-400" title="🗑️ Delete">🗑️</button>
-            <button type="button" onclick="window.hideClickedItemInspectorBar()" class="text-slate-300 hover:text-white text-xs font-bold px-1">✕</button>
+            <button type="button" onclick="window.hideClickedItemInspectorBar()" class="sym-dock-btn text-slate-200 text-xs font-bold">✕</button>
         `;
         bar.classList.remove('hidden');
         bar.style.left = `${Math.max(12, Math.min(window.innerWidth - 300, clientX - 130))}px`;
-        bar.style.top = `${Math.max(58, Math.min(window.innerHeight - 100, clientY - 58))}px`;
+        bar.style.top = `${Math.max(58, Math.min(window.innerHeight - 100, clientY - 64))}px`;
     }
 
     window.hideClickedItemInspectorBar = function() {
@@ -2498,7 +2706,7 @@
         hideClickedItemInspectorBar();
         syncSvgAndTextLayerModes();
         refreshVisiblePageSvgs();
-        showToast(studioActive ? "✏️ Live Pencil & Shape Studio Active" : "🔤 Native Blue-Line Text Selection & Reading Mode Active");
+        showToast(studioActive ? "✏️ Live Pencil & Shape Studio Active" : "🔤 Native Text Selection & Reading Mode Active");
     });
 
     function applyIsolatedPageZoom(newZoom) {
@@ -2635,6 +2843,7 @@
 
         document.getElementById('reader-fullscreen-overlay').classList.remove('hidden');
         applyReaderAppearanceAndLocks();
+        window.applyTxtAndSelectionColors();
         syncBottomBarVisibilityUI();
         mountReaderBottomSymbolDock();
 
@@ -2690,19 +2899,22 @@
         saveReaderMeta();
     }
 
+    // FIXED POMODOC FORGE (.PBOOK) RENDERER (Zero False Paragraph Centering + Custom Background Themes)
     function renderStructuredPbookSheet(pageNum, pData) {
         const sheet = document.createElement('div');
-        sheet.className = "pbook-page-sheet";
+        const bgTheme = readerSettings.txtBgTheme || 'default';
+        sheet.className = `pbook-page-sheet ${bgTheme !== 'default' ? `txt-bg-${bgTheme}` : ''}`;
+        if (bgTheme !== 'default') sheet.setAttribute('data-custom-bg', 'true');
         sheet.style.fontSize = `${Math.round(16 * readerZoom)}px`;
 
         const blocks = Array.isArray(pData?.blocks) ? pData.blocks : [];
         let html = '';
         blocks.forEach(blk => {
-            const alignStyle = blk.align === 'center' ? 'text-align:center;' : (blk.indentPct ? `padding-left:${Math.min(28, blk.indentPct)}%;` : '');
+            const cleanText = String(blk.text || '').replace(/\s+/g, ' ').trim();
             if (blk.type === 'h1') {
-                html += `<h2 class="pbook-headline-h1" style="${alignStyle}">${escapeHtml(blk.text)}</h2>`;
+                html += `<h2 class="pbook-headline-h1">${escapeHtml(cleanText)}</h2>`;
             } else if (blk.type === 'h2') {
-                html += `<h3 class="pbook-headline-h2" style="${alignStyle}">${escapeHtml(blk.text)}</h3>`;
+                html += `<h3 class="pbook-headline-h2">${escapeHtml(cleanText)}</h3>`;
             } else if (blk.type === 'diagram' && blk.dataUrl) {
                 html += `
                     <figure class="pbook-diagram-figure">
@@ -2711,9 +2923,12 @@
                     </figure>
                 `;
             } else if (blk.type === 'bullet') {
-                html += `<div class="pbook-paragraph pl-4 border-l-2 border-blue-500/40" style="${alignStyle}">${escapeHtml(blk.text)}</div>`;
+                html += `<div class="pbook-paragraph pl-4 border-l-2 border-blue-500/40">${escapeHtml(cleanText)}</div>`;
             } else {
-                html += `<p class="pbook-paragraph" style="${alignStyle}">${escapeHtml(blk.text || '')}</p>`;
+                const isTrueQuote = (blk.align === 'center' && cleanText.length < 220 && /^["'“‘«]/.test(cleanText));
+                const hasFirstIndent = (!isTrueQuote && blk.firstLineIndent);
+                const extraCls = isTrueQuote ? 'pbook-centered-quote' : (hasFirstIndent ? 'pbook-first-indent' : '');
+                html += `<p class="pbook-paragraph ${extraCls}">${escapeHtml(cleanText)}</p>`;
             }
         });
 
@@ -2761,6 +2976,7 @@
         const cardWidth = Math.round(820 * readerZoom);
         const estHeight = Math.round(cardWidth * 1.38);
         const useDrawOverlay = studioActive || occlusionModeActive || readerSelectionMode === 'box';
+        const bgTheme = readerSettings.txtBgTheme || 'default';
 
         pagesList.forEach(pageNum => {
             const card = document.createElement('div');
@@ -2788,13 +3004,21 @@
                 textLayer.setAttribute('data-page', pageNum);
                 card.appendChild(textLayer);
             } else {
+                card.style.minHeight = 'auto';
                 const contentDiv = document.createElement('div');
-                contentDiv.className = "pbook-page-sheet";
+                contentDiv.className = `pbook-page-sheet ${bgTheme !== 'default' ? `txt-bg-${bgTheme}` : ''}`;
+                if (bgTheme !== 'default') contentDiv.setAttribute('data-custom-bg', 'true');
                 contentDiv.style.fontSize = `${Math.round(16 * readerZoom)}px`;
                 const rawTxt = activeExtractedPages[pageNum - 1] || '';
-                let html = escapeHtml(rawTxt).replace(/\n/g, '<br>');
+                let html = '';
                 if (activeReaderBook.format === 'md' && typeof marked !== 'undefined') {
                     try { html = marked.parse(rawTxt); } catch (e) {}
+                }
+                if (!html) {
+                    const paras = rawTxt.split(/\n\s*\n/).map(p => p.replace(/\s+/g, ' ').trim()).filter(Boolean);
+                    html = paras.length
+                        ? paras.map(p => `<p class="pbook-paragraph">${escapeHtml(p)}</p>`).join('')
+                        : `<p class="pbook-paragraph">${escapeHtml(rawTxt)}</p>`;
                 }
                 contentDiv.innerHTML = html;
                 card.appendChild(contentDiv);
@@ -2826,6 +3050,7 @@
                     }
                     if (!isJumpingPage && entry.intersectionRatio >= 0.4) {
                         updateHeaderAndSliderForCurrentPage(pageNum);
+                        window.runTurboRamCleaner(true);
                     }
                 }
             });
@@ -2838,7 +3063,6 @@
         stage.querySelectorAll('.v4-page-card').forEach(card => pageScrollObserver.observe(card));
     }
 
-    // FIXED SUB-PIXEL CALIBRATED PDF TEXT SELECTION LAYER (Zero Right-Margin Overshoot & Zero Mid-Word Overlap)
     async function ensurePdfPageRendered(pageNum, cardEl) {
         if (!activePdfDoc || renderedCanvasPages.has(pageNum)) return;
         renderedCanvasPages.add(pageNum);
@@ -2847,7 +3071,8 @@
             const textLayer = cardEl.querySelector('.pomo-pdf-text-layer');
             if (!canvas) return;
             const page = await activePdfDoc.getPage(pageNum);
-            const safeScale = Math.min(3.0, 1.65 * Math.max(1, readerZoom));
+            const baseScale = window.pomoOptimalPdfScale || 1.65;
+            const safeScale = Math.min(3.0, baseScale * Math.max(1, readerZoom));
             const vp = page.getViewport({ scale: safeScale });
             canvas.width = vp.width;
             canvas.height = vp.height;
@@ -2915,6 +3140,7 @@
         }
     }
 
+    // COLLISION-FREE TRANSPARENT FLOATING SELECTION BAR POSITIONING
     function handleNativeDomTextSelection(e) {
         if (studioActive || occlusionModeActive || readerSelectionMode === 'box') return;
         const sel = window.getSelection();
@@ -2967,8 +3193,13 @@
         if (flBar) {
             flBar.classList.remove('hidden');
             flBar.classList.add('flex');
-            flBar.style.left = `${Math.max(12, Math.min(window.innerWidth - 350, e.clientX - 160))}px`;
-            flBar.style.top = `${Math.max(56, Math.min(window.innerHeight - 130, e.clientY - 92))}px`;
+            const topClientRect = rawRects[0];
+            const botClientRect = rawRects[rawRects.length - 1];
+            const preferredTop = topClientRect.top - 78;
+            const finalTop = preferredTop >= 52 ? preferredTop : Math.min(window.innerHeight - 95, botClientRect.bottom + 14);
+            const centerX = (topClientRect.left + topClientRect.right) / 2;
+            flBar.style.left = `${Math.max(12, Math.min(window.innerWidth - 350, centerX - 165))}px`;
+            flBar.style.top = `${finalTop}px`;
         }
     }
 
@@ -3442,7 +3673,7 @@
                         flBar.classList.remove('hidden');
                         flBar.classList.add('flex');
                         flBar.style.left = `${Math.max(12, Math.min(window.innerWidth - 350, e.clientX - 160))}px`;
-                        flBar.style.top = `${Math.max(56, Math.min(window.innerHeight - 130, e.clientY - 95))}px`;
+                        flBar.style.top = `${Math.max(56, Math.min(window.innerHeight - 130, e.clientY - 88))}px`;
                     }
                 } else {
                     previewNode?.remove();
@@ -3999,19 +4230,24 @@
         if (targetBook.format === 'pbook' && Array.isArray(sPages) && sPages[pageNum - 1]) {
             return sPages[pageNum - 1].plainText || '';
         }
+        const extPages = customStored?.extractedPagesText || (targetBook === activeReaderBook ? activeExtractedPages : null);
+        if (Array.isArray(extPages) && extPages[pageNum - 1]) {
+            return extPages[pageNum - 1];
+        }
         const pdfDocToUse = customPdfDoc || activePdfDoc;
         if (pdfDocToUse) {
             try {
                 const page = await pdfDocToUse.getPage(pageNum);
                 const tc = await page.getTextContent();
-                return tc.items.map(i => i.str).join(' ');
+                const txt = tc.items.map(i => i.str).join(' ');
+                if (targetBook === activeReaderBook) activeExtractedPages[pageNum - 1] = txt;
+                try { page.cleanup(); } catch (e) {}
+                return txt;
             } catch (e) { return ''; }
         }
-        const extPages = customStored?.extractedPagesText || activeExtractedPages;
-        return extPages[pageNum - 1] || '';
+        return '';
     }
 
-    // Helper for External Studio Bridge to extract any page range on demand
     window.extractBookPageRangeTextForBridge = async function(bookId, startP = 1, endP = 10) {
         const b = readerBooks.find(x => x.id === bookId);
         if (!b) return '';
@@ -4090,7 +4326,7 @@
         const regex = new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
         let matches = 0;
         for (let p = 1; p <= activeReaderBook.totalPages; p++) {
-            if (p % 15 === 0) await new Promise(r => setTimeout(r, 0));
+            if (p % 12 === 0) await new Promise(r => setTimeout(r, 0));
             const txt = await extractTextOfPage(p);
             const idx = txt.toLowerCase().indexOf(q.toLowerCase());
             if (idx !== -1) {
@@ -4110,8 +4346,8 @@
     }
     document.getElementById('fullbook-search-run-btn')?.addEventListener('click', executeFullBookRedSearch);
     document.getElementById('fullbook-search-input')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') executeFullBookRedSearch(); });
-
-    /* =========================================================================
+// ⬇️ PASTE PART 2B DIRECTLY BELOW THIS LINE ⬇️
+ /* =========================================================================
        8B. SETTINGS 1–10 CONTROL CENTER & POMOCLOUD CONNECTOR (WITH TG AUTO-SWAP)
        ========================================================================= */
     let selectedA10Source = 'local';
@@ -4643,6 +4879,7 @@
             const alpha = readerSettings.blueLightEnabled ? ((readerSettings.blueLightIntensity || 30) / 100) * 0.55 : 0;
             shield.style.background = `rgba(255, 140, 0, ${alpha})`;
         }
+        window.applyTxtAndSelectionColors();
     }
 
     document.getElementById('reader-more-dots-btn')?.addEventListener('click', (e) => {
@@ -4703,13 +4940,18 @@
             document.getElementById('misc-daily-dur-inp')?.addEventListener('change', (ev) => { b.dailyTargetMins = Math.max(1, parseInt(ev.target.value) || 30); saveReaderMeta(); updateHeaderAndSliderForCurrentPage(b.currentPage); });
             document.getElementById('misc-bluelight-slider')?.addEventListener('input', (ev) => { readerSettings.blueLightIntensity = parseInt(ev.target.value) || 30; readerSettings.blueLightEnabled = true; saveReaderMeta(); applyReaderAppearanceAndLocks(); });
         } else if (subType === 'sub-themes-options') {
-            titleEl.textContent = "🎨 Reading Color Themes";
+            titleEl.textContent = "🎨 Reading Color Themes & TXT Sheet Colors";
             bodyEl.innerHTML = [
                 { id: 'night', label: '🌙 Night Slate (Default)' },
                 { id: 'amoled', label: '🖤 Pure AMOLED Pitch Black' },
                 { id: 'sepia', label: '📜 Warm Sepia Paper' },
                 { id: 'day', label: '☀️ Crisp Daylight White' }
-            ].map(t => `<button type="button" onclick="window.setReaderTheme('${t.id}')" class="w-full p-3 rounded-xl border text-left text-xs font-bold flex justify-between ${readerSettings.theme === t.id ? 'bg-blue-600 text-white border-blue-400' : 'bg-slate-950 text-slate-300 border-slate-800'}"><span>${t.label}</span><span>${readerSettings.theme === t.id ? '✓' : ''}</span></button>`).join('');
+            ].map(t => `<button type="button" onclick="window.setReaderTheme('${t.id}')" class="w-full p-3 rounded-xl border text-left text-xs font-bold flex justify-between ${readerSettings.theme === t.id ? 'bg-blue-600 text-white border-blue-400' : 'bg-slate-950 text-slate-300 border-slate-800'}"><span>${t.label}</span><span>${readerSettings.theme === t.id ? '✓' : ''}</span></button>`).join('') + `
+                <button type="button" onclick="window.openTxtAndSelectionColorStudio()" class="w-full mt-2 p-3 rounded-xl border border-cyan-500/50 bg-cyan-950/40 text-cyan-300 text-xs font-extrabold flex justify-between items-center">
+                    <span>🎨 Customize .TXT / .PBOOK Sheet & Selection Highlight Colors</span>
+                    <span>➔</span>
+                </button>
+            `;
         } else if (subType === 'sub-book-info') {
             titleEl.textContent = "ℹ️ iv. Complete Book Information";
             const stars = [1, 2, 3, 4, 5].map(s => `<button type="button" onclick="window.setBookStarRating(${s})" class="text-lg">${s <= (b.rating || 5) ? '⭐' : '☆'}</button>`).join('');
@@ -4783,7 +5025,7 @@
 
     /* =========================================================================
        9 & 10. POMODOC FORGE TOOLKIT, VISUAL PAGE THUMBNAIL INSPECTOR &
-               TRUE-KERNING PDF-TO-BOOK (.PBOOK / .TXT) CONVERTER
+               PARAGRAPH-CONSENSUS PDF-TO-BOOK (.PBOOK / .TXT) CONVERTER
        ========================================================================= */
     let activeILovePdfBookId = null;
 
@@ -4814,12 +5056,12 @@
                 </select>
             </div>
 
-            <!-- 1. TRUE-KERNING PDF-TO-STRUCTURED-BOOK (.PBOOK) & CLEAN-FORMAT TXT CONVERTER -->
+            <!-- 1. PARAGRAPH-CONSENSUS PDF-TO-STRUCTURED-BOOK (.PBOOK) & CLEAN-FORMAT TXT CONVERTER -->
             <div class="bg-gradient-to-br from-emerald-950/50 via-slate-950 to-slate-950 border border-emerald-500/50 rounded-2xl p-4 flex flex-col gap-3 shadow-lg">
                 <div>
-                    <span class="text-[9px] font-extrabold uppercase tracking-widest bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30">📖 PomoDoc Forge True-Kerning Typography Engine (Zero Word-Splitting • Auto-Chapter Detection • Studio Bridge Index)</span>
+                    <span class="text-[9px] font-extrabold uppercase tracking-widest bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30">📖 PomoDoc Forge v16.1 Paragraph-Consensus Typography Engine (Zero False Centering • Auto-Chapter Detection)</span>
                     <h4 class="text-sm font-extrabold text-white mt-1">1. Convert PDF to True-Format Book (.pbook) or Clean-Format Text (.txt)</h4>
-                    <p class="text-[11px] text-slate-300 mt-0.5">Preserves 1:1 Page Numbers (1 to ${totP}), eliminates split words, de-hyphenates wrapped lines, auto-extracts Chapters into your ☰ Contents Drawer, and indexes all pages for your external Studio Bridge!</p>
+                    <p class="text-[11px] text-slate-300 mt-0.5">Preserves 1:1 Page Numbers (1 to ${totP}), aligns all paragraphs uniformly with clean justification, de-hyphenates wrapped lines, auto-extracts Chapters into your ☰ Contents Drawer, and indexes all pages for your external Studio Bridge!</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2 pt-1">
                     <label class="flex items-center gap-1.5 text-xs font-bold text-slate-200 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800">
@@ -4827,7 +5069,7 @@
                         <span>🖼️ Embed Verified Charts & Figures</span>
                     </label>
                     <button type="button" onclick="window.convertPdfToStructuredBook('replace')" class="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold px-4 py-2 rounded-xl text-xs shadow active:scale-95">
-                        🔄 Convert in Same Book (Keep Highlights & Auto-Detect Chapters)
+                        🔄 Convert in Same Book (Fix Alignment & Auto-Detect Chapters)
                     </button>
                     <button type="button" onclick="window.convertPdfToStructuredBook('add')" class="bg-blue-600 hover:bg-blue-500 text-white font-extrabold px-4 py-2 rounded-xl text-xs shadow active:scale-95">
                         ➕ Add as New Book on Shelf
@@ -4953,6 +5195,7 @@
                     </div>
                 `;
                 grid.appendChild(card);
+                try { page.cleanup(); } catch (e) {}
             }
         } catch (e) {
             grid.innerHTML = `<p class="text-xs text-red-400 col-span-4">Could not render page thumbnails.</p>`;
@@ -4963,6 +5206,7 @@
         }
     };
 
+    // FIXED POMODOC FORGE PARAGRAPH-CONSENSUS ENGINE (Eliminates false centering of indented paragraphs)
     window.convertPdfToStructuredBook = async function(actionMode = 'replace') {
         const b = readerBooks.find(x => x.id === activeILovePdfBookId) || activeReaderBook;
         if (!b) { showToast("Select a book first!", true); return; }
@@ -4976,7 +5220,7 @@
         const keepDiagrams = document.getElementById('pbook-keep-diagrams-chk')?.checked !== false;
         if (statusEl) {
             statusEl.classList.remove('hidden');
-            statusEl.textContent = `⏳ Running True-Kerning Typography & Auto-Chapter Engine across ${b.totalPages} pages...`;
+            statusEl.textContent = `⏳ Running Paragraph-Consensus Typography & Auto-Chapter Engine across ${b.totalPages} pages...`;
         }
 
         let pdf = null;
@@ -4992,7 +5236,7 @@
 
                 for (let p = 1; p <= numPages; p++) {
                     if (p % 5 === 0) {
-                        if (statusEl) statusEl.textContent = `⏳ Reconstructing Page ${p} / ${numPages} (Zero Word-Splitting & Natural Paragraphs)...`;
+                        if (statusEl) statusEl.textContent = `⏳ Reconstructing Page ${p} / ${numPages} (Uniform Paragraph Alignment & Zero Word-Splitting)...`;
                         await new Promise(r => setTimeout(r, 0));
                     }
                     const page = await pdf.getPage(p);
@@ -5042,7 +5286,7 @@
                         if (last && Math.abs(last.y - item.y) < sameLineTol) {
                             const xGap = item.x - last.xEnd;
                             const wordSpaceThreshold = Math.max(0.0035, (item.fh / unitVp.width) * 0.18);
-                            const joiner = xGap > 0.12 ? '   ' : (xGap >= wordSpaceThreshold ? ' ' : '');
+                            const joiner = xGap > 0.12 ? ' ' : (xGap >= wordSpaceThreshold ? ' ' : '');
                             last.text += joiner + item.str;
                             last.xEnd = Math.max(last.xEnd, item.x + item.w);
                             last.maxFh = Math.max(last.maxFh, item.fh);
@@ -5068,10 +5312,27 @@
 
                     const blocks = [];
                     let curPara = null;
+
+                    // PARAGRAPH-LEVEL ALIGNMENT CONSENSUS: Evaluates all lines in the paragraph before setting alignment
                     const flushPara = () => {
                         if (curPara && curPara.text.trim()) {
                             curPara.text = curPara.text.replace(/\s{2,}/g, ' ').trim();
-                            blocks.push(curPara);
+                            const pLines = curPara.lineMetrics || [];
+                            const allLinesSymmetricCentered = pLines.length > 0 && pLines.length <= 3 && pLines.every(m => {
+                                const leftMargin = m.xStart;
+                                const rightMargin = 1.0 - m.xEnd;
+                                const mid = (m.xStart + m.xEnd) / 2;
+                                return leftMargin > 0.16 && rightMargin > 0.16 && Math.abs(leftMargin - rightMargin) < 0.06 && Math.abs(mid - 0.5) < 0.04;
+                            });
+                            const hasFirstLineIndent = pLines.length >= 2 && pLines[0].indentPct >= 3 && pLines[1].indentPct <= 2;
+
+                            blocks.push({
+                                type: 'p',
+                                text: curPara.text,
+                                align: allLinesSymmetricCentered ? 'center' : 'justify',
+                                firstLineIndent: hasFirstLineIndent,
+                                indentPct: 0
+                            });
                             curPara = null;
                         }
                     };
@@ -5124,9 +5385,6 @@
                         if (!t) return;
                         const prev = idx > 0 ? lines[idx - 1] : null;
                         const yJump = prev ? (ln.y - prev.y) : 0;
-                        const centerPos = (ln.xStart + ln.xEnd) / 2;
-                        const lineW = ln.xEnd - ln.xStart;
-                        const isCentered = Math.abs(centerPos - 0.5) < 0.08 && lineW < 0.68;
                         const indentPct = Math.max(0, Math.round((ln.xStart - minMarginX) * 100));
                         const tocMatch = t.match(/^([0-9IVX]+\.?\s+[A-Za-z].*?)\s*\.{3,}\s*(\d+)$/);
                         const isTocLine = Boolean(tocMatch);
@@ -5147,7 +5405,7 @@
 
                         if (isH1) {
                             flushPara();
-                            blocks.push({ type: 'h1', text: t, align: isCentered ? 'center' : 'left', indentPct: 0 });
+                            blocks.push({ type: 'h1', text: t, align: 'left', indentPct: 0 });
                             const ck = t.toLowerCase().slice(0, 30);
                             if (!seenChapKeys.has(ck) && t.length >= 4 && !/^page\s+\d+/i.test(t)) {
                                 seenChapKeys.add(ck);
@@ -5155,7 +5413,7 @@
                             }
                         } else if (isH2) {
                             flushPara();
-                            blocks.push({ type: 'h2', text: t, align: isCentered ? 'center' : 'left', indentPct: 0 });
+                            blocks.push({ type: 'h2', text: t, align: 'left', indentPct: 0 });
                             const ck = t.toLowerCase().slice(0, 30);
                             if (!seenChapKeys.has(ck) && t.length >= 4) {
                                 seenChapKeys.add(ck);
@@ -5169,13 +5427,18 @@
                             const prevLineShort = prev ? ((prev.xEnd - prev.xStart) < 0.52) : false;
                             const isNewParaBreak = !curPara
                                 || yJump > medianGap * 1.48
-                                || (indentPct >= 4 && prevEndedSentence)
+                                || (indentPct >= 3 && prevEndedSentence)
                                 || (prevLineShort && prevEndedSentence);
 
                             if (isNewParaBreak) {
                                 flushPara();
-                                curPara = { type: 'p', text: t, align: isCentered ? 'center' : 'left', indentPct: isCentered ? 0 : indentPct };
+                                curPara = {
+                                    type: 'p',
+                                    text: t,
+                                    lineMetrics: [{ xStart: ln.xStart, xEnd: ln.xEnd, indentPct }]
+                                };
                             } else {
+                                curPara.lineMetrics.push({ xStart: ln.xStart, xEnd: ln.xEnd, indentPct });
                                 if (/[a-z]-\s*$/i.test(curPara.text) && /^[a-z]/.test(t)) {
                                     curPara.text = curPara.text.replace(/-\s*$/, '') + t;
                                 } else {
@@ -5202,9 +5465,13 @@
 
                     structuredPages.push({ page: p, blocks, plainText: formattedPageTxt.trim() });
                     extractedPlain.push(formattedPageTxt.trim());
+                    try { page.cleanup(); } catch (e) {}
                 }
             } else {
-                structuredPages = stored.structuredPages || [];
+                structuredPages = (stored.structuredPages || []).map(sp => ({
+                    ...sp,
+                    blocks: (sp.blocks || []).map(blk => (blk.type === 'p' ? { ...blk, align: 'justify', indentPct: 0 } : blk))
+                }));
                 extractedPlain = stored.extractedPagesText || [];
             }
 
@@ -5244,7 +5511,7 @@
                     await buildBookStageAndObserver();
                 }
                 document.getElementById('ilovepdf-studio-modal').classList.add('hidden');
-                showToast(`🔄 Converted "${b.title}" with True-Kerning, ${autoChapters.length} Chapters & Studio Bridge Index!`);
+                showToast(`🔄 Converted "${b.title}" with Uniform Paragraph Alignment & ${autoChapters.length} Chapters!`);
             } else {
                 const newBookId = 'pbook_' + Date.now();
                 const newBook = {
@@ -5512,6 +5779,7 @@
                 await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
                 const b64 = c.toDataURL('image/png').split(',')[1];
                 zip.file(`Page_${String(p).padStart(3, '0')}.png`, b64, { base64: true });
+                try { page.cleanup(); } catch (e) {}
             }
             const blob = await zip.generateAsync({ type: 'blob' });
             const a = document.createElement('a');
@@ -5529,7 +5797,7 @@
     };
 
     /* =========================================================================
-       11. FINAL BOOTSTRAP & EVENT BUS HOOKS (PURE DESKTOP v16.0)
+       11. FINAL BOOTSTRAP & EVENT BUS HOOKS (PURE DESKTOP v16.1)
        ========================================================================= */
     PomoEventBus.on('reader:openedTab', () => {
         renderWoodenShelf();
@@ -5542,8 +5810,9 @@
     });
 
     setTimeout(() => {
+        window.applyTxtAndSelectionColors();
         mountHomeContinueReadingWidget();
         hydrateBookCoversAndHandles();
     }, 120);
 })();
-// ✅ END OF FILE (04-reader-pro.js v16.0 Pure Desktop Edition) — 100% COMPLETE & UNCUT
+// ✅ END OF FILE (04-reader-pro.js v16.1 Pure Desktop Edition) — 100% COMPLETE & UNCUT

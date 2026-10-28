@@ -122,12 +122,43 @@ window.idbDelete = async function(storeName, key) {
     } catch (e) { return false; }
 };
 
-if (navigator.storage && navigator.storage.persist) {
-    navigator.storage.persist().then(persisted => {
-        const badge = document.getElementById('reader-folder-sync-badge');
-        if (badge) badge.innerHTML = `🛡️ 16GB Unleashed ${persisted ? 'Locked' : 'Active'} • Unlimited Shelf`;
-    }).catch(() => {});
-}
+// AUTO-DETECT USER'S SSD QUOTA & RAM CAPACITY DYNAMICALLY
+(async function detectHardwareAndStorageQuota() {
+    const badge = document.getElementById('reader-folder-sync-badge');
+    let persisted = false;
+    try {
+        if (navigator.storage && navigator.storage.persist) {
+            persisted = await navigator.storage.persist();
+        }
+    } catch (e) {}
+
+    // 1. Detect SSD / Disk Quota allocated by Browser
+    let ssdLabel = 'Unlimited Disk';
+    try {
+        if (navigator.storage && navigator.storage.estimate) {
+            const est = await navigator.storage.estimate();
+            if (est && est.quota) {
+                const totalGb = Math.round(est.quota / (1024 * 1024 * 1024));
+                const usedMb = Math.round((est.usage || 0) / (1024 * 1024));
+                if (totalGb > 0) {
+                    ssdLabel = `${totalGb}GB SSD Quota (${usedMb}MB Used)`;
+                }
+            }
+        }
+    } catch (e) {}
+
+    // 2. Detect RAM Tier & Auto-Scale PDF Page Buffer Window
+    // (Note: Browsers report up to 8 for 8GB/16GB/32GB+ PCs for privacy, or 2/4 for budget laptops)
+    const rawRam = navigator.deviceMemory || 8;
+    const cores = navigator.hardwareConcurrency || 8;
+    const isHighSpecPc = (rawRam >= 8 && cores >= 8);
+    window.pomoMaxPageBufferWindow = isHighSpecPc ? 20 : (rawRam <= 4 ? 6 : 12);
+    const ramLabel = isHighSpecPc ? `High-RAM Turbo (${cores}-Thread)` : `${rawRam}GB+ RAM Mode`;
+
+    if (badge) {
+        badge.innerHTML = `🛡️ ${persisted ? 'Locked' : 'Active'} • ${ssdLabel} • ⚡ ${ramLabel}`;
+    }
+})();
 
 // 3. SAFE LOCALSTORAGE ENGINE + APOSTROPHE-SAFE ESCAPE UTILITIES
 const MEM_CACHE = {};

@@ -1,4 +1,13 @@
-/* ================= CORE RESET & 100% OFFLINE CSS ENGINE (v16.0 PURE DESKTOP EDITION) ================= */
+/* ================= CORE RESET & 100% OFFLINE CSS ENGINE (v16.1 PURE DESKTOP EDITION) ================= */
+:root {
+    --shelf-cols: 7;
+    --pdf-sel-bg: rgba(37, 99, 235, 0.32);
+    --txt-sel-bg: rgba(37, 99, 235, 0.55);
+    --txt-sel-fg: #ffffff;
+    --txt-sheet-bg: #0f172a;
+    --txt-sheet-fg: #e2e8f0;
+}
+
 *, *::before, *::after { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body {
     margin: 0; padding: 0; width: 100%; height: 100%; height: 100dvh;
@@ -43,6 +52,7 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
 .grid-cols-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .grid-cols-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 .grid-cols-7 { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.grid-cols-8 { grid-template-columns: repeat(8, minmax(0, 1fr)); }
 .gap-0\.5 { gap: 0.125rem; }
 .gap-1 { gap: 0.25rem; }
 .gap-1\.5 { gap: 0.375rem; }
@@ -359,7 +369,7 @@ body:not(.dim-mode) #dim-controls-bar { display: none !important; }
 .todo-check-circle.checked { background-color: #3b82f6; border-color: #3b82f6; color: #ffffff; transform: scale(1.05); }
 .modal-backdrop { background: rgba(2, 6, 23, 0.88); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
 
-/* ================= 3D WOODEN BOOKSHELF & PRO READER STUDIO ================= */
+/* ================= 3D WOODEN BOOKSHELF (COMPACT 6–8 BOOKS PER ROW) ================= */
 #page-reader { background: radial-gradient(circle at top, #1e1b18 0%, #090d16 100%); }
 
 .wood-shelf-container {
@@ -367,7 +377,7 @@ body:not(.dim-mode) #dim-controls-bar { display: none !important; }
     border: 2px solid #4a321f;
     box-shadow: inset 0 0 40px rgba(0,0,0,0.85), 0 12px 30px rgba(0,0,0,0.6);
     border-radius: 1.25rem;
-    padding: 1.25rem 1.25rem 0.75rem 1.25rem;
+    padding: 1rem 1rem 0.65rem 1rem;
     max-height: calc(100dvh - 13.5rem) !important;
     min-height: 62vh !important;
     overflow-y: auto !important;
@@ -382,14 +392,30 @@ body:not(.dim-mode) #dim-controls-bar { display: none !important; }
     border-radius: 8px !important; border: 2px solid #1a110a !important;
 }
 
+/* Exact-Fit Multi-Book Plank Grid (Defaults to --shelf-cols: 7 on Widescreen) */
 .wood-shelf-row {
-    position: relative; padding-bottom: 1.6rem; margin-bottom: 1.5rem;
-    border-bottom: 18px solid #5c3a21;
-    box-shadow: 0 14px 18px -4px rgba(0, 0, 0, 0.85), inset 0 -4px 6px rgba(0,0,0,0.45);
+    position: relative;
+    display: grid !important;
+    grid-template-columns: repeat(var(--shelf-cols, 7), minmax(0, 1fr)) !important;
+    gap: 0.75rem !important;
+    padding: 0.35rem 0.5rem 1.15rem 0.5rem !important;
+    margin-bottom: 1.15rem;
+    border-bottom: 15px solid #5c3a21;
+    box-shadow: 0 12px 16px -4px rgba(0, 0, 0, 0.85), inset 0 -4px 6px rgba(0,0,0,0.45);
     background-image: repeating-linear-gradient(90deg, rgba(255,255,255,0.015) 0px, rgba(255,255,255,0.015) 2px, transparent 2px, transparent 14px);
 }
+@media (max-width: 1280px) {
+    .wood-shelf-row {
+        grid-template-columns: repeat(min(var(--shelf-cols, 6), 6), minmax(0, 1fr)) !important;
+    }
+}
+@media (max-width: 900px) {
+    .wood-shelf-row {
+        grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    }
+}
 .wood-shelf-row::after {
-    content: ''; position: absolute; left: 0; right: 0; bottom: -18px; height: 6px;
+    content: ''; position: absolute; left: 0; right: 0; bottom: -15px; height: 5px;
     background: linear-gradient(90deg, #3d2514, #734829, #3d2514);
 }
 
@@ -397,28 +423,44 @@ body:not(.dim-mode) #dim-controls-bar { display: none !important; }
     background: linear-gradient(90deg, #451a03 0%, #78350f 50%, #451a03 100%);
     border: 1px solid #f59e0b;
     box-shadow: 0 4px 12px rgba(0,0,0,0.65), inset 0 1px 1px rgba(253, 224, 71, 0.35);
-    border-radius: 0.75rem; padding: 0.45rem 0.9rem; margin-bottom: 0.85rem;
+    border-radius: 0.75rem; padding: 0.4rem 0.85rem; margin-bottom: 0.65rem;
     display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem;
 }
 
+/* Realistic, Compact 3D Book Spine Proportions */
 .book-card-3d {
-    position: relative; width: 100%; aspect-ratio: 2 / 2.85;
-    border-radius: 6px 12px 12px 6px;
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1 / 1.42;
+    max-height: 245px;
+    border-radius: 5px 10px 10px 5px;
     background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-    box-shadow: -5px 6px 14px rgba(0,0,0,0.75), inset 4px 0 8px rgba(255,255,255,0.12);
-    border-left: 6px solid #cbd5e1;
-    transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.22s ease;
+    box-shadow: -4px 5px 12px rgba(0,0,0,0.78), inset 3px 0 6px rgba(255,255,255,0.12);
+    border-left: 5px solid #cbd5e1;
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
     cursor: pointer; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between;
 }
 .book-card-3d:hover {
-    transform: translateY(-8px) scale(1.03);
-    box-shadow: -8px 14px 24px rgba(0,0,0,0.9), 0 0 18px rgba(59, 130, 246, 0.35);
+    transform: translateY(-6px) scale(1.03);
+    box-shadow: -6px 12px 20px rgba(0,0,0,0.92), 0 0 16px rgba(59, 130, 246, 0.4);
+    z-index: 10;
+}
+.book-card-3d > div {
+    padding: 0.45rem !important;
+}
+.book-card-3d h4 {
+    font-size: 0.7rem !important;
+    line-height: 1.2 !important;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 .book-corner-menu-btn {
-    position: absolute; top: 6px; right: 6px; width: 28px; height: 28px; border-radius: 8px;
-    background: rgba(2, 6, 23, 0.82); border: 1px solid rgba(255,255,255,0.18);
+    position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border-radius: 6px;
+    background: rgba(2, 6, 23, 0.75); border: 1px solid rgba(255,255,255,0.18);
     color: #f8fafc; display: flex; align-items: center; justify-content: center;
-    z-index: 15; font-weight: 800; backdrop-filter: blur(6px);
+    z-index: 15; font-size: 11px; font-weight: 800; backdrop-filter: blur(4px);
 }
 .book-corner-menu-btn:hover { background: #2563eb; border-color: #60a5fa; }
 
@@ -464,7 +506,7 @@ body:not(.dim-mode) #dim-controls-bar { display: none !important; }
     background: rgba(255, 145, 0, 0); mix-blend-mode: multiply; transition: background 0.25s ease;
 }
 
-/* ================= CALIBRATED SUB-PIXEL PDF BLUE TEXT SELECTION LAYER & VECTOR STUDIO ================= */
+/* ================= CALIBRATED SUB-PIXEL PDF SELECTION vs VISIBLE TXT/PBOOK SELECTION ================= */
 .v4-page-card {
     position: relative; margin: 0.5rem auto; background: #ffffff;
     box-shadow: 0 12px 32px rgba(0,0,0,0.72); border-radius: 6px;
@@ -493,10 +535,20 @@ body:not(.dim-mode) #dim-controls-bar { display: none !important; }
     pointer-events: all;
     user-select: text !important; -webkit-user-select: text !important;
 }
-.pomo-pdf-text-layer span::selection,
-.pbook-page-sheet ::selection {
-    background: rgba(37, 99, 235, 0.36) !important;
+
+/* 1. PDF Invisible Text Overlay Selection (Keeps transparent glyph color so PDF canvas underneath shows through) */
+.pomo-pdf-text-layer span::selection {
+    background: var(--pdf-sel-bg, rgba(37, 99, 235, 0.32)) !important;
     color: transparent !important;
+}
+
+/* 2. Visible Text Selection for .TXT, .MD, .EPUB, and .PBOOK (NEVER hides text while selecting!) */
+.pbook-page-sheet::selection,
+.pbook-page-sheet *::selection {
+    background: var(--txt-sel-bg, rgba(37, 99, 235, 0.55)) !important;
+    color: var(--txt-sel-fg, #ffffff) !important;
+    -webkit-text-fill-color: var(--txt-sel-fg, #ffffff) !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5) !important;
 }
 
 .v4-interactive-svg {
@@ -526,23 +578,37 @@ body:not(.dim-mode) #dim-controls-bar { display: none !important; }
 }
 .v4-margin-chip:hover { transform: scale(1.08); }
 
-/* Transparent Crystal Glass Floating Highlight Bar & Inspector */
+/* ================= 100% TRANSPARENT FLOATING HIGHLIGHT BAR & INSPECTOR ================= */
 #reader-floating-sel-bar, #v5-clicked-ann-inspector {
-    background: rgba(15, 23, 42, 0.85) !important;
-    backdrop-filter: blur(14px) saturate(180%) !important;
-    -webkit-backdrop-filter: blur(14px) saturate(180%) !important;
-    border: 1px solid rgba(96, 165, 250, 0.5) !important;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6) !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    pointer-events: none;
+}
+#reader-floating-sel-bar > div,
+#v5-clicked-ann-inspector > * {
+    pointer-events: auto;
+    border-color: rgba(148, 163, 184, 0.22) !important;
+}
+#reader-floating-sel-bar span {
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.95), 0 0 8px rgba(0, 0, 0, 0.9);
+    font-weight: 800;
 }
 .sym-dock-btn {
-    width: 34px; height: 34px; border-radius: 9px;
+    width: 32px; height: 32px; border-radius: 9px;
     display: inline-flex; align-items: center; justify-content: center;
-    background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(148, 163, 184, 0.35);
+    background: rgba(2, 6, 23, 0.22) !important;
+    border: 1px solid rgba(148, 163, 184, 0.42);
     font-size: 15px; transition: all 0.14s ease;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.95);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 .sym-dock-btn:hover {
-    transform: translateY(-2px) scale(1.08);
-    background: rgba(37, 99, 235, 0.88); border-color: #60a5fa;
+    transform: translateY(-2px) scale(1.1);
+    background: rgba(37, 99, 235, 0.75) !important;
+    border-color: #60a5fa;
     box-shadow: 0 4px 12px rgba(37, 99, 235, 0.45);
 }
 
@@ -557,37 +623,73 @@ body:not(.dim-mode) #dim-controls-bar { display: none !important; }
     transform: translateY(-1px);
 }
 
-/* ================= PAGE-TRUE STRUCTURED BOOK (.pbook) LAYOUT ================= */
+/* ================= PAGE-TRUE STRUCTURED BOOK (.pbook / .txt) LAYOUT & CUSTOM BACKGROUNDS ================= */
 .pbook-page-sheet {
-    width: 100%; min-height: 780px; padding: 2.5rem 2.75rem 3rem 2.75rem;
-    text-align: left; line-height: 1.72;
-    background: #fcfaf2; color: #1e293b;
+    width: 100%; min-height: 780px; padding: 2.5rem 3rem 3rem 3rem;
+    text-align: left; line-height: 1.76;
+    background: var(--txt-sheet-bg, #fcfaf2);
+    color: var(--txt-sheet-fg, #1e293b);
     font-family: 'Inter', Georgia, serif;
     position: relative;
     user-select: text !important; -webkit-user-select: text !important;
+    transition: background-color 0.2s ease, color 0.2s ease;
 }
-#reader-fullscreen-overlay.theme-night .pbook-page-sheet { background: #0f172a; color: #e2e8f0; }
-#reader-fullscreen-overlay.theme-amoled .pbook-page-sheet { background: #050505; color: #d1d5db; border: 1px solid #1e293b; }
-#reader-fullscreen-overlay.theme-sepia .pbook-page-sheet { background: #f4ecd8; color: #3b2f2f; }
+#reader-fullscreen-overlay.theme-day .pbook-page-sheet:not([data-custom-bg="true"]) { background: #fcfaf2; color: #1e293b; }
+#reader-fullscreen-overlay.theme-night .pbook-page-sheet:not([data-custom-bg="true"]) { background: #0f172a; color: #e2e8f0; }
+#reader-fullscreen-overlay.theme-amoled .pbook-page-sheet:not([data-custom-bg="true"]) { background: #050505; color: #d1d5db; border: 1px solid #1e293b; }
+#reader-fullscreen-overlay.theme-sepia .pbook-page-sheet:not([data-custom-bg="true"]) { background: #f4ecd8; color: #3b2f2f; }
+
+/* Custom User-Selectable .TXT / .PBOOK Sheet Background Presets */
+.pbook-page-sheet.txt-bg-black { background: #050505 !important; color: #e5e7eb !important; }
+.pbook-page-sheet.txt-bg-blue { background: #0a192f !important; color: #dbeafe !important; }
+.pbook-page-sheet.txt-bg-green { background: #06281e !important; color: #d1fae5 !important; }
+.pbook-page-sheet.txt-bg-sepia { background: #f4ecd8 !important; color: #3b2f2f !important; }
+.pbook-page-sheet.txt-bg-paper { background: #ffffff !important; color: #0f172a !important; }
+
 .pbook-headline-h1 {
     font-size: 1.45em; font-weight: 800; color: #2563eb;
     border-bottom: 2px solid rgba(59, 130, 246, 0.35);
     padding-bottom: 0.35rem; margin: 1.1rem 0 0.75rem 0; line-height: 1.3;
+    text-align: left;
     user-select: text !important; -webkit-user-select: text !important;
 }
 #reader-fullscreen-overlay.theme-night .pbook-headline-h1,
-#reader-fullscreen-overlay.theme-amoled .pbook-headline-h1 { color: #60a5fa; }
+#reader-fullscreen-overlay.theme-amoled .pbook-headline-h1,
+.pbook-page-sheet.txt-bg-black .pbook-headline-h1,
+.pbook-page-sheet.txt-bg-blue .pbook-headline-h1,
+.pbook-page-sheet.txt-bg-green .pbook-headline-h1 { color: #60a5fa; }
+
 .pbook-headline-h2 {
     font-size: 1.18em; font-weight: 700; color: #059669;
     margin: 0.9rem 0 0.45rem 0; line-height: 1.35;
+    text-align: left;
     user-select: text !important; -webkit-user-select: text !important;
 }
 #reader-fullscreen-overlay.theme-night .pbook-headline-h2,
-#reader-fullscreen-overlay.theme-amoled .pbook-headline-h2 { color: #34d399; }
+#reader-fullscreen-overlay.theme-amoled .pbook-headline-h2,
+.pbook-page-sheet.txt-bg-black .pbook-headline-h2,
+.pbook-page-sheet.txt-bg-blue .pbook-headline-h2,
+.pbook-page-sheet.txt-bg-green .pbook-headline-h2 { color: #34d399; }
+
+/* Fixed PomoDoc Forge Paragraph Alignment (No pre-wrap gaps, clean inter-word justification) */
 .pbook-paragraph {
-    margin: 0 0 0.75rem 0; text-align: justify; white-space: pre-wrap;
+    margin: 0 0 0.85rem 0;
+    text-align: justify !important;
+    text-justify: inter-word;
+    white-space: normal !important;
+    word-spacing: normal;
+    hyphens: auto;
     user-select: text !important; -webkit-user-select: text !important;
 }
+.pbook-paragraph.pbook-centered-quote {
+    text-align: center !important;
+    font-style: italic;
+    padding: 0 1.5rem;
+}
+.pbook-paragraph.pbook-first-indent {
+    text-indent: 1.6em;
+}
+
 .pbook-diagram-figure {
     margin: 1rem auto; padding: 0.65rem;
     background: rgba(15, 23, 42, 0.06);

@@ -1,7 +1,7 @@
 {
-  "name": "DeenTimeR & PomoReader Pro (v16.0 Desktop)",
+  "name": "DeenTimeR & PomoReader Pro (v17.0 Enterprise Desktop)",
   "short_name": "DeenTimeR Pro",
-  "description": "Desktop Polymath Life OS, Memory Beast FSRS Vault, 3D Wooden Bookshelf & PomoDoc Forge",
+  "description": "Desktop Polymath Life OS, Memory Beast FSRS Vault, 3D Wooden Bookshelf, PomoDoc Forge & OneNote Split Studio",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

@@ -1,7 +1,7 @@
 /* =========================================================================
-   03-VAULT-RPG.JS (v16.0 PURE DESKTOP EDITION) — 3-TIER COMPASS, MEMORY BEAST
-   FSRS-5 VAULT, BUILT-IN FLASHCARD CREATOR & REVIEWER, ADDITIVE +4/-1 MCQ
-   ENGINE, 5-PILLAR POLYMATH SKILL TREE, WEEKLY BOSS RAID & ACHIEVEMENTS
+   03-VAULT-RPG.JS (v17.0 ENTERPRISE DESKTOP EDITION) — 3-TIER COMPASS,
+   MEMORY BEAST FSRS-5 VAULT, BUILT-IN FLASHCARD CREATOR & REVIEWER,
+   ADDITIVE +4/-1 MCQ ENGINE, 5-PILLAR POLYMATH SKILL TREE & BOSS RAID
    ========================================================================= */
 
 window.haptic = window.haptic || function() {};
@@ -291,7 +291,6 @@ document.getElementById('save-goal-modal-btn')?.addEventListener('click', () => 
     }
 });
 
-// Calculates live Memory Retention % using FSRS-5 power-law forgetting curve: R(t) = (1 + t / (9 * S))^-1
 window.computeMemoryRetentionPct = function(item) {
     const stabilityDays = Math.max(0.5, parseFloat(item.stabilityDays) || (item.completed ? 7.0 : 2.5));
     const lastRev = item.lastReviewedAt || (item.createdDate ? new Date(item.createdDate).getTime() : Date.now());
@@ -326,7 +325,6 @@ window.quickBoostMemoryStability = function(taskId) {
     }
 };
 
-// Built-in Manual FSRS-5 Flashcard Creator & Editor Modal (Zero AI Dependency)
 window.openManualFlashcardCreatorModal = function(editIdx = -1) {
     const modal = document.getElementById('reader-suboptions-modal');
     const titleEl = document.getElementById('suboptions-modal-title');
@@ -924,7 +922,6 @@ window.renderTasks = function(tab) {
 
     container.innerHTML = '';
 
-    // In "🧠 Memory Beast" ('revision') tab, render FSRS Flashcard Deck & Creator Bar
     if (tab === 'revision') {
         const savedCards = JSON.parse(safeGet('pages_pomodoro_fsrs_cards_v15', '[]'));
         const fcSection = document.createElement('div');
@@ -1624,4 +1621,4 @@ renderTasks(activeTaskTab);
 renderAdvancedProfileTelemetry();
 updateTopBarRpgBadge();
 setTimeout(() => { if (window.renderOmniBentoStrip) window.renderOmniBentoStrip(); }, 250);
-// ✅ END OF FILE (03-vault-rpg.js v16.0 Desktop) — 100% COMPLETE & UNCUT
+// ✅ END OF FILE (03-vault-rpg.js v17.0 Enterprise Desktop Edition) — 100% COMPLETE & UNCUT

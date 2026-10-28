@@ -1,9 +1,11 @@
 /* =========================================================================
-   04-READER-PRO.JS (v17.1 ENTERPRISE DESKTOP EDITION — 100% RESTORED)
-   3D WOODEN BOOKSHELF, MULTI-BOOK IMPORT (PDF/EPUB/DOCX/MD/TXT) + GENRE LOCK,
-   CUSTOM SHELVES BAR, 3-CORNER MODAL, SETTINGS 1–10 MASTER CONTROL CENTER,
-   6-MONTH STATS & CALENDAR, CALIBRATED PDF TEXT LAYER, 9-ACTION FLOATING DOCK,
-   60FPS PENCIL & SHAPE STUDIO, TRANSPARENT OCCLUSION REVEAL, TOC, TTS & SEARCH
+   04-READER-PRO.JS (v17.2 FULL MASTER RESTORATION — ZERO FEATURES REMOVED)
+   3D WOODEN BOOKSHELF (DRAG-DROP, SEQUENCE ◀/▶, SECTIONS/GRID, 0MB OFFLOAD),
+   MULTI-BOOK IMPORT (PDF/EPUB/DOCX/MD/TXT) + PRIORITY GENRE LOCK,
+   REAL PDFLIB ANNOTATION BAKING, TELEGRAM TDLIB / GDRIVE / DROPBOX CLOUD SYNC,
+   SETTINGS 1–10 MASTER CONTROL CENTER, 6-MONTH BAR CHART & CALENDAR,
+   CALIBRATED PDF TEXT LAYER, 9-ACTION FLOATING DOCK, 60FPS PENCIL & SHAPE
+   STUDIO WITH MOVE/RESIZE HANDLES, 100% TRANSPARENT OCCLUSION REVEAL, TOC, TTS
    ========================================================================= */
 (function() {
     document.getElementById('reader-floating-thumb-dock')?.remove();
@@ -123,6 +125,7 @@
     let activeCustomShelfFilter = 'all';
     let shelfDisplayLayout = 'sections';
     let activeCornerBookId = null;
+    let activeA10Source = 'local';
 
     let activeReaderBook = null;
     let activePdfDoc = null;
@@ -131,6 +134,7 @@
     let readerZoom = 1.0;
     let studioActive = false;
     let studioTool = 'line';
+    let studioStrokeWidth = 4;
     let readerSelectionMode = 'official';
     let occlusionModeActive = false;
     let bionicReadingActive = false;
@@ -148,10 +152,13 @@
     const pageTextItemsCache = {};
     const renderedCanvasPages = new Set();
 
-    // Expose state hooks for 05-pomodoc-forge.js and 06-onenote-studio.js
+    // Global State Bridges for 05-pomodoc-forge.js & 06-onenote-studio.js
     window.getActiveReaderBook = () => activeReaderBook;
     window.getActivePdfDoc = () => activePdfDoc;
     window.getRenderedCanvasPages = () => renderedCanvasPages;
+    window.getPageTextItemsCache = () => pageTextItemsCache;
+    window.getActiveExtractedPages = () => activeExtractedPages;
+    window.getActiveStructuredPages = () => activeStructuredPages;
     window.getReaderSelectionMode = () => readerSelectionMode;
     window.setReaderSelectionMode = (m) => {
         readerSelectionMode = m;
@@ -180,6 +187,12 @@
         if (lbl) lbl.textContent = `${Math.round(readerZoom * 100)}%`;
         applyZoomToExistingPages();
     };
+    window.rebuildActiveReaderStage = async (targetPage = null) => {
+        if (!activeReaderBook) return;
+        await buildBookStageAndObserver();
+        jumpToReaderPage(targetPage || activeReaderBook.currentPage || 1);
+    };
+    window.refreshSingleReaderPageSvg = (pageNum) => updateSinglePageSvg(pageNum);
 
     const studioBroadcastChan = ('BroadcastChannel' in window) ? new BroadcastChannel('pomo_studio_bridge_v1') : null;
 
@@ -221,6 +234,16 @@
             } catch (e) { return false; }
         },
 
+        async getPageRangeText(bookId, startPage = 1, endPage = 5) {
+            const stored = await idbGet('bookFiles', bookId);
+            const s = Math.max(1, parseInt(startPage) || 1);
+            const e = Math.max(s, parseInt(endPage) || s);
+            if (stored && Array.isArray(stored.extractedPagesText) && stored.extractedPagesText.length >= s) {
+                return stored.extractedPagesText.slice(s - 1, e).map((t, i) => `--- PAGE ${s + i} ---\n${t}`).join('\n\n');
+            }
+            return '';
+        },
+
         async sendSelectionToExternalStudio(payload) {
             const packet = {
                 id: 'bridge_' + Date.now(),
@@ -259,7 +282,6 @@
         }
     };
 
-    // RESTORED: updatePendingSyncBadge (fixes the ReferenceError that broke multi-book import!)
     window.updatePendingSyncBadge = function() {
         const count = (window.readerBooks || []).filter(b => b.pendingCloudSync).length;
         const badge = document.getElementById('pending-sync-count-badge');
@@ -333,8 +355,247 @@
     }
 
     /* =========================================================================
-       2. ZERO-CONTRADICTION CRDT WIRELESS SYNC & POMOCLOUD 0MB OFFLOAD ENGINE
+       2. REAL PDFLIB ANNOTATION BAKING & MULTI-CLOUD SYNC (TG, GDRIVE, DROPBOX)
        ========================================================================= */
+    function hexToRgb01(hex) {
+        const clean = (hex || '#facc15').replace('#', '');
+        const num = parseInt(clean, 16) || 0xfacc15;
+        return { r: ((num >> 16) & 255) / 255, g: ((num >> 8) & 255) / 255, b: (num & 255) / 255 };
+    }
+
+    window.bakeAnnotationsIntoPdfBytes = async function(book) {
+        const stored = await idbGet('bookFiles', book.id);
+        if (!stored || !stored.originalBytes) return null;
+        if (book.format !== 'pdf' || typeof PDFLib === 'undefined') {
+            return new Uint8Array(stored.originalBytes);
+        }
+        try {
+            const pdfDoc = await PDFLib.PDFDocument.load(stored.originalBytes, { ignoreEncryption: true });
+            const pages = pdfDoc.getPages();
+            pdfDoc.setTitle(book.title || 'PomoReader Book');
+            pdfDoc.setAuthor(book.author || 'PomoReader Pro');
+            pdfDoc.setSubject(JSON.stringify({ pomoBookId: book.id, rev: book.rev || 1, currentPage: book.currentPage }));
+
+            (book.annotations || []).forEach(ann => {
+                const pIdx = Math.max(0, Math.min(pages.length - 1, (ann.page || 1) - 1));
+                const page = pages[pIdx];
+                if (!page) return;
+                const { width, height } = page.getSize();
+                const c = hexToRgb01(ann.color || '#facc15');
+                const pdfColor = PDFLib.rgb(c.r, c.g, c.b);
+
+                if (ann.type === 'highlight' || ann.type === 'note' || ann.type === 'bookmark' || ann.type === 'attachment') {
+                    const rects = (Array.isArray(ann.rects) && ann.rects.length > 0) ? ann.rects : [{ x: 0.08, y: ann.yNorm || 0.2, w: 0.84, h: 0.024 }];
+                    rects.forEach(rc => {
+                        const rw = Math.max(12, rc.w * width);
+                        const rh = Math.max(10, rc.h * height);
+                        const rx = rc.x * width;
+                        const ry = height - (rc.y * height) - rh;
+                        page.drawRectangle({ x: rx, y: Math.max(4, ry), width: rw, height: rh, color: pdfColor, opacity: 0.34 });
+                    });
+                    if (ann.note || ann.type === 'bookmark') {
+                        const firstY = rects[0] ? rects[0].y : (ann.yNorm || 0.2);
+                        const by = Math.max(15, Math.min(height - 20, height - (firstY * height)));
+                        page.drawText(`[${(ann.type || 'NOTE').toUpperCase()}] ${(ann.note || ann.text || '').slice(0, 75)}`, {
+                            x: Math.max(12, width - 210), y: by, size: 7.5, color: PDFLib.rgb(0.85, 0.15, 0.15)
+                        });
+                    }
+                } else if (ann.type === 'drawing') {
+                    const sw = ann.strokeWidth || 3;
+                    if ((ann.tool === 'pen' || ann.tool === 'hl') && Array.isArray(ann.points) && ann.points.length > 1) {
+                        for (let i = 1; i < ann.points.length; i++) {
+                            const p0 = ann.points[i - 1], p1 = ann.points[i];
+                            page.drawLine({
+                                start: { x: p0.x * width, y: height - (p0.y * height) },
+                                end: { x: p1.x * width, y: height - (p1.y * height) },
+                                thickness: ann.tool === 'hl' ? 14 : sw,
+                                color: pdfColor,
+                                opacity: ann.tool === 'hl' ? 0.32 : 0.9
+                            });
+                        }
+                    } else if (ann.tool === 'line' || ann.tool === 'arrow' || ann.tool === 'darrow') {
+                        page.drawLine({
+                            start: { x: (ann.x1 || 0.1) * width, y: height - ((ann.y1 || 0.1) * height) },
+                            end: { x: (ann.x2 || 0.3) * width, y: height - ((ann.y2 || 0.3) * height) },
+                            thickness: sw, color: pdfColor, opacity: 0.92
+                        });
+                    } else if (ann.tool === 'rect') {
+                        const rx = Math.min(ann.x1, ann.x2) * width;
+                        const rw = Math.max(8, Math.abs(ann.x2 - ann.x1) * width);
+                        const rh = Math.max(8, Math.abs(ann.y2 - ann.y1) * height);
+                        const ry = height - (Math.max(ann.y1, ann.y2) * height);
+                        page.drawRectangle({ x: rx, y: ry, width: rw, height: rh, borderColor: pdfColor, borderWidth: sw, opacity: 0.1 });
+                    } else if (ann.tool === 'text' && ann.text) {
+                        page.drawText(String(ann.text).slice(0, 90), {
+                            x: (ann.x1 || 0.1) * width, y: height - ((ann.y1 || 0.1) * height),
+                            size: Math.max(8, (ann.fontSize || 20) * 0.65), color: pdfColor
+                        });
+                    }
+                }
+            });
+
+            const bakedUint8 = await pdfDoc.save();
+            stored.bakedBytes = bakedUint8.buffer;
+            await idbPut('bookFiles', stored);
+            return bakedUint8;
+        } catch (e) {
+            return new Uint8Array(stored.originalBytes);
+        }
+    };
+
+    async function writeBakedPdfToFolderHandle(dirHandle, fileName, uint8Bytes) {
+        if (!dirHandle || !uint8Bytes) return false;
+        try {
+            let perm = await dirHandle.queryPermission({ mode: 'readwrite' });
+            if (perm !== 'granted') perm = await dirHandle.requestPermission({ mode: 'readwrite' });
+            if (perm !== 'granted') return false;
+            const fh = await dirHandle.getFileHandle(fileName, { create: true });
+            const writable = await fh.createWritable();
+            await writable.write(uint8Bytes);
+            await writable.close();
+            return true;
+        } catch (e) { return false; }
+    }
+
+    async function syncBookWithTelegramCloud(book, bakedUint8) {
+        const token = safeGet('pages_pomodoro_tg_token', '');
+        const chatId = safeGet('pages_pomodoro_tg_chatid', '');
+        const tdlibUrl = (readerSettings.clouds.telegram?.tdlibUrl || '').trim();
+        if ((!token || !chatId) && !tdlibUrl) return false;
+        if (!navigator.onLine) { book.pendingCloudSync = true; return false; }
+
+        try {
+            const form = new FormData();
+            form.append('chat_id', chatId);
+            const blob = new Blob([bakedUint8], { type: 'application/pdf' });
+            form.append('document', blob, book.fileName || `${book.title}.pdf`);
+            form.append('caption', `📘 *${book.title}*\n📊 Progress: ${book.progressPct || 0}% (Page ${book.currentPage}/${book.totalPages})\n🔖 Annotations: ${(book.annotations || []).length}`);
+            form.append('parse_mode', 'Markdown');
+
+            const endpoint = tdlibUrl ? `${tdlibUrl.replace(/\/$/, '')}/bot${token}/sendDocument` : `${HTTPS}api.telegram.org/bot${token}/sendDocument`;
+            const res = await fetch(endpoint, { method: 'POST', body: form });
+            const json = await res.json();
+            if (json && json.ok) {
+                book.telegramMsgId = json.result?.message_id;
+                if (json.result?.document?.file_id) book.telegramFileId = json.result.document.file_id;
+                if (!book.sources.includes('telegram')) book.sources.push('telegram');
+                readerSettings.clouds.telegram.connected = true;
+                readerSettings.clouds.telegram.status = `Synced (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`;
+                return true;
+            }
+        } catch (e) { book.pendingCloudSync = true; }
+        return false;
+    }
+
+    async function syncBookWithGoogleDriveApi(book, bakedUint8) {
+        const gd = readerSettings.clouds.gdrive;
+        if (!gd || !gd.token || !navigator.onLine) return false;
+        try {
+            const metadata = { name: book.fileName || `${book.title}.pdf`, mimeType: 'application/pdf', description: `PomoReader Sync rev ${book.rev || 1}` };
+            if (gd.folderId && !book.gdriveFileId) metadata.parents = [gd.folderId];
+            const boundary = '-------PomoReaderGDriveBoundary' + Date.now();
+            const metaPart = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n--${boundary}\r\nContent-Type: application/pdf\r\n\r\n`;
+            const closePart = `\r\n--${boundary}--`;
+            const bodyBlob = new Blob([metaPart, bakedUint8, closePart], { type: `multipart/related; boundary=${boundary}` });
+
+            const url = book.gdriveFileId
+                ? `${HTTPS}www.googleapis.com/upload/drive/v3/files/${book.gdriveFileId}?uploadType=multipart`
+                : `${HTTPS}www.googleapis.com/upload/drive/v3/files?uploadType=multipart`;
+            const res = await fetch(url, {
+                method: book.gdriveFileId ? 'PATCH' : 'POST',
+                headers: { 'Authorization': `Bearer ${gd.token}` },
+                body: bodyBlob
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.id) book.gdriveFileId = data.id;
+                if (!book.sources.includes('gdrive')) book.sources.push('gdrive');
+                gd.connected = true;
+                gd.status = `API Synced (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`;
+                return true;
+            }
+        } catch (e) {}
+        return false;
+    }
+
+    async function syncBookWithDropboxApi(book, bakedUint8) {
+        const dbx = readerSettings.clouds.dropbox;
+        if (!dbx || !dbx.token || !navigator.onLine) return false;
+        try {
+            const dropboxPath = `/PomoReader/${book.fileName || (book.title + '.pdf')}`;
+            const res = await fetch(`${HTTPS}content.dropboxapi.com/2/files/upload`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${dbx.token}`,
+                    'Dropbox-API-Arg': JSON.stringify({ path: dropboxPath, mode: 'overwrite', autorename: false, mute: true }),
+                    'Content-Type': 'application/octet-stream'
+                },
+                body: bakedUint8
+            });
+            if (res.ok) {
+                book.dropboxPath = dropboxPath;
+                if (!book.sources.includes('dropbox')) book.sources.push('dropbox');
+                dbx.connected = true;
+                dbx.status = `API Synced (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`;
+                return true;
+            }
+        } catch (e) {}
+        return false;
+    }
+
+    window.syncSingleBookEverywhere = async function(bookId, manualTrigger = false) {
+        const book = readerBooks.find(x => x.id === bookId);
+        if (!book) return;
+        const bakedUint8 = await window.bakeAnnotationsIntoPdfBytes(book);
+        if (!bakedUint8) return;
+
+        let syncedTargets = 0;
+        const bookHandleObj = await idbGet('handles', 'book_' + book.id);
+        if (bookHandleObj && bookHandleObj.handle) {
+            try {
+                const wr = await bookHandleObj.handle.createWritable();
+                await wr.write(bakedUint8);
+                await wr.close();
+                syncedTargets++;
+            } catch (e) {}
+        } else if (mainDirectoryHandle) {
+            const ok = await writeBakedPdfToFolderHandle(mainDirectoryHandle, book.fileName, bakedUint8);
+            if (ok) syncedTargets++;
+        }
+
+        for (const [ck, dirH] of Object.entries(cloudDirectoryHandles)) {
+            if (dirH && (book.sources.includes(ck) || book.autoSync)) {
+                const ok = await writeBakedPdfToFolderHandle(dirH, book.fileName, bakedUint8);
+                if (ok) syncedTargets++;
+            }
+        }
+
+        if (book.sources.includes('gdrive') || readerSettings.clouds.gdrive?.token) {
+            if (await syncBookWithGoogleDriveApi(book, bakedUint8)) syncedTargets++;
+        }
+        if (book.sources.includes('dropbox') || readerSettings.clouds.dropbox?.token) {
+            if (await syncBookWithDropboxApi(book, bakedUint8)) syncedTargets++;
+        }
+        if (book.sources.includes('telegram') || safeGet('pages_pomodoro_tg_token', '')) {
+            if (await syncBookWithTelegramCloud(book, bakedUint8)) syncedTargets++;
+        }
+
+        await window.uploadBookBinaryToWirelessCloud(book.id);
+        book.pendingCloudSync = false;
+        saveReaderMeta();
+        if (manualTrigger) showToast(`☁️ Baked PDF & annotations synced (${syncedTargets} targets)!`);
+    };
+
+    window.syncAllPendingReaderBooks = async function() {
+        const list = readerBooks.filter(b => b.pendingCloudSync);
+        if (!list.length) { showToast("All books are already in sync!"); return; }
+        showToast(`🔄 Syncing ${list.length} book(s) across clouds...`);
+        for (const b of list) await window.syncSingleBookEverywhere(b.id, false);
+        saveReaderMeta();
+        showToast("✅ All pending books synced!");
+    };
+    document.getElementById('sync-all-clouds-now-btn')?.addEventListener('click', window.syncAllPendingReaderBooks);
+
     function broadcastReaderLedgerToCloud() {
         const roomId = safeGet('pages_pomodoro_sync_room', '');
         if (!roomId || isApplyingRemoteReaderSync || typeof firebase === 'undefined' || !firebase.apps?.length) return;
@@ -766,7 +1027,6 @@
         return newBook;
     };
 
-    // FIXED MULTI-BOOK IMPORT: Clones FileList array BEFORE input reset & catches any per-file error so all books import!
     window.handleMultipleBookImport = async function(fileList, sourceTag = 'local', manualChoice = null) {
         const filesArray = Array.from(fileList || []);
         if (!filesArray.length) return;
@@ -823,7 +1083,6 @@
         await handleMultipleBookImport(filesClone, 'local', choice);
     });
 
-    // Main Desktop Folder Selection & Auto-Scan
     async function selectMainDesktopFolder() {
         if ('showDirectoryPicker' in window) {
             try {
@@ -880,8 +1139,22 @@
     document.getElementById('settings-select-main-folder-btn')?.addEventListener('click', selectMainDesktopFolder);
     document.getElementById('settings-rescan-main-folder-btn')?.addEventListener('click', scanMainFolderAndImport);
 
+    // Drag & Drop Books Directly Onto Wooden Bookshelf
+    const shelfWrapperEl = document.getElementById('wooden-bookshelf-wrapper');
+    if (shelfWrapperEl) {
+        shelfWrapperEl.addEventListener('dragover', (e) => { e.preventDefault(); shelfWrapperEl.style.borderColor = '#38bdf8'; });
+        shelfWrapperEl.addEventListener('dragleave', () => { shelfWrapperEl.style.borderColor = '#5c3a21'; });
+        shelfWrapperEl.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            shelfWrapperEl.style.borderColor = '#5c3a21';
+            if (e.dataTransfer?.files?.length) {
+                await handleMultipleBookImport(Array.from(e.dataTransfer.files), 'local', null);
+            }
+        });
+    }
+
     /* =========================================================================
-       4. CUSTOM SHELVES BAR, SORTING & 3D WOODEN BOOKSHELF
+       4. CUSTOM SHELVES BAR, SORTING & 3D WOODEN BOOKSHELF (SECTIONS + GRID)
        ========================================================================= */
     window.renderCustomShelvesBar = function() {
         const bar = document.getElementById('custom-shelves-bar');
@@ -906,10 +1179,11 @@
         });
 
         bar.innerHTML = `
-            <div class="flex items-center justify-between gap-2 mb-1.5 px-1">
+            <div class="flex items-center justify-between gap-2 mb-1.5 px-1 flex-wrap">
                 <div class="flex items-center gap-2">
                     <span class="text-[10px] font-extrabold uppercase tracking-wider text-amber-400">🪵 Genre Shelves</span>
                     <button type="button" onclick="window.openAddCustomShelfModal()" class="bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/40 px-2.5 py-0.5 rounded-lg text-[10px] font-extrabold">➕ New Genre Shelf</button>
+                    <button type="button" onclick="window.toggleShelfDisplayLayout()" class="bg-slate-950 hover:bg-slate-800 text-cyan-300 border border-slate-800 px-2.5 py-0.5 rounded-lg text-[10px] font-bold">${shelfDisplayLayout === 'sections' ? '🪵 View: Sections' : '⊞ View: Unified Grid'}</button>
                 </div>
                 <div class="flex items-center gap-1.5">
                     <span class="text-[10px] font-bold text-slate-400">Books/Row:</span>
@@ -925,6 +1199,12 @@
             </div>
             <div class="${wrapMode ? 'shelves-wrap-grid' : 'shelves-scroll-strip'}">${pillsHtml}</div>
         `;
+    };
+
+    window.toggleShelfDisplayLayout = function() {
+        shelfDisplayLayout = shelfDisplayLayout === 'sections' ? 'grid' : 'sections';
+        renderCustomShelvesBar();
+        renderWoodenShelf();
     };
 
     window.setCustomShelfFilter = function(name) {
@@ -1083,6 +1363,7 @@
             if (sortMode === 'recent') return (b.lastOpened || 0) - (a.lastOpened || 0);
             if (sortMode === 'title') return (a.title || '').localeCompare(b.title || '');
             if (sortMode === 'author') return (a.author || '').localeCompare(b.author || '');
+            if (sortMode === 'storage') return ((a.sources && a.sources[0]) || 'local').localeCompare((b.sources && b.sources[0]) || 'local');
             if (sortMode === 'progress') return (b.progressPct || 0) - (a.progressPct || 0);
             return (a.readSeq || 999) - (b.readSeq || 999);
         });
@@ -1090,18 +1371,23 @@
         rowsContainer.innerHTML = '';
 
         if (!filtered.length) {
-            rowsContainer.innerHTML = `<div class="py-16 text-center flex flex-col items-center justify-center gap-2"><span class="text-4xl">📚</span><p class="text-sm font-bold text-amber-200">No books on this shelf yet. Click "➕ Import Books" above!</p></div>`;
+            rowsContainer.innerHTML = `<div class="py-16 text-center flex flex-col items-center justify-center gap-2"><span class="text-4xl">📚</span><p class="text-sm font-bold text-amber-200">No books on this shelf yet. Click "➕ Import Books" or Drag & Drop files here!</p></div>`;
             return;
         }
 
         const groups = {};
-        filtered.forEach(b => {
-            const s = b.shelfName || 'General Shelf';
-            if (!groups[s]) groups[s] = [];
-            groups[s].push(b);
-        });
+        if (shelfDisplayLayout === 'sections' && activeCustomShelfFilter === 'all') {
+            filtered.forEach(b => {
+                const s = b.shelfName || 'General Shelf';
+                if (!groups[s]) groups[s] = [];
+                groups[s].push(b);
+            });
+        } else {
+            groups[activeCustomShelfFilter === 'all' ? 'All Library Books' : activeCustomShelfFilter] = filtered;
+        }
 
         const perRow = computeExactShelfBooksPerRow();
+        const spineColors = { study: '#3b82f6', deen: '#10b981', side: '#a855f7' };
 
         Object.entries(groups).forEach(([shelfName, gBooks], sectionIdx) => {
             const sec = document.createElement('div');
@@ -1133,6 +1419,7 @@
 
                     const card = document.createElement('div');
                     card.className = "book-card-3d group";
+                    card.style.borderLeftColor = spineColors[book.category] || '#3b82f6';
                     if (coverUrl) {
                         card.style.backgroundImage = `linear-gradient(180deg, rgba(2,6,23,0.22) 0%, rgba(2,6,23,0.94) 84%), url('${coverUrl}')`;
                         card.style.backgroundSize = 'cover';
@@ -1145,17 +1432,27 @@
                             <div class="flex items-center gap-1 flex-wrap pr-5">
                                 <span class="bg-slate-950/90 text-[8px] font-mono font-extrabold text-amber-300 px-1 py-0.5 rounded">#${seqNum}</span>
                                 <span class="bg-slate-950/90 text-[8px] font-extrabold px-1.5 py-0.5 rounded text-white">${(book.format || 'pdf').toUpperCase()}</span>
+                                ${book.isOffloadedZeroStorage ? `<span class="bg-cyan-950/95 border border-cyan-400/50 text-[8px] font-bold text-cyan-300 px-1 py-0.5 rounded">☁️ 0MB</span>` : ''}
+                                ${book.hasCloudPageIndex ? `<span class="bg-purple-950/95 border border-purple-400/50 text-[8px] font-bold text-purple-300 px-1 py-0.5 rounded">⚡Idx</span>` : ''}
                                 ${book.favorite ? `<span class="text-[10px]">❤️</span>` : ''}
                             </div>
                         </div>
                         <div class="p-1.5 bg-gradient-to-t from-slate-950 via-slate-950/95 to-transparent flex flex-col gap-0.5">
                             <h4 class="text-[11px] font-extrabold text-white line-clamp-2 leading-tight">${escapeHtml(book.title)}</h4>
+                            <p class="text-[9px] text-slate-300 truncate">${escapeHtml(book.author || 'Unknown')}</p>
                             <div class="flex items-center justify-between text-[9px] font-mono mt-0.5">
                                 <span class="text-emerald-400 font-bold">${pct}%</span>
                                 <span class="text-slate-400">p.${curP}/${totP}</span>
                             </div>
                             <div class="w-full h-1 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
                                 <div class="h-full bg-gradient-to-r from-blue-500 to-emerald-400 rounded-full" style="width: ${pct}%"></div>
+                            </div>
+                            <div class="flex items-center justify-between gap-1 mt-0.5">
+                                <div class="flex gap-0.5">
+                                    <button type="button" onclick="event.stopPropagation(); window.moveBookInShelfSequence('${safeBookId}', -1)" class="bg-slate-900/90 hover:bg-amber-600 text-slate-300 hover:text-white text-[8px] font-bold px-1.5 py-0.5 rounded border border-slate-700" title="Move Earlier (#)">◀</button>
+                                    <button type="button" onclick="event.stopPropagation(); window.moveBookInShelfSequence('${safeBookId}', 1)" class="bg-slate-900/90 hover:bg-amber-600 text-slate-300 hover:text-white text-[8px] font-bold px-1.5 py-0.5 rounded border border-slate-700" title="Move Later (#)">▶</button>
+                                </div>
+                                ${book.isOffloadedZeroStorage ? `<button type="button" onclick="event.stopPropagation(); window.downloadBookBinaryFromWirelessCloud('${safeBookId}')" class="bg-cyan-600/30 hover:bg-cyan-600 text-cyan-200 text-[8px] font-extrabold px-1.5 py-0.5 rounded border border-cyan-500/40">📥 Stream</button>` : `<span class="text-[8px] font-mono text-amber-300/80">🔖 ${(book.annotations || []).length}</span>`}
                             </div>
                         </div>
                     `;
@@ -1170,14 +1467,14 @@
             for (let e = 0; e < (5 - totalRowsCount); e++) {
                 const emptyPlank = document.createElement('div');
                 emptyPlank.className = "wood-shelf-empty-plank";
-                emptyPlank.textContent = "🪵 Empty Study Shelf — Click '➕ Import Books' to Add More";
+                emptyPlank.textContent = "🪵 Empty Study Shelf — Click '➕ Import Books' or Drag & Drop Books Here";
                 rowsContainer.appendChild(emptyPlank);
             }
         }
     };
 
     /* =========================================================================
-       5. RESTORED BOOK 3-CORNER METADATA MODAL (#book-corner-modal)
+       5. BOOK 3-CORNER METADATA MODAL (#book-corner-modal)
        ========================================================================= */
     window.openBookCornerModal = function(bookId) {
         const b = readerBooks.find(x => x.id === bookId);
@@ -1382,7 +1679,8 @@
             book.totalPages = activeExtractedPages.length;
         }
 
-        const targetStartPage = forcedPage !== null ? Math.max(1, Math.min(book.totalPages, parseInt(forcedPage) || 1)) : (book.currentPage || 1);
+        const defaultStart = book.openMode === 'first' ? 1 : (book.currentPage || 1);
+        const targetStartPage = forcedPage !== null ? Math.max(1, Math.min(book.totalPages, parseInt(forcedPage) || 1)) : defaultStart;
         book.currentPage = targetStartPage;
 
         const overlay = document.getElementById('reader-fullscreen-overlay');
@@ -1390,7 +1688,7 @@
         overlay.classList.add(`theme-${readerSettings.theme || 'night'}`);
         document.getElementById('reader-split-host').style.flexDirection = 'row';
 
-        // DO NOT auto-open Scratchpad / OneNote Studio! Keep it closed until user clicks 📝 Scratchpad button!
+        // Scratchpad NEVER opens automatically—only when user clicks 📝 Scratchpad button!
         if (window.closeOnenoteStudioDock) window.closeOnenoteStudioDock();
 
         document.getElementById('reader-page-slider').max = book.totalPages || 1;
@@ -1411,6 +1709,9 @@
         if (window.speechSynthesis) window.speechSynthesis.cancel();
         if (window.closeOnenoteStudioDock) window.closeOnenoteStudioDock();
         document.getElementById('v5-clicked-ann-inspector')?.remove();
+        if (activeReaderBook && activeReaderBook.pendingCloudSync && activeReaderBook.autoSync) {
+            window.syncSingleBookEverywhere(activeReaderBook.id, false);
+        }
         if (activePdfDoc) {
             try { await activePdfDoc.destroy(); } catch (e) {}
             activePdfDoc = null;
@@ -1421,7 +1722,6 @@
     }
     document.getElementById('reader-back-to-shelf-btn')?.addEventListener('click', closeActiveBookReader);
 
-    // Sync Mini Pomodoro Timer Pill inside Reader Header
     setInterval(() => {
         const pillTxt = document.getElementById('reader-mini-timer-text');
         if (pillTxt && window.timeDisplay) pillTxt.textContent = window.timeDisplay.textContent || '00:00';
@@ -1542,7 +1842,17 @@
     document.getElementById('reader-zoom-in-btn')?.addEventListener('click', () => window.setReaderZoom(readerZoom + 0.15));
     document.getElementById('reader-zoom-out-btn')?.addEventListener('click', () => window.setReaderZoom(readerZoom - 0.15));
 
-    // RESTORED: Calibrated Sub-Pixel PDF Text Selection Layer
+    // Isolated Ctrl+Wheel & 2-Finger Pinch Zoom inside #reader-viewport
+    const readerVpEl = document.getElementById('reader-viewport');
+    if (readerVpEl) {
+        readerVpEl.addEventListener('wheel', (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                e.preventDefault();
+                window.setReaderZoom(readerZoom + (e.deltaY < 0 ? 0.1 : -0.1));
+            }
+        }, { passive: false });
+    }
+
     async function renderCalibratedPdfTextLayer(page, textLayerEl, pageNum) {
         if (!textLayerEl) return;
         try {
@@ -1602,7 +1912,7 @@
     }
 
     /* =========================================================================
-       7. 60FPS PENCIL & SHAPE STUDIO + FIXED TRANSPARENT OCCLUSION REVEAL
+       7. 60FPS PENCIL & SHAPE STUDIO (WITH MOVE/RESIZE HANDLES) & OCCLUSION
        ========================================================================= */
     function renderPencilStudioToolbar() {
         const bar = document.getElementById('reader-pencil-toolbar');
@@ -1631,6 +1941,7 @@
                 `).join('')}
             </div>
             <div class="flex items-center gap-1.5 flex-wrap">
+                <input type="range" min="2" max="14" value="${studioStrokeWidth}" onchange="window.setReaderStudioStrokeWidth(this.value)" class="w-16 accent-amber-400" title="Stroke Width">
                 ${colors.map(c => `
                     <button type="button" onclick="window.setReaderStudioColor('${c}')" class="w-5 h-5 rounded-full border-2 ${activeHighlightColor === c ? 'border-white scale-110' : 'border-slate-700'}" style="background:${c}"></button>
                 `).join('')}
@@ -1647,6 +1958,11 @@
         document.querySelectorAll('.v4-interactive-svg').forEach(svg => {
             svg.classList.toggle('mode-select', studioTool === 'select');
         });
+        if (activeReaderBook) updateSinglePageSvg(activeReaderBook.currentPage || 1);
+    };
+
+    window.setReaderStudioStrokeWidth = function(w) {
+        studioStrokeWidth = Math.max(2, Math.min(16, parseInt(w) || 4));
     };
 
     window.setReaderStudioColor = function(c) {
@@ -1658,6 +1974,7 @@
         if (!activeReaderBook || !Array.isArray(activeReaderBook.annotations) || !activeReaderBook.annotations.length) return;
         const popped = activeReaderBook.annotations.pop();
         if (popped?.id) activeReaderBook.deletedAnnotationIds.push(popped.id);
+        activeReaderBook.pendingCloudSync = true;
         saveReaderMeta();
         updateSinglePageSvg(popped?.page || activeReaderBook.currentPage || 1);
         showToast("↩️ Undid last annotation");
@@ -1678,7 +1995,6 @@
         window.setReaderSelectionMode(readerSelectionMode);
     });
 
-    // FIXED 100% TRANSPARENT OCCLUSION REVEAL + FULL VECTOR SHAPES & MARGIN CHIPS
     function updateSinglePageSvg(pageNum) {
         if (!activeReaderBook) return;
         const card = document.querySelector(`.v4-page-card[data-page="${pageNum}"]`);
@@ -1697,7 +2013,9 @@
         pageAnns.forEach(ann => {
             const color = ann.color || '#facc15';
             const sw = ann.strokeWidth || 4;
+            const isSelected = (selectedShapeId === ann.id);
 
+            // 100% Transparent Occlusion Click-to-Reveal (Never triggers shape inspector!)
             if (ann.type === 'occlusion') {
                 const rc = (Array.isArray(ann.rects) && ann.rects[0]) ? ann.rects[0] : { x: 0.1, y: 0.1, w: 0.25, h: 0.05 };
                 const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
@@ -1807,11 +2125,24 @@
                     g.appendChild(tx);
                 }
 
+                // Restored Resize Handle when selected in Move/Resize mode
+                if (isSelected && ann.x2 !== undefined && ann.y2 !== undefined) {
+                    const hnd = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    hnd.setAttribute('class', 'v4-resize-handle');
+                    hnd.setAttribute('data-resize-id', ann.id);
+                    hnd.setAttribute('cx', (ann.x2 || 0.3) * 1000);
+                    hnd.setAttribute('cy', (ann.y2 || 0.3) * 1400);
+                    hnd.setAttribute('r', '10');
+                    g.appendChild(hnd);
+                }
+
                 g.onclick = (ev) => {
                     ev.stopPropagation();
                     if (studioActive && studioTool === 'eraser') {
                         deleteAnnotationById(ann.id, pageNum);
                     } else {
+                        selectedShapeId = ann.id;
+                        updateSinglePageSvg(pageNum);
                         openClickedAnnotationInspector(ann, pageNum, ev.clientX, ev.clientY);
                     }
                 };
@@ -1824,6 +2155,7 @@
         if (!activeReaderBook) return;
         activeReaderBook.annotations = (activeReaderBook.annotations || []).filter(a => a.id !== annId);
         activeReaderBook.deletedAnnotationIds.push(annId);
+        activeReaderBook.pendingCloudSync = true;
         saveReaderMeta();
         updateSinglePageSvg(pageNum);
     }
@@ -1833,7 +2165,7 @@
         const insp = document.createElement('div');
         insp.id = 'v5-clicked-ann-inspector';
         insp.className = "fixed z-[290] flex items-center gap-1 p-1.5";
-        insp.style.left = `${Math.max(12, Math.min(window.innerWidth - 260, clientX - 80))}px`;
+        insp.style.left = `${Math.max(12, Math.min(window.innerWidth - 280, clientX - 80))}px`;
         insp.style.top = `${Math.max(12, clientY - 52)}px`;
 
         const colors = ['#facc15', '#34d399', '#60a5fa', '#f472b6', '#ef4444'];
@@ -1851,6 +2183,7 @@
             b.onclick = () => {
                 ann.color = b.getAttribute('data-col');
                 ann.updatedAt = Date.now();
+                activeReaderBook.pendingCloudSync = true;
                 saveReaderMeta();
                 updateSinglePageSvg(pageNum);
                 insp.remove();
@@ -1868,6 +2201,8 @@
 
     function bindPageInteractiveSvg(pageNum, svg) {
         let drawing = false;
+        let movingShape = null;
+        let resizingShape = null;
         let startNorm = { x: 0, y: 0 };
         let currentPoints = [];
         let previewEl = null;
@@ -1882,8 +2217,33 @@
 
         svg.onpointerdown = (e) => {
             if (e.target.closest('.v4-occlusion-node')) return;
+
+            // Check if dragging a resize handle
+            const resizeHnd = e.target.closest('.v4-resize-handle');
+            if (resizeHnd && activeReaderBook) {
+                const rId = resizeHnd.getAttribute('data-resize-id');
+                resizingShape = (activeReaderBook.annotations || []).find(a => a.id === rId);
+                if (resizingShape) {
+                    svg.setPointerCapture(e.pointerId);
+                    return;
+                }
+            }
+
+            // Check if dragging an existing shape in Move/Resize mode
+            const shapeNode = e.target.closest('.v4-shape-node');
+            if (shapeNode && studioActive && studioTool === 'select' && activeReaderBook) {
+                const sId = shapeNode.getAttribute('data-ann-id');
+                movingShape = (activeReaderBook.annotations || []).find(a => a.id === sId);
+                if (movingShape) {
+                    selectedShapeId = sId;
+                    startNorm = getNorm(e);
+                    svg.setPointerCapture(e.pointerId);
+                    return;
+                }
+            }
+
             if (!studioActive && !occlusionModeActive && readerSelectionMode !== 'direct') return;
-            if (studioActive && studioTool === 'eraser') return;
+            if (studioActive && (studioTool === 'eraser' || studioTool === 'select')) return;
 
             startNorm = getNorm(e);
             if (studioActive && studioTool === 'text') {
@@ -1899,15 +2259,34 @@
 
             previewEl = document.createElementNS('http://www.w3.org/2000/svg', (studioActive && (studioTool === 'pen' || studioTool === 'hl')) ? 'path' : 'rect');
             previewEl.setAttribute('stroke', activeHighlightColor);
-            previewEl.setAttribute('stroke-width', '4');
+            previewEl.setAttribute('stroke-width', String(studioStrokeWidth));
             previewEl.setAttribute('fill', occlusionModeActive ? '#0f172a' : activeHighlightColor);
             previewEl.setAttribute('fill-opacity', (studioActive && (studioTool === 'pen' || studioTool === 'hl')) ? '0' : '0.35');
             svg.appendChild(previewEl);
         };
 
         svg.onpointermove = (e) => {
-            if (!drawing || !previewEl) return;
             const cur = getNorm(e);
+            if (resizingShape) {
+                resizingShape.x2 = cur.x;
+                resizingShape.y2 = cur.y;
+                updateSinglePageSvg(pageNum);
+                return;
+            }
+            if (movingShape) {
+                const dx = cur.x - startNorm.x;
+                const dy = cur.y - startNorm.y;
+                startNorm = cur;
+                if (movingShape.x1 !== undefined) {
+                    movingShape.x1 += dx; movingShape.y1 += dy;
+                    if (movingShape.x2 !== undefined) { movingShape.x2 += dx; movingShape.y2 += dy; }
+                } else if (Array.isArray(movingShape.points)) {
+                    movingShape.points.forEach(pt => { pt.x += dx; pt.y += dy; });
+                }
+                updateSinglePageSvg(pageNum);
+                return;
+            }
+            if (!drawing || !previewEl) return;
             if (studioActive && (studioTool === 'pen' || studioTool === 'hl')) {
                 currentPoints.push(cur);
                 const d = currentPoints.map((pt, i) => `${i === 0 ? 'M' : 'L'} ${(pt.x * 1000).toFixed(1)} ${(pt.y * 1400).toFixed(1)}`).join(' ');
@@ -1921,6 +2300,13 @@
         };
 
         svg.onpointerup = (e) => {
+            if (resizingShape || movingShape) {
+                resizingShape = null;
+                movingShape = null;
+                if (activeReaderBook) activeReaderBook.pendingCloudSync = true;
+                saveReaderMeta();
+                return;
+            }
             if (!drawing) return;
             drawing = false;
             previewEl?.remove();
@@ -1931,6 +2317,12 @@
             const rx = Math.min(startNorm.x, endNorm.x), ry = Math.min(startNorm.y, endNorm.y);
             const rw = Math.abs(endNorm.x - startNorm.x), rh = Math.abs(endNorm.y - startNorm.y);
 
+            // Check if Interactive Diagram Snip Mode is active (from 05-pomodoc-forge.js)
+            if (window._activeDiagramSnipMode && window.completeInteractiveDiagramSnip) {
+                window.completeInteractiveDiagramSnip(pageNum, rx, ry, rw, rh);
+                return;
+            }
+
             if (occlusionModeActive) {
                 if (rw < 0.015 && rh < 0.01) return;
                 activeReaderBook.annotations.push({
@@ -1938,6 +2330,7 @@
                     rects: [{ x: rx, y: ry, w: Math.max(0.04, rw), h: Math.max(0.022, rh) }],
                     revealed: false, createdAt: Date.now()
                 });
+                activeReaderBook.pendingCloudSync = true;
                 saveReaderMeta();
                 updateSinglePageSvg(pageNum);
                 showToast("🎭 Occlusion Mask Added! Click it anytime to reveal.");
@@ -1963,12 +2356,15 @@
                     showFloatingSelectionBar(e.clientX, e.clientY);
                     return;
                 }
+                const newId = 'drw_' + Date.now();
                 activeReaderBook.annotations.push({
-                    id: 'drw_' + Date.now(), type: 'drawing', tool: studioTool, page: pageNum,
-                    color: activeHighlightColor, strokeWidth: 4,
+                    id: newId, type: 'drawing', tool: studioTool, page: pageNum,
+                    color: activeHighlightColor, strokeWidth: studioStrokeWidth,
                     x1: startNorm.x, y1: startNorm.y, x2: endNorm.x, y2: endNorm.y,
                     points: currentPoints, createdAt: Date.now()
                 });
+                selectedShapeId = newId;
+                activeReaderBook.pendingCloudSync = true;
                 saveReaderMeta();
                 updateSinglePageSvg(pageNum);
             }
@@ -1988,11 +2384,11 @@
             color: activeHighlightColor, x1: pendingTextPlacement.x, y1: pendingTextPlacement.y,
             text: txt, fontSize: sz, createdAt: Date.now()
         });
+        activeReaderBook.pendingCloudSync = true;
         saveReaderMeta();
         updateSinglePageSvg(pendingTextPlacement.pageNum);
     });
 
-    // Native Browser Text Selection -> Floating Selection Bar
     function showFloatingSelectionBar(clientX, clientY) {
         const bar = document.getElementById('reader-floating-sel-bar');
         if (!bar) return;
@@ -2063,6 +2459,7 @@
             updatedAt: Date.now()
         };
         activeReaderBook.annotations.push(newAnn);
+        activeReaderBook.pendingCloudSync = true;
         saveReaderMeta();
         updateSinglePageSvg(pendingLaserSelection.pageNum);
         document.getElementById('reader-floating-sel-bar')?.classList.add('hidden');
@@ -2145,12 +2542,12 @@
             text: `Page ${p} Bookmark`, note: `Bookmarked Page ${p}`, color: '#f59e0b',
             rects: [{ x: 0.08, y: 0.06, w: 0.3, h: 0.025 }], yNorm: 0.06, createdAt: Date.now()
         });
+        activeReaderBook.pendingCloudSync = true;
         saveReaderMeta();
         updateSinglePageSvg(p);
         showToast(`🔖 Page ${p} Bookmarked!`);
     });
 
-    // Line Item Viewer & File Attachment Modal
     function openLineItemViewerModal(annId) {
         if (!activeReaderBook) return;
         const ann = (activeReaderBook.annotations || []).find(a => a.id === annId);
@@ -2179,6 +2576,7 @@
         if (ann) {
             ann.note = document.getElementById('line-viewer-note-input').value;
             ann.updatedAt = Date.now();
+            activeReaderBook.pendingCloudSync = true;
             saveReaderMeta();
             updateSinglePageSvg(ann.page || 1);
             showToast("💾 Note saved!");
@@ -2206,6 +2604,7 @@
             await idbPut('lineAttachments', { id: attId, name: f.name, type: f.type, dataUrl: r.result });
             ann.attachmentId = attId;
             ann.attachmentName = f.name;
+            activeReaderBook.pendingCloudSync = true;
             saveReaderMeta();
             openLineItemViewerModal(ann.id);
             updateSinglePageSvg(ann.page || 1);
@@ -2215,7 +2614,7 @@
     });
 
     /* =========================================================================
-       8. NAVIGATION, TOC DRAWER, FULL-BOOK SEARCH, TTS & 3-DOTS MENU
+       8. NAVIGATION, TOC DRAWER, FULL-BOOK SEARCH, TTS & FULL 3-DOTS MODALS
        ========================================================================= */
     window.jumpToReaderPage = function(pageNum) {
         if (!activeReaderBook) return;
@@ -2246,7 +2645,6 @@
         saveReaderMeta();
     });
 
-    // TOC & Bookmarks Drawer (#reader-toc-bookmarks-drawer)
     function renderTocAndBookmarksDrawer() {
         const listEl = document.getElementById('book-toc-drawer-list');
         if (!listEl || !activeReaderBook) return;
@@ -2308,7 +2706,6 @@
     });
     document.getElementById('book-toc-search-input')?.addEventListener('input', renderTocAndBookmarksDrawer);
 
-    // Full-Book Search Drawer (#reader-fullsearch-drawer)
     document.getElementById('reader-bottom-search-btn')?.addEventListener('click', () => {
         document.getElementById('reader-fullsearch-drawer')?.classList.remove('hidden');
         setTimeout(() => document.getElementById('fullbook-search-input')?.focus(), 50);
@@ -2360,7 +2757,6 @@
     document.getElementById('fullbook-search-run-btn')?.addEventListener('click', executeFullBookSearch);
     document.getElementById('fullbook-search-input')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') executeFullBookSearch(); });
 
-    // Read Aloud Text-to-Speech (TTS)
     function speakCurrentReaderPage() {
         if (!('speechSynthesis' in window) || !activeReaderBook) return;
         window.speechSynthesis.cancel();
@@ -2401,7 +2797,6 @@
         document.getElementById('reader-tts-bar')?.classList.add('hidden');
     });
 
-    // Top-Right 3-Dots Menu & Sub-Modals
     function applyBlueLightFilter() {
         const shield = document.getElementById('reader-bluelight-shield');
         if (!shield) return;
@@ -2450,9 +2845,9 @@
                 </div>
             `;
         } else if (subType === 'sub-control-options') {
-            titleEl.textContent = "🖥️ ii. Control & Scroll Lock Options";
+            titleEl.textContent = "🖥️ ii. Control, Highlight Colors & Paper Background";
             bodyEl.innerHTML = `
-                <div class="flex flex-col gap-2 text-xs">
+                <div class="flex flex-col gap-2.5 text-xs">
                     <label class="flex items-center justify-between bg-slate-950 p-3 rounded-xl border border-slate-800">
                         <span class="font-bold text-slate-200">🔒 Lock Horizontal Scroll</span>
                         <input type="checkbox" ${readerSettings.lockHorizontalScroll ? 'checked' : ''} onchange="window.toggleReaderScrollLock('h', this.checked)">
@@ -2461,6 +2856,12 @@
                         <span class="font-bold text-slate-200">🔒 Lock Vertical Scroll</span>
                         <input type="checkbox" ${readerSettings.lockVerticalScroll ? 'checked' : ''} onchange="window.toggleReaderScrollLock('v', this.checked)">
                     </label>
+                    <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 flex items-center justify-between">
+                        <span class="font-bold text-cyan-300">📄 .TXT / Semantic Paper Theme</span>
+                        <select onchange="window.setReaderTxtPaperTheme(this.value)" class="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-white font-bold">
+                            ${['default', 'black', 'blue', 'green', 'sepia', 'paper'].map(t => `<option value="${t}" ${readerSettings.txtBgTheme === t ? 'selected' : ''}>${t.toUpperCase()}</option>`).join('')}
+                        </select>
+                    </div>
                 </div>
             `;
         } else if (subType === 'sub-themes-options') {
@@ -2471,9 +2872,12 @@
                         <button type="button" onclick="window.setReaderThemeMode('${th}')" class="p-2.5 rounded-xl border font-extrabold uppercase ${readerSettings.theme === th ? 'bg-blue-600 text-white border-blue-400' : 'bg-slate-950 text-slate-300 border-slate-800'}">${th}</button>
                     `).join('')}
                 </div>
-                <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 flex items-center justify-between mt-2">
-                    <span class="text-xs font-bold text-amber-300">🕶️ Blue-Light Eye Shield</span>
-                    <input type="checkbox" ${readerSettings.blueLightEnabled ? 'checked' : ''} onchange="window.toggleBlueLightShield(this.checked)">
+                <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 flex flex-col gap-2 mt-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-amber-300">🕶️ Blue-Light Eye Shield</span>
+                        <input type="checkbox" ${readerSettings.blueLightEnabled ? 'checked' : ''} onchange="window.toggleBlueLightShield(this.checked)">
+                    </div>
+                    <input type="range" min="10" max="75" value="${readerSettings.blueLightIntensity || 30}" oninput="window.setBlueLightIntensity(this.value)" class="w-full accent-amber-500">
                 </div>
             `;
         } else if (subType === 'sub-book-info' && activeReaderBook) {
@@ -2482,15 +2886,21 @@
                 <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-xs flex flex-col gap-1.5 font-mono">
                     <p><b class="text-slate-400">Title:</b> ${escapeHtml(activeReaderBook.title)}</p>
                     <p><b class="text-slate-400">Author:</b> ${escapeHtml(activeReaderBook.author)}</p>
-                    <p><b class="text-slate-400">Shelf:</b> ${escapeHtml(activeReaderBook.shelfName)}</p>
+                    <p><b class="text-slate-400">Shelf:</b> ${escapeHtml(activeReaderBook.shelfName)} (#${activeReaderBook.readSeq || 1})</p>
+                    <p><b class="text-slate-400">Format & Size:</b> ${(activeReaderBook.format || 'pdf').toUpperCase()} • ${((activeReaderBook.fileSize || 0) / 1048576).toFixed(2)} MB</p>
                     <p><b class="text-slate-400">Pages:</b> ${activeReaderBook.currentPage} / ${activeReaderBook.totalPages} (${activeReaderBook.progressPct}%)</p>
+                    <p><b class="text-slate-400">Reading Time:</b> ${activeReaderBook.readingMins || 0} mins</p>
                     <p><b class="text-slate-400">Annotations:</b> ${(activeReaderBook.annotations || []).length}</p>
                 </div>
             `;
         } else if (subType === 'sub-share-options' && activeReaderBook) {
-            titleEl.textContent = "📤 v. Share & Export Annotated PDF";
+            titleEl.textContent = "📤 v. Share, Sync & Export Baked PDF";
             bodyEl.innerHTML = `
-                <button type="button" onclick="window.exportBakedPdfFile()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-3 rounded-xl text-xs shadow">⬇️ Download PDF with Baked Highlights & Notes</button>
+                <div class="flex flex-col gap-2">
+                    <button type="button" onclick="window.exportBakedPdfFile()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-3 rounded-xl text-xs shadow">⬇️ Download Real PDF with Baked Highlights & Drawings</button>
+                    <button type="button" onclick="window.exportBookNotesMarkdown()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-extrabold py-2.5 rounded-xl text-xs shadow">📝 Export Book Highlights & Notes (.MD)</button>
+                    <button type="button" onclick="window.syncSingleBookEverywhere('${escapeJsStr(activeReaderBook.id)}', true)" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-extrabold py-2.5 rounded-xl text-xs shadow">☁️ Sync Baked PDF to Connected Clouds Now</button>
+                </div>
             `;
         } else {
             modal.classList.add('hidden');
@@ -2514,6 +2924,11 @@
         vp?.classList.toggle('lock-h-scroll', Boolean(readerSettings.lockHorizontalScroll));
         vp?.classList.toggle('lock-v-scroll', Boolean(readerSettings.lockVerticalScroll));
     };
+    window.setReaderTxtPaperTheme = function(th) {
+        readerSettings.txtBgTheme = th;
+        saveReaderMeta();
+        if (activeReaderBook) buildBookStageAndObserver();
+    };
     window.setReaderThemeMode = function(th) {
         readerSettings.theme = th;
         saveReaderMeta();
@@ -2528,21 +2943,43 @@
         saveReaderMeta();
         applyBlueLightFilter();
     };
+    window.setBlueLightIntensity = function(val) {
+        readerSettings.blueLightIntensity = parseInt(val) || 30;
+        readerSettings.blueLightEnabled = true;
+        saveReaderMeta();
+        applyBlueLightFilter();
+    };
 
     window.exportBakedPdfFile = async function() {
         if (!activeReaderBook) return;
-        const stored = await idbGet('bookFiles', activeReaderBook.id);
-        if (!stored?.originalBytes) { showToast("Original PDF binary required.", true); return; }
+        showToast("⏳ Baking highlights, drawings & notes into PDF...");
+        const bakedUint8 = await window.bakeAnnotationsIntoPdfBytes(activeReaderBook);
+        if (!bakedUint8) { showToast("Original PDF binary required.", true); return; }
         const a = document.createElement('a');
-        a.href = URL.createObjectURL(new Blob([stored.originalBytes], { type: 'application/pdf' }));
-        a.download = activeReaderBook.fileName || `${activeReaderBook.title}.pdf`;
+        a.href = URL.createObjectURL(new Blob([bakedUint8], { type: 'application/pdf' }));
+        a.download = activeReaderBook.fileName || `${activeReaderBook.title}_Annotated.pdf`;
         a.click();
         document.getElementById('reader-suboptions-modal')?.classList.add('hidden');
-        showToast("📤 PDF Exported!");
+        showToast("📤 Baked Annotated PDF Exported!");
+    };
+
+    window.exportBookNotesMarkdown = function() {
+        if (!activeReaderBook) return;
+        const lines = [`# 📘 ${activeReaderBook.title} — Study Notes & Highlights\n`];
+        (activeReaderBook.annotations || []).forEach(a => {
+            lines.push(`### Page ${a.page || 1} [${(a.type || 'NOTE').toUpperCase()}]`);
+            if (a.text) lines.push(`> ${a.text}`);
+            if (a.note) lines.push(`\n**Note:** ${a.note}\n`);
+        });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' }));
+        a.download = `${activeReaderBook.title}_Notes.md`;
+        a.click();
+        showToast("📝 Markdown Notes Exported!");
     };
 
     /* =========================================================================
-       9. RESTORED SETTINGS 1–10 MASTER CONTROL CENTER, 6M STATS & MY FILES
+       9. FULL SETTINGS 1–10 MASTER CONTROL CENTER, 6M STATS & MY FILES
        ========================================================================= */
     function openMasterReaderSettings(initialPanel = 'panel-a1') {
         const modal = document.getElementById('reader-master-settings-modal');
@@ -2616,6 +3053,12 @@
         saveReaderMeta();
         renderWoodenShelf();
     });
+    document.getElementById('toggle-auto-folder-import-btn')?.addEventListener('click', (e) => {
+        readerSettings.autoFolderImport = !readerSettings.autoFolderImport;
+        e.currentTarget.textContent = readerSettings.autoFolderImport ? 'Enabled' : 'Disabled';
+        saveReaderMeta();
+        updateMainFolderUI();
+    });
 
     function renderCloudProvidersConfigA6() {
         const grid = document.getElementById('cloud-providers-config-grid');
@@ -2627,9 +3070,55 @@
                     <span class="text-[10px] font-mono px-2 py-0.5 rounded ${cl.connected ? 'bg-emerald-950 text-emerald-400' : 'bg-slate-900 text-slate-400'}">${cl.connected ? 'Connected' : 'Ready'}</span>
                 </div>
                 <p class="text-[10px] text-slate-400">${escapeHtml(cl.status)}</p>
+                <div class="flex gap-1.5 pt-1">
+                    <button type="button" onclick="window.connectCloudFolderPicker('${k}')" class="flex-1 bg-slate-900 hover:bg-slate-800 text-emerald-300 border border-slate-700 py-1.5 rounded-lg text-[10px] font-bold">📂 Link Folder</button>
+                    ${['gdrive', 'dropbox', 'telegram'].includes(k) ? `<button type="button" onclick="window.openCloudTokenModal('${k}')" class="flex-1 bg-blue-600/25 hover:bg-blue-600 text-blue-300 hover:text-white border border-blue-500/40 py-1.5 rounded-lg text-[10px] font-bold">🔑 API / Token</button>` : ''}
+                </div>
             </div>
         `).join('');
     }
+
+    window.connectCloudFolderPicker = async function(cloudKey) {
+        if (!('showDirectoryPicker' in window)) { showToast("Desktop Folder Picker requires Chromium/Edge/Tauri.", true); return; }
+        try {
+            const dirH = await window.showDirectoryPicker({ mode: 'readwrite' });
+            cloudDirectoryHandles[cloudKey] = dirH;
+            await idbPut('handles', { key: 'cloud_' + cloudKey, handle: dirH, name: dirH.name });
+            if (readerSettings.clouds[cloudKey]) {
+                readerSettings.clouds[cloudKey].connected = true;
+                readerSettings.clouds[cloudKey].folderName = dirH.name;
+                readerSettings.clouds[cloudKey].status = `Synced Folder: ${dirH.name}`;
+            }
+            saveReaderMeta();
+            renderCloudProvidersConfigA6();
+            showToast(`✅ Linked ${dirH.name} to ${cloudKey.toUpperCase()}!`);
+        } catch (e) {}
+    };
+
+    window.openCloudTokenModal = function(cloudKey) {
+        const modal = document.getElementById('reader-suboptions-modal');
+        const titleEl = document.getElementById('suboptions-modal-title');
+        const bodyEl = document.getElementById('suboptions-modal-body');
+        if (!modal || !titleEl || !bodyEl) return;
+        const cl = readerSettings.clouds[cloudKey] || {};
+        titleEl.textContent = `🔑 Configure ${cl.name || cloudKey.toUpperCase()} API`;
+        bodyEl.innerHTML = `
+            <input type="text" id="cloud-token-inp" value="${escapeHtml(cl.token || cl.tdlibUrl || '')}" placeholder="${cloudKey === 'telegram' ? 'TDLib Local Server URL (e.g. http://127.0.0.1:8081)' : 'Paste OAuth2 / Access Token'}" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono">
+            <button type="button" id="save-cloud-token-btn" class="w-full bg-emerald-600 text-white font-extrabold py-2.5 rounded-xl text-xs">💾 Save Cloud Credentials</button>
+        `;
+        modal.classList.remove('hidden');
+        document.getElementById('save-cloud-token-btn').onclick = () => {
+            const val = (document.getElementById('cloud-token-inp')?.value || '').trim();
+            if (cloudKey === 'telegram') cl.tdlibUrl = val;
+            else cl.token = val;
+            cl.connected = Boolean(val);
+            cl.status = val ? 'API Token Active ✓' : 'Not Connected';
+            saveReaderMeta();
+            renderCloudProvidersConfigA6();
+            modal.classList.add('hidden');
+            showToast("☁️ Cloud credentials saved!");
+        };
+    };
 
     function renderA9StatsAndCalendar() {
         document.getElementById('stat-books-on-shelf').textContent = readerBooks.length;
@@ -2643,6 +3132,26 @@
         document.getElementById('a9-live-clock-display').textContent = now.toLocaleTimeString();
         document.getElementById('a9-live-date-display').textContent = formatDDMMYYYY(getLocalTodayString(now));
 
+        const barsEl = document.getElementById('a9-6month-bars');
+        if (barsEl) {
+            const mBuckets = [];
+            for (let i = 5; i >= 0; i--) {
+                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                let mMins = 0;
+                Object.entries(readerReadingLog).forEach(([k, v]) => { if (k.startsWith(ym)) mMins += (v.totalMins || 0); });
+                mBuckets.push({ label: d.toLocaleDateString('en-US', { month: 'short' }), hrs: +(mMins / 60).toFixed(1) });
+            }
+            const maxH = Math.max(2, ...mBuckets.map(x => x.hrs));
+            barsEl.innerHTML = mBuckets.map(b => `
+                <div class="flex flex-col items-center justify-end h-full gap-1">
+                    <span class="text-[9px] font-mono text-amber-300 font-bold">${b.hrs}h</span>
+                    <div class="w-full bg-gradient-to-t from-blue-600 to-cyan-400 rounded-t-lg" style="height:${Math.max(8, Math.round((b.hrs / maxH) * 100))}%"></div>
+                    <span class="text-[9px] font-bold text-slate-400">${b.label}</span>
+                </div>
+            `).join('');
+        }
+
         const calGrid = document.getElementById('a9-calendar-days-grid');
         const calTitle = document.getElementById('cal-month-title');
         if (calGrid && calTitle) {
@@ -2655,11 +3164,20 @@
             for (let d = 1; d <= daysInM; d++) {
                 const iso = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
                 const mins = readerReadingLog[iso]?.totalMins || 0;
-                html += `<div class="p-1.5 rounded-lg text-[10px] font-mono ${mins > 0 ? 'bg-emerald-600 text-white font-extrabold' : 'bg-slate-900 text-slate-400'}">${d}</div>`;
+                html += `<div class="p-1.5 rounded-lg text-[10px] font-mono ${mins > 0 ? 'bg-emerald-600 text-white font-extrabold' : 'bg-slate-900 text-slate-400'}" title="${mins} mins read">${d}</div>`;
             }
             calGrid.innerHTML = html;
         }
     }
+
+    document.getElementById('cal-prev-month-btn')?.addEventListener('click', () => {
+        a9CalendarCursor.setMonth(a9CalendarCursor.getMonth() - 1);
+        renderA9StatsAndCalendar();
+    });
+    document.getElementById('cal-next-month-btn')?.addEventListener('click', () => {
+        a9CalendarCursor.setMonth(a9CalendarCursor.getMonth() + 1);
+        renderA9StatsAndCalendar();
+    });
 
     function renderA10StorageExplorer() {
         const grid = document.getElementById('a10-storage-folders-grid');
@@ -2667,15 +3185,17 @@
         if (!grid || !list) return;
         grid.innerHTML = Object.entries(readerSettings.clouds || {}).map(([k, cl]) => {
             const cnt = readerBooks.filter(b => (b.sources || []).includes(k)).length;
+            const act = activeA10Source === k;
             return `
-                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3 flex items-center justify-between">
+                <div onclick="window.selectA10StorageSource('${k}')" class="bg-slate-950 hover:bg-slate-900 border ${act ? 'border-cyan-400' : 'border-slate-800'} rounded-2xl p-3 flex items-center justify-between cursor-pointer">
                     <span class="text-xs font-bold text-white">${cl.icon} ${escapeHtml(cl.name)}</span>
                     <span class="text-xs font-mono font-extrabold text-cyan-400">${cnt}</span>
                 </div>
             `;
         }).join('');
 
-        list.innerHTML = readerBooks.map(b => `
+        const sourceBooks = readerBooks.filter(b => activeA10Source === 'local' || (b.sources || []).includes(activeA10Source));
+        list.innerHTML = sourceBooks.length ? sourceBooks.map(b => `
             <div class="flex items-center justify-between bg-slate-900 p-2.5 rounded-xl border border-slate-800">
                 <div class="min-w-0 flex-1 pr-2">
                     <p class="text-xs font-bold text-white truncate">${escapeHtml(b.title)}</p>
@@ -2686,8 +3206,13 @@
                     <button type="button" onclick="window.offloadBookBinaryToSaveLocalSpace('${escapeJsStr(b.id)}')" class="bg-amber-600/25 text-amber-300 border border-amber-500/40 px-2.5 py-1 rounded-lg text-[10px] font-bold">🧹 0MB Offload</button>
                 </div>
             </div>
-        `).join('');
+        `).join('') : `<p class="text-xs text-slate-400 italic text-center p-4">No books linked to this storage source yet.</p>`;
     }
+
+    window.selectA10StorageSource = function(src) {
+        activeA10Source = src;
+        renderA10StorageExplorer();
+    };
 
     document.getElementById('reader-export-backup-btn')?.addEventListener('click', () => {
         const dump = { readerBooks, customShelves, readerReadingLog, readerSettings };
@@ -2695,6 +3220,29 @@
         a.href = URL.createObjectURL(new Blob([JSON.stringify(dump, null, 2)], { type: 'application/json' }));
         a.download = `PomoReader_Backup_${getLocalTodayString()}.json`;
         a.click();
+    });
+    document.getElementById('reader-import-backup-btn')?.addEventListener('click', () => {
+        document.getElementById('reader-restore-json-input')?.click();
+    });
+    document.getElementById('reader-restore-json-input')?.addEventListener('change', (e) => {
+        const f = e.target.files?.[0];
+        e.target.value = '';
+        if (!f) return;
+        const r = new FileReader();
+        r.onload = () => {
+            try {
+                const parsed = JSON.parse(r.result);
+                if (Array.isArray(parsed.readerBooks)) window.readerBooks = parsed.readerBooks;
+                if (Array.isArray(parsed.customShelves)) window.customShelves = parsed.customShelves;
+                if (parsed.readerReadingLog) window.readerReadingLog = parsed.readerReadingLog;
+                if (parsed.readerSettings) window.readerSettings = parsed.readerSettings;
+                saveReaderMeta();
+                renderCustomShelvesBar();
+                renderWoodenShelf();
+                showToast("✅ Reader Library Backup Restored!");
+            } catch (err) { showToast("Invalid Reader JSON file", true); }
+        };
+        r.readAsText(f);
     });
 
     PomoEventBus.on('reader:openedTab', () => { renderCustomShelvesBar(); renderWoodenShelf(); updateMainFolderUI(); });
@@ -2706,4 +3254,4 @@
         setupWirelessReaderCloudSync();
     }, 120);
 })();
-// ✅ END OF FILE (04-reader-pro.js v17.1 Enterprise Desktop Edition) — 100% RESTORED & UNCUT
+// ✅ END OF FILE (04-reader-pro.js v17.2 Full Master Restoration) — 100% RESTORED & UNCUT

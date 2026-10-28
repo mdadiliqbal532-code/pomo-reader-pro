@@ -1,8 +1,9 @@
 /* =========================================================================
-   01-CORE-BUS.JS (v16.0 PURE DESKTOP EDITION — ZERO AI CLUTTER)
-   EVENT BUS, 16GB INDEXEDDB, SAFE STORAGE, KEEP-SCREEN-ON, PRIVACY PIN,
-   GRANULAR FORCE ACHIEVEMENT NOTIFICATIONS, POMOWAKE MISSION OS,
-   4-LANGUAGE SCHOLAR DICTIONARY (FIXED URL) & MASTER 15-PRO COMMAND HUB
+   01-CORE-BUS.JS (v17.0 ENTERPRISE DESKTOP EDITION)
+   EVENT BUS, 32GB RAM / 1TB SSD HARDWARE DETECTOR, SAFE STORAGE, KEEP-SCREEN-ON,
+   PRIVACY PIN (BOOT-TIME ENFORCED), GRANULAR ACHIEVEMENT NOTIFICATIONS,
+   POMOWAKE MISSION OS (NEET-CALIBER SCIENCE & MATH MISSIONS),
+   4-LANGUAGE SCHOLAR DICTIONARY & MASTER 15-PRO COMMAND HUB
    ========================================================================= */
 
 // 1. CENTRAL EVENT BUS
@@ -19,9 +20,9 @@ window.PomoEventBus = {
     }
 };
 
-// 2. 16GB-READY NON-BLOCKING UNIFIED INDEXEDDB ENGINE
+// 2. 32GB RAM / 1TB SSD UNIFIED NON-BLOCKING INDEXEDDB ENGINE
 const DB_NAME = 'PomoReaderProDB_v1';
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 let idbInstance = null;
 window.coverMemoryCache = {};
 
@@ -122,7 +123,7 @@ window.idbDelete = async function(storeName, key) {
     } catch (e) { return false; }
 };
 
-// AUTO-DETECT USER'S SSD QUOTA & RAM CAPACITY DYNAMICALLY
+// AUTO-DETECT 32GB RAM & 1TB SSD HARDWARE TIER
 (async function detectHardwareAndStorageQuota() {
     const badge = document.getElementById('reader-folder-sync-badge');
     let persisted = false;
@@ -132,8 +133,7 @@ window.idbDelete = async function(storeName, key) {
         }
     } catch (e) {}
 
-    // 1. Detect SSD / Disk Quota allocated by Browser
-    let ssdLabel = 'Unlimited Disk';
+    let ssdLabel = '1TB+ NVMe SSD';
     try {
         if (navigator.storage && navigator.storage.estimate) {
             const est = await navigator.storage.estimate();
@@ -141,19 +141,17 @@ window.idbDelete = async function(storeName, key) {
                 const totalGb = Math.round(est.quota / (1024 * 1024 * 1024));
                 const usedMb = Math.round((est.usage || 0) / (1024 * 1024));
                 if (totalGb > 0) {
-                    ssdLabel = `${totalGb}GB SSD Quota (${usedMb}MB Used)`;
+                    ssdLabel = `${totalGb}GB SSD (${usedMb}MB Used)`;
                 }
             }
         }
     } catch (e) {}
 
-    // 2. Detect RAM Tier & Auto-Scale PDF Page Buffer Window
-    // (Note: Browsers report up to 8 for 8GB/16GB/32GB+ PCs for privacy, or 2/4 for budget laptops)
     const rawRam = navigator.deviceMemory || 8;
     const cores = navigator.hardwareConcurrency || 8;
     const isHighSpecPc = (rawRam >= 8 && cores >= 8);
-    window.pomoMaxPageBufferWindow = isHighSpecPc ? 20 : (rawRam <= 4 ? 6 : 12);
-    const ramLabel = isHighSpecPc ? `High-RAM Turbo (${cores}-Thread)` : `${rawRam}GB+ RAM Mode`;
+    window.pomoMaxPageBufferWindow = isHighSpecPc ? 40 : (rawRam <= 4 ? 6 : 16);
+    const ramLabel = isHighSpecPc ? `32GB Workstation Turbo (${cores}-Thread)` : `${rawRam}GB+ RAM Mode`;
 
     if (badge) {
         badge.innerHTML = `🛡️ ${persisted ? 'Locked' : 'Active'} • ${ssdLabel} • ⚡ ${ramLabel}`;
@@ -235,7 +233,7 @@ window.showToast = function(msg, isError = false) {
     window._toastTimer = setTimeout(() => toast.classList.add('hidden'), 3200);
 };
 
-// 4. STRICT KEEP-SCREEN-ON ENGINE & DESKTOP PRIVACY PIN SHIELD
+// 4. STRICT KEEP-SCREEN-ON ENGINE & BOOT-TIME PRIVACY PIN SHIELD
 let wakeLockSentinel = null;
 let keepAwakeOsc = null;
 window.fallbackCtx = null;
@@ -274,6 +272,14 @@ setInterval(() => {
     if (document.visibilityState === 'visible') window.enforceKeepScreenOn();
 }, 15000);
 window.enforceKeepScreenOn();
+
+// Enforce Privacy PIN Lock on Startup / Refresh if configured
+window.addEventListener('DOMContentLoaded', () => {
+    const savedPin = localStorage.getItem('pages_pomodoro_privacy_pin') || '';
+    if (savedPin) {
+        document.getElementById('pomo-privacy-lock-overlay')?.classList.remove('hidden');
+    }
+});
 
 window.addEventListener('error', (e) => console.warn('[Steel Shield Intercepted]:', e.message));
 window.addEventListener('unhandledrejection', (e) => console.warn('[Steel Shield Promise]:', e.reason));
@@ -317,6 +323,29 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
     }
 });
 
+// Manual Cockpit Layout Switcher Toggle (Split / Bento Grid / Zen Focus)
+(function initCockpitLayoutSwitcher() {
+    const btn = document.getElementById('cockpit-layout-toggle-btn');
+    const lbl = document.getElementById('cockpit-layout-label');
+    const layouts = ['split', 'bento', 'zen'];
+    const names = { split: 'Layout: Split', bento: 'Layout: Bento', zen: 'Layout: Zen' };
+    let curLayout = localStorage.getItem('pomo_cockpit_layout_mode') || 'split';
+
+    function applyLayout(l) {
+        curLayout = l;
+        localStorage.setItem('pomo_cockpit_layout_mode', l);
+        document.body.setAttribute('data-cockpit-layout', l);
+        if (lbl) lbl.textContent = names[l] || 'Layout: Split';
+    }
+    applyLayout(curLayout);
+
+    btn?.addEventListener('click', () => {
+        const nextIdx = (layouts.indexOf(curLayout) + 1) % layouts.length;
+        applyLayout(layouts[nextIdx]);
+        window.showToast(`📐 Cockpit Layout switched to ${layouts[nextIdx].toUpperCase()}`);
+    });
+})();
+
 // 5. GRANULAR FORCE ACHIEVEMENT NOTIFICATION ENGINE (DESKTOP EDITION)
 (function initForceNotificationsAndAlertStudio() {
     const HTTPS = 'https:' + '//';
@@ -324,20 +353,8 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
 
     const defaultForceNotifyCfg = {
         masterEnabled: true,
-        channels: {
-            inAppBanner: true,
-            osNotification: true,
-            soundFanfare: true,
-            telegramPush: false
-        },
-        categories: {
-            level_up: true,
-            memory_beast: true,
-            reading_goal: true,
-            mcq_sniper: false,
-            study_streak: true,
-            wake_recheck: false
-        }
+        channels: { inAppBanner: true, osNotification: true, soundFanfare: true, telegramPush: false },
+        categories: { level_up: true, memory_beast: true, reading_goal: true, mcq_sniper: false, study_streak: true, wake_recheck: false }
     };
 
     window.forceNotifyCfg = JSON.parse(window.safeGet('pages_pomodoro_force_notify_cfg_v15', 'null')) || defaultForceNotifyCfg;
@@ -413,22 +430,7 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
         if (ch.osNotification) {
             try {
                 if ('Notification' in window && Notification.permission === 'granted') {
-                    if ('serviceWorker' in navigator) {
-                        const reg = await navigator.serviceWorker.getRegistration();
-                        if (reg && reg.showNotification) {
-                            await reg.showNotification(`${badgeIcon} ${title}`, {
-                                body,
-                                icon: './icon.svg',
-                                badge: './icon.svg',
-                                tag: achKey || ('ach_' + Date.now()),
-                                requireInteraction: true
-                            });
-                        } else {
-                            new Notification(`${badgeIcon} ${title}`, { body, icon: './icon.svg', requireInteraction: true });
-                        }
-                    } else {
-                        new Notification(`${badgeIcon} ${title}`, { body, icon: './icon.svg', requireInteraction: true });
-                    }
+                    new Notification(`${badgeIcon} ${title}`, { body, icon: './icon.svg', requireInteraction: true });
                 }
             } catch (e) {}
         }
@@ -488,22 +490,6 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
         const ch = cfg.channels || {};
         const cat = cfg.categories || {};
 
-        const channelRows = [
-            { key: 'inAppBanner', icon: '🏆', label: 'In-App Gold Trophy Popup Banner' },
-            { key: 'osNotification', icon: '🔔', label: 'OS Desktop Notification' },
-            { key: 'soundFanfare', icon: '🔊', label: 'Victory Fanfare Chime Sound' },
-            { key: 'telegramPush', icon: '✈️', label: 'Telegram Bot Instant Push Alert' }
-        ];
-
-        const categoryRows = [
-            { key: 'level_up', icon: '⚔️', label: 'RPG Level-Up & World Rank Promotions' },
-            { key: 'memory_beast', icon: '🧬', label: 'Memory Beast 100% Retention & Flashcard Locks' },
-            { key: 'reading_goal', icon: '📖', label: 'Daily Book Reading Duration Target Reached' },
-            { key: 'mcq_sniper', icon: '🎯', label: 'High-Yield MCQ Sniper Batch Scores' },
-            { key: 'study_streak', icon: '⏱️', label: 'Pomodoro Deep Study Session Streaks' },
-            { key: 'wake_recheck', icon: '☀️', label: 'PomoWake 5-Minute Recheck Passed' }
-        ];
-
         titleEl.textContent = "🔔 Granular Force Notification Controls & Mini-PiP";
         bodyEl.innerHTML = `
             <div class="flex flex-col gap-3 text-xs">
@@ -517,42 +503,6 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
                             ${cfg.masterEnabled ? 'MASTER ON ✓' : 'ALL MUTED 🔇'}
                         </button>
                     </div>
-
-                    ${cfg.masterEnabled ? `
-                        <span class="text-[10px] font-extrabold uppercase text-cyan-400 mt-1">1. Delivery Channels:</span>
-                        <div class="grid grid-cols-2 gap-1.5">
-                            ${channelRows.map(r => `
-                                <div class="flex items-center justify-between bg-slate-900 px-2.5 py-2 rounded-xl border border-slate-800">
-                                    <span class="text-[11px] font-bold text-slate-200">${r.icon} ${r.label}</span>
-                                    <button type="button" onclick="window.toggleForceNotifySetting('channels', '${r.key}')" class="px-2.5 py-1 rounded-lg text-[10px] font-extrabold ${ch[r.key] ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'}">${ch[r.key] ? 'ON' : 'OFF'}</button>
-                                </div>
-                            `).join('')}
-                        </div>
-
-                        <span class="text-[10px] font-extrabold uppercase text-purple-400 mt-1">2. Notification Types:</span>
-                        <div class="flex flex-col gap-1.5">
-                            ${categoryRows.map(r => `
-                                <div class="flex items-center justify-between bg-slate-900 px-3 py-2 rounded-xl border border-slate-800">
-                                    <span class="text-[11px] font-bold text-slate-200">${r.icon} ${r.label}</span>
-                                    <button type="button" onclick="window.toggleForceNotifySetting('categories', '${r.key}')" class="px-3 py-1 rounded-lg text-[10px] font-extrabold ${cat[r.key] ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}">${cat[r.key] ? 'ON' : 'OFF'}</button>
-                                </div>
-                            `).join('')}
-                        </div>
-                    ` : `<p class="text-[11px] text-slate-400 italic text-center py-2">All Force Achievement Notifications are currently muted.</p>`}
-
-                    <button type="button" onclick="window.requestAllDesktopPermissions && window.requestAllDesktopPermissions(false); window.triggerForceAchievementNotification('Test Force Notification!', 'Testing your currently enabled desktop notification channels.', '🏆', 'test_alert', true);" class="w-full bg-amber-600/25 hover:bg-amber-600 text-amber-300 hover:text-white border border-amber-500/40 font-extrabold py-2 rounded-xl text-xs mt-1">
-                        🔔 Test Active Notification Channels Now
-                    </button>
-                </div>
-
-                <div class="bg-slate-950 border border-cyan-500/40 rounded-2xl p-3 flex items-center justify-between gap-2">
-                    <div>
-                        <span class="text-[10px] font-extrabold uppercase text-cyan-400">🖼️ Desktop Floating PiP Mini-Cockpit</span>
-                        <p class="text-[10px] text-slate-400 mt-0.5">Always-on-top mini timer window while studying in other apps.</p>
-                    </div>
-                    <button type="button" onclick="document.getElementById('reader-suboptions-modal').classList.add('hidden'); window.launchPipMiniCockpitWidget && window.launchPipMiniCockpitWidget();" class="bg-cyan-600 hover:bg-cyan-500 text-white font-extrabold px-4 py-2 rounded-xl text-xs shadow shrink-0">
-                        🖼️ Pop Out PiP
-                    </button>
                 </div>
             </div>
         `;
@@ -560,28 +510,9 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
     };
 
     document.getElementById('mobile-widget-hub-btn')?.addEventListener('click', window.openDeviceWidgetStudioModal);
-
-    window.addEventListener('DOMContentLoaded', () => {
-        setTimeout(() => {
-            const params = new URLSearchParams(window.location.search);
-            const wCmd = params.get('widget');
-            if (!wCmd) return;
-            if (wCmd === 'start50' && window.startTimer) {
-                window.startTimer();
-            } else if (wCmd === 'flashcards' && window.activateVaultSubview) {
-                window.switchPage && window.switchPage('page-vault');
-                window.activateVaultSubview('neet');
-                window.activeTaskTab = 'revision';
-                window.renderTasks && window.renderTasks('revision');
-            } else if (wCmd === 'resume_book' && window.readerBooks?.length && window.openBookAtPage) {
-                const latest = [...window.readerBooks].sort((a, b) => (b.lastOpened || 0) - (a.lastOpened || 0))[0];
-                if (latest) window.openBookAtPage(latest.id, latest.currentPage || 1);
-            }
-        }, 700);
-    });
 })();
 
-// 6. POMOWAKE MISSION OS (WITH 60s/90s QUIET-SOLVE, ALGEBRA/ROOTS & 5-MIN WAKE RECHECK)
+// 6. POMOWAKE MISSION OS (WITH NEET-CALIBER SCIENCE, PHYSICS & MATH CHALLENGES + 5-MIN WAKE RECHECK)
 (function initPomoWakeMissionOS() {
     window.sendDesktopNotification = function(title, body, tag = 'pomo-os', requireInteraction = false) {
         try {
@@ -616,8 +547,8 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
     };
 
     window.pomoAlarms = JSON.parse(window.safeGet('pages_pomodoro_alarms_v1', 'null')) || [
-        { id: 'alm_fajr', time: '05:05', label: '🕋 Fajr & Tahajjud Wake-Up', mission: 'math_algebra', muteWindowSec: 90, wakeRecheck: true, enabled: false, days: [0,1,2,3,4,5,6] },
-        { id: 'alm_study', time: '08:00', label: '🔥 Morning Deep Study Lock-In', mission: 'math_div_root', muteWindowSec: 90, wakeRecheck: true, enabled: false, days: [0,1,2,3,4,5,6] }
+        { id: 'alm_fajr', time: '05:05', label: '🕋 Fajr & NEET Physics Wake-Up', mission: 'neet_physics', muteWindowSec: 90, wakeRecheck: true, enabled: false, days: [0,1,2,3,4,5,6] },
+        { id: 'alm_study', time: '08:00', label: '🔥 Morning NEET Chem & Bio Lock-In', mission: 'neet_chem', muteWindowSec: 90, wakeRecheck: true, enabled: false, days: [0,1,2,3,4,5,6] }
     ];
     window.firedAlarmKeys = {};
     window.activeSirenLoop = null;
@@ -787,23 +718,22 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
             <div class="bg-slate-900 border border-rose-500/50 rounded-3xl p-5 w-full max-w-lg shadow-2xl flex flex-col gap-3.5 max-h-[92dvh] native-scroll">
                 <div class="flex justify-between items-center border-b border-slate-800 pb-2.5">
                     <div>
-                        <span class="text-[9px] font-extrabold uppercase tracking-widest bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-full border border-rose-500/30">⏰ PomoWake Mission OS (v16.0 Desktop)</span>
-                        <h3 class="text-base font-extrabold text-white mt-1">Mission Alarms, 60s/90s Quiet-Solve & 5m Recheck</h3>
+                        <span class="text-[9px] font-extrabold uppercase tracking-widest bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-full border border-rose-500/30">⏰ PomoWake Mission OS (v17.0 NEET Edition)</span>
+                        <h3 class="text-base font-extrabold text-white mt-1">NEET Physics, Chem & Bio Numerical Alarms</h3>
                     </div>
                     <button type="button" onclick="document.getElementById('alarmy-studio-modal').classList.add('hidden')" class="bg-slate-800 text-slate-300 px-3 py-1 rounded-xl text-xs font-bold">✕ Close</button>
                 </div>
 
                 <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 flex flex-col gap-2.5">
-                    <p class="text-[10px] font-extrabold uppercase tracking-wider text-rose-400">➕ Create New PomoWake Alarm</p>
+                    <p class="text-[10px] font-extrabold uppercase tracking-wider text-rose-400">➕ Create New NEET-Caliber Alarm</p>
                     <div class="grid grid-cols-3 gap-2">
-                        <input type="time" id="new-alarm-time-inp" value="05:15" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-base font-mono font-extrabold text-white">
+                        <input type="time" id="new-alarm-time-inp" value="05:05" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-base font-mono font-extrabold text-white">
                         <select id="new-alarm-mission-sel" class="bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-2 text-xs font-bold text-amber-300">
-                            <option value="math_algebra">📐 Algebra Equations (Linear & Quadratic x)</option>
-                            <option value="math_div_root">➗ Square Roots (√x), Powers & Division</option>
-                            <option value="math_master">🧠 Master Mix (Algebra + √x + Division)</option>
-                            <option value="math">🧮 Standard Arithmetic (3 Equations)</option>
+                            <option value="neet_physics">⚡ NEET Physics (Kinematics & Optics v=u+at)</option>
+                            <option value="neet_chem">🧪 Physical Chem (pH = -log[H+] & Half-life)</option>
+                            <option value="neet_calculus">📐 Calculus & Algebra Derivatives (d/dx)</option>
+                            <option value="neet_master">🩺 NEET Master Mix (Physics + Chem + Bio Math)</option>
                             <option value="vault">🧬 Study Vault Recall Mission</option>
-                            <option value="typing">⌨️ Discipline Typing Mission</option>
                             <option value="standard">🔔 Standard 1-Click Dismiss</option>
                         </select>
                         <select id="new-alarm-mute-sel" class="bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-2 text-xs font-bold text-emerald-300">
@@ -813,20 +743,8 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
                         </select>
                     </div>
                     <div class="flex gap-2">
-                        <input type="text" id="new-alarm-label-inp" placeholder="Alarm Label (e.g. Fajr + Anatomy Revision)..." class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white">
+                        <input type="text" id="new-alarm-label-inp" placeholder="Alarm Label (e.g. Fajr + Physics Wave Optics)..." class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white">
                         <button type="button" onclick="window.addNewMissionAlarm()" class="bg-rose-600 hover:bg-rose-500 text-white font-extrabold px-4 py-2 rounded-xl text-xs shadow">＋ Add Alarm</button>
-                    </div>
-                </div>
-
-                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3 flex items-center justify-between gap-2">
-                    <div>
-                        <p class="text-xs font-bold text-white">🎵 Custom Alarm Ringtone (Optional MP3/WAV)</p>
-                        <p class="text-[10px] text-slate-400">Siren auto-pauses for 60s/90s when you type + 5-min anti-back-to-sleep recheck!</p>
-                    </div>
-                    <div class="flex gap-1.5 shrink-0">
-                        <input type="file" id="custom-alarm-audio-inp" accept="audio/*" class="hidden">
-                        <button type="button" onclick="document.getElementById('custom-alarm-audio-inp').click()" class="bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 px-2.5 py-1.5 rounded-xl text-[10px] font-bold">📂 Audio</button>
-                        <button type="button" onclick="window.triggerMissionAlarmOverlay({id:'test', time:'NOW', label:'Test PomoWake Mission', mission: document.getElementById('new-alarm-mission-sel')?.value || 'math_algebra', muteWindowSec: parseInt(document.getElementById('new-alarm-mute-sel')?.value)||90, wakeRecheck: true})" class="bg-amber-600/25 hover:bg-amber-600 text-amber-300 hover:text-white border border-amber-500/40 px-2.5 py-1.5 rounded-xl text-[10px] font-extrabold">🔊 Test</button>
                     </div>
                 </div>
 
@@ -840,7 +758,6 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
                                     <span class="text-[9px] font-mono text-emerald-400">🔇 ${a.muteWindowSec || 90}s Mute • 🛡️ 5m Recheck</span>
                                 </div>
                                 <p class="text-xs font-bold text-slate-200 truncate mt-0.5">${escapeHtml(a.label)}</p>
-                                <p class="text-[9px] text-slate-500 font-mono mt-0.5">${(a.days || [0,1,2,3,4,5,6]).map(d => dayNames[d]).join(' • ')}</p>
                             </div>
                             <div class="flex items-center gap-1.5 shrink-0">
                                 <button type="button" onclick="window.toggleMissionAlarm(${idx})" class="px-3 py-1.5 rounded-xl text-xs font-extrabold ${a.enabled ? 'bg-emerald-600 text-white shadow' : 'bg-slate-800 text-slate-400'}">${a.enabled ? 'ON' : 'OFF'}</button>
@@ -852,31 +769,20 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
             </div>
         `;
         modal.classList.remove('hidden');
-
-        document.getElementById('custom-alarm-audio-inp')?.addEventListener('change', (e) => {
-            const f = e.target.files[0];
-            if (!f) return;
-            const r = new FileReader();
-            r.onload = async () => {
-                await window.idbPut('steelSnapshots', { key: 'custom_alarm_ringtone', name: f.name, dataUrl: r.result });
-                window.showToast(`🎵 Saved "${f.name}" as offline alarm ringtone!`);
-            };
-            r.readAsDataURL(f);
-        });
     };
 
     window.addNewMissionAlarm = function() {
-        const time = document.getElementById('new-alarm-time-inp')?.value || '06:00';
-        const mission = document.getElementById('new-alarm-mission-sel')?.value || 'math_algebra';
+        const time = document.getElementById('new-alarm-time-inp')?.value || '05:05';
+        const mission = document.getElementById('new-alarm-mission-sel')?.value || 'neet_physics';
         const muteWindowSec = parseInt(document.getElementById('new-alarm-mute-sel')?.value) || 90;
-        const label = (document.getElementById('new-alarm-label-inp')?.value || '').trim() || 'Wake-Up & Focus Mission';
+        const label = (document.getElementById('new-alarm-label-inp')?.value || '').trim() || 'NEET Morning Wake-Up';
         window.pomoAlarms.unshift({
             id: 'alm_' + Date.now(),
             time, label, mission, muteWindowSec, wakeRecheck: true, enabled: true, days: [0,1,2,3,4,5,6]
         });
         window.savePomoAlarms();
         window.openAlarmyStudioModal();
-        window.showToast(`⏰ PomoWake set for ${time} (${mission.toUpperCase()} • ${muteWindowSec}s Quiet-Solve)!`);
+        window.showToast(`⏰ PomoWake NEET Alarm set for ${time}!`);
     };
 
     window.toggleMissionAlarm = function(idx) {
@@ -893,6 +799,7 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
         window.openAlarmyStudioModal();
     };
 
+    // NEET-CALIBER ALARM MISSION GENERATOR (Physics, Physical Chemistry, Calculus & Physiology)
     window.triggerMissionAlarmOverlay = function(alarmObj) {
         let ov = document.getElementById('alarmy-mission-active-overlay');
         if (!ov) {
@@ -902,80 +809,57 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
             document.body.appendChild(ov);
         }
         window.startLoudSirenLoop();
-        window.sendDesktopNotification(`⏰ POMOWAKE: ${alarmObj.label}`, `Complete your ${alarmObj.mission.toUpperCase()} mission!`, 'alarmy-ring', true);
+        window.sendDesktopNotification(`⏰ POMOWAKE NEET: ${alarmObj.label}`, `Solve your ${alarmObj.mission.toUpperCase()} challenge to wake up!`, 'alarmy-ring', true);
 
         let missionPrompt = '';
         let expectedAnswer = '';
-        const isMathMission = String(alarmObj.mission || '').startsWith('math');
-        let stepCount = isMathMission ? 3 : 1;
+        let stepCount = 3;
         let currentStep = 1;
         const defaultMuteSec = alarmObj.muteWindowSec || 90;
 
-        function generateChallenge() {
-            const mType = alarmObj.mission === 'math_master'
-                ? ['math_algebra', 'math_div_root', 'math'][currentStep % 3]
-                : alarmObj.mission;
+        function generateNeetChallenge() {
+            const mType = alarmObj.mission === 'neet_master'
+                ? ['neet_physics', 'neet_chem', 'neet_calculus'][currentStep % 3]
+                : (alarmObj.mission || 'neet_physics');
 
-            if (mType === 'math_algebra') {
-                if (currentStep % 2 === 1) {
-                    const xVal = Math.floor(Math.random() * 14) + 3;
-                    const a = Math.floor(Math.random() * 7) + 3;
-                    const b = Math.floor(Math.random() * 25) + 8;
-                    const c = a * xVal + b;
-                    missionPrompt = `📐 Linear Algebra (${currentStep}/${stepCount}):\nSolve for x:   ${a}x + ${b} = ${c}`;
-                    expectedAnswer = String(xVal);
-                } else {
-                    const r1 = Math.floor(Math.random() * 5) + 2;
-                    const r2 = r1 + Math.floor(Math.random() * 5) + 2;
-                    const sumB = r1 + r2;
-                    const prodC = r1 * r2;
-                    missionPrompt = `📐 Quadratic Algebra (${currentStep}/${stepCount}):\nFind the LARGER root (x) of:   x² - ${sumB}x + ${prodC} = 0`;
-                    expectedAnswer = String(r2);
-                }
-            } else if (mType === 'math_div_root') {
-                const roots = [49, 64, 81, 100, 121, 144, 169, 196, 225, 256, 289, 324, 400];
-                const pickedSq = roots[Math.floor(Math.random() * roots.length)];
-                const rootVal = Math.round(Math.sqrt(pickedSq));
-                const divisor = Math.floor(Math.random() * 8) + 3;
-                const quotient = Math.floor(Math.random() * 9) + 4;
-                const dividend = divisor * quotient;
-                const pwrBase = Math.floor(Math.random() * 4) + 2;
-                const ans = rootVal + quotient + (pwrBase * pwrBase);
-                missionPrompt = `➗ Roots & Division (${currentStep}/${stepCount}):\nSolve:   √${pickedSq} + (${dividend} ÷ ${divisor}) + ${pwrBase}² = ?`;
+            if (mType === 'neet_physics') {
+                const u = Math.floor(Math.random() * 5) * 2; // 0, 2, 4, 6, 8
+                const a = Math.floor(Math.random() * 4) + 2; // 2, 3, 4, 5
+                const t = Math.floor(Math.random() * 4) + 3; // 3, 4, 5, 6
+                const v = u + a * t;
+                missionPrompt = `⚡ NEET Physics Kinematics (${currentStep}/${stepCount}):\nA particle starts with initial velocity u = ${u} m/s and constant acceleration a = ${a} m/s² for t = ${t} s.\nFind final velocity v = ? (m/s)`;
+                expectedAnswer = String(v);
+            } else if (mType === 'neet_chem') {
+                const powers = [3, 4, 5, 6];
+                const p = powers[Math.floor(Math.random() * powers.length)];
+                // [H+] = 1.0 x 10^-p -> pH = p
+                missionPrompt = `🧪 NEET Physical Chemistry (${currentStep}/${stepCount}):\nCalculate the pH of an aqueous solution where hydrogen ion concentration [H⁺] = 1.0 × 10⁻${p} mol/L.\nFind pH = ?`;
+                expectedAnswer = String(p);
+            } else if (mType === 'neet_calculus') {
+                const coeff = Math.floor(Math.random() * 4) + 2;
+                const pow = Math.floor(Math.random() * 2) + 3; // 3 or 4
+                const atX = Math.floor(Math.random() * 2) + 1; // 1 or 2
+                // y = coeff * x^pow -> y' = coeff * pow * x^(pow-1)
+                const derivedCoeff = coeff * pow;
+                const derivedPow = pow - 1;
+                const ans = derivedCoeff * Math.pow(atX, derivedPow);
+                missionPrompt = `📐 NEET Calculus & Math (${currentStep}/${stepCount}):\nIf y = ${coeff}x^${pow}, evaluate the derivative dy/dx at x = ${atX}.\nAnswer = ?`;
                 expectedAnswer = String(ans);
-            } else if (mType === 'math') {
-                const a = Math.floor(Math.random() * 14) + 6;
-                const b = Math.floor(Math.random() * 9) + 4;
-                const c = Math.floor(Math.random() * 25) + 10;
-                missionPrompt = `🧮 Equation (${currentStep}/${stepCount}):  (${a} × ${b}) + ${c} = ?`;
-                expectedAnswer = String((a * b) + c);
-            } else if (mType === 'vault') {
-                const vTasks = JSON.parse(window.safeGet('pages_pomodoro_tasks_v8', '[]')).filter(t => !t.completed);
-                const pick = vTasks[0]?.title || 'MEDICAL SCIENCE MASTER';
-                const cleanTarget = pick.slice(0, 22).trim();
-                missionPrompt = `🧬 Vault Recall: Type "${cleanTarget}" below to prove you're awake:`;
-                expectedAnswer = cleanTarget.toLowerCase();
-            } else if (mType === 'typing') {
-                const phrases = [
-                    "LOCK IN AND PROTECT MY DEEN AND GOALS",
-                    "DISCIPLINE OVER SLEEP SUCCESS IS EARNED",
-                    "BISMILLAH I WILL MASTER MY TARGETS TODAY"
-                ];
-                const p = phrases[Math.floor(Math.random() * phrases.length)];
-                missionPrompt = `⌨️ Type this phrase exactly:\n"${p}"`;
-                expectedAnswer = p.toLowerCase();
             } else {
-                missionPrompt = `🔔 Click Dismiss below to wake up & start your day!`;
-                expectedAnswer = '';
+                const sv = Math.floor(Math.random() * 15) + 65; // 70-80 mL
+                const hr = Math.floor(Math.random() * 10) + 70; // 70-80 bpm
+                const co = (sv * hr) / 1000; // Liters/min
+                missionPrompt = `🩺 NEET Human Physiology (${currentStep}/${stepCount}):\nCalculate Cardiac Output (CO in L/min) if Stroke Volume (SV) = ${sv} mL and Heart Rate (HR) = ${hr} beats/min.\nAnswer (in L/min, e.g. 5.2 or 5) = ?`;
+                expectedAnswer = String(Number.isInteger(co) ? co : co.toFixed(1));
             }
         }
-        generateChallenge();
+        generateNeetChallenge();
 
         function renderMissionCard() {
             ov.innerHTML = `
                 <div class="bg-slate-950/95 border-2 border-red-500 rounded-3xl p-6 w-full max-w-md shadow-2xl text-center flex flex-col gap-3.5">
                     <div class="flex items-center justify-between">
-                        <span class="text-[10px] font-mono font-extrabold uppercase tracking-widest bg-red-600 text-white px-3 py-1 rounded-full">${escapeHtml(alarmObj.time)} • POMOWAKE ACTIVE</span>
+                        <span class="text-[10px] font-mono font-extrabold uppercase tracking-widest bg-red-600 text-white px-3 py-1 rounded-full">${escapeHtml(alarmObj.time)} • NEET ALARM ACTIVE</span>
                         <div class="flex gap-1.5">
                             <button type="button" onclick="window.activateAlarmQuietSolveWindow(60)" class="bg-emerald-600/30 hover:bg-emerald-600 text-emerald-200 border border-emerald-500/50 px-2.5 py-1 rounded-lg text-[10px] font-extrabold">🔇 Mute 60s</button>
                             <button type="button" onclick="window.activateAlarmQuietSolveWindow(90)" class="bg-cyan-600/30 hover:bg-cyan-600 text-cyan-200 border border-cyan-500/50 px-2.5 py-1 rounded-lg text-[10px] font-extrabold">🔇 Mute 90s</button>
@@ -983,16 +867,14 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
                     </div>
                     <h2 class="text-xl font-extrabold text-white">${escapeHtml(alarmObj.label)}</h2>
                     <div id="alarmy-quiet-solve-badge" class="text-[11px] font-mono font-bold bg-amber-950/80 text-amber-300 border border-amber-500/40 px-3 py-1.5 rounded-xl">
-                        💡 Start typing or click "Mute 60s / 90s" above to silence siren while solving!
+                        💡 Solve the NEET numerical below to silence the siren!
                     </div>
                     <div class="bg-slate-900 border border-amber-500/50 rounded-2xl p-4">
-                        <p class="text-sm sm:text-base font-mono font-extrabold text-amber-300 whitespace-pre-wrap">${escapeHtml(missionPrompt)}</p>
-                        ${expectedAnswer ? `
-                            <input type="text" id="alarmy-mission-ans-inp" placeholder="Type answer (auto-mutes siren for ${defaultMuteSec}s)..." class="w-full mt-3 bg-slate-950 border-2 border-blue-500 rounded-xl px-4 py-3 text-center font-mono text-base font-extrabold text-white focus:outline-none" autocomplete="off">
-                        ` : ''}
+                        <p class="text-xs sm:text-sm font-mono font-extrabold text-amber-300 whitespace-pre-wrap leading-relaxed">${escapeHtml(missionPrompt)}</p>
+                        <input type="text" id="alarmy-mission-ans-inp" placeholder="Type numerical answer..." class="w-full mt-3 bg-slate-950 border-2 border-blue-500 rounded-xl px-4 py-3 text-center font-mono text-base font-extrabold text-white focus:outline-none" autocomplete="off">
                     </div>
                     <button type="button" id="alarmy-submit-mission-btn" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-3.5 rounded-2xl text-sm uppercase tracking-wider shadow-lg">
-                        ${expectedAnswer ? `✅ Verify Answer (${currentStep}/${stepCount})` : `🔓 Dismiss Alarm Now`}
+                        ✅ Verify NEET Answer (${currentStep}/${stepCount})
                     </button>
                 </div>
             `;
@@ -1006,26 +888,21 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
             });
 
             const checkFn = () => {
-                if (!expectedAnswer) {
-                    window.stopLoudSirenLoop(true);
-                    ov.remove();
-                    window.scheduleFiveMinuteWakeRecheck(alarmObj);
-                    return;
-                }
                 const userVal = (inp?.value || '').trim().toLowerCase();
                 if (userVal === expectedAnswer.toLowerCase()) {
                     if (currentStep < stepCount) {
                         currentStep++;
-                        generateChallenge();
+                        generateNeetChallenge();
                         renderMissionCard();
                         window.activateAlarmQuietSolveWindow(defaultMuteSec);
                     } else {
                         window.stopLoudSirenLoop(true);
                         ov.remove();
                         window.scheduleFiveMinuteWakeRecheck(alarmObj);
+                        window.triggerForceAchievementNotification('NEET Morning Challenger!', `Successfully solved all 3 NEET numericals for "${alarmObj.label}" (+100 XP)!`, '🩺');
                     }
                 } else {
-                    window.showToast("❌ Incorrect! Keep trying!", true);
+                    window.showToast("❌ Incorrect numerical answer! Try again.", true);
                     if (inp) { inp.value = ''; inp.focus(); }
                 }
             };
@@ -1050,46 +927,10 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
                 window.triggerMissionAlarmOverlay(alm);
             }
         });
-
-        (window.todos || []).forEach(t => {
-            if (t.completed || !t.reminderTime) return;
-            if (t.dueDate && t.dueDate !== todayIso && t.myDayDate !== todayIso) return;
-            const rKey = `todo_rem_${t.id}_${todayIso}_${hhmm}`;
-            if (t.reminderTime === hhmm && !window.firedAlarmKeys[rKey]) {
-                window.firedAlarmKeys[rKey] = true;
-                if (window.playChime) window.playChime('salah');
-                window.sendDesktopNotification(`🔔 PomoTask Reminder: ${t.title}`, `Scheduled for ${hhmm}. Click to launch on Timer!`, rKey, true);
-                window.showTaskReminderBanner(t);
-            }
-        });
     }, 12000);
-
-    window.showTaskReminderBanner = function(taskObj) {
-        let b = document.getElementById('live-task-reminder-popup');
-        if (!b) {
-            b = document.createElement('div');
-            b.id = 'live-task-reminder-popup';
-            b.className = "fixed bottom-20 right-4 w-96 z-[450] bg-slate-900 border-2 border-amber-500 rounded-2xl p-4 shadow-2xl flex flex-col gap-2.5";
-            document.body.appendChild(b);
-        }
-        const safeId = window.escapeJsStr(taskObj.id);
-        b.innerHTML = `
-            <div class="flex justify-between items-start gap-2">
-                <div>
-                    <span class="text-[9px] font-extrabold uppercase tracking-widest bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full">🔔 Scheduled Task Reminder (${escapeHtml(taskObj.reminderTime || 'NOW')})</span>
-                    <h4 class="text-sm font-extrabold text-white mt-1">${escapeHtml(taskObj.title)}</h4>
-                </div>
-                <button type="button" onclick="this.closest('#live-task-reminder-popup').remove()" class="text-slate-400 hover:text-white text-xs font-bold">✕</button>
-            </div>
-            <div class="flex gap-2">
-                <button type="button" onclick="document.getElementById('live-task-reminder-popup')?.remove(); window.openProtocolRunModal && window.openProtocolRunModal('todo', '${safeId}')" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-2 rounded-xl text-xs shadow">▶️ Run Now on Timer</button>
-                <button type="button" onclick="document.getElementById('live-task-reminder-popup')?.remove()" class="bg-slate-800 text-slate-300 font-bold px-3 py-2 rounded-xl text-xs">Later</button>
-            </div>
-        `;
-    };
 })();
 
-// 7. POMOLEXICON 4-LANGUAGE MASTER DICTIONARY (ARABIC • URDU • ENGLISH • HINDI — FIXED URL)
+// 7. POMOLEXICON 4-LANGUAGE MASTER DICTIONARY
 (function initFourLanguageScholarDictionary() {
     const HTTPS = 'https:' + '//';
     const MEDICAL_ROOTS = {
@@ -1102,25 +943,10 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
         hema: 'Greek (Haima): Blood',
         itis: 'Suffix: Inflammation',
         ectomy: 'Suffix: Surgical removal',
-        pathy: 'Suffix: Disease or disorder',
-        lysis: 'Suffix: Breakdown or dissolution',
-        genesis: 'Suffix: Origin / Production / Formation',
-        cyte: 'Suffix: Cell',
-        blast: 'Suffix: Immature / Precursor cell',
-        trophy: 'Suffix: Growth or nourishment'
+        pathy: 'Suffix: Disease or disorder'
     };
 
     var savedVocabBank = JSON.parse(window.safeGet('pages_pomodoro_vocab_bank_v12', '[]'));
-
-    function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
-        return new Promise((resolve, reject) => {
-            const ctrl = new AbortController();
-            const timer = setTimeout(() => { ctrl.abort(); reject(new Error('Timeout')); }, timeoutMs);
-            fetch(url, { ...options, signal: ctrl.signal })
-                .then(res => { clearTimeout(timer); resolve(res); })
-                .catch(err => { clearTimeout(timer); reject(err); });
-        });
-    }
 
     window.openReaderDictionaryModal = function(initialWord = '') {
         const modal = document.getElementById('reader-dictionary-modal');
@@ -1162,13 +988,13 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
             .filter(([k]) => qLow.includes(k))
             .map(([k, v]) => `<span class="bg-purple-950/80 text-purple-300 border border-purple-500/40 px-2 py-0.5 rounded text-[10px] font-mono"><b>-${k}-</b>: ${escapeHtml(v)}</span>`);
 
-        let engDef = '', phonetic = '', partOfSpeech = '', example = '', synonyms = [];
+        let engDef = '', phonetic = '', partOfSpeech = '', example = '';
         let arTrans = '', urTrans = '', hiTrans = '';
 
         if (navigator.onLine) {
             try {
                 const dictUrl = `${HTTPS}api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(firstWordClean)}`;
-                const dRes = await fetchWithTimeout(dictUrl, {}, 6500);
+                const dRes = await fetch(dictUrl);
                 if (dRes.ok) {
                     const dJson = await dRes.json();
                     const entry = dJson?.[0];
@@ -1177,15 +1003,13 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
                     partOfSpeech = m?.partOfSpeech || '';
                     engDef = m?.definitions?.[0]?.definition || '';
                     example = m?.definitions?.[0]?.example || '';
-                    synonyms = (m?.synonyms || []).slice(0, 5);
                 }
             } catch (e) {}
 
-            // FIXED CLEAN TRANSLATE ENDPOINT URL
             const fetchTrans = async (langCode) => {
                 try {
                     const transUrl = `${HTTPS}translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${langCode}&dt=t&q=${encodeURIComponent(query)}`;
-                    const r = await fetchWithTimeout(transUrl, {}, 6500);
+                    const r = await fetch(transUrl);
                     if (r.ok) {
                         const j = await r.json();
                         return (j?.[0] || []).map(x => x?.[0]).join('') || '';
@@ -1206,20 +1030,16 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
                     <div class="min-w-0">
                         <span class="text-base font-extrabold text-white">${escapeHtml(firstWordClean)}</span>
                         ${phonetic ? `<span class="text-xs font-mono text-cyan-400 ml-2">${escapeHtml(phonetic)}</span>` : ''}
-                        ${partOfSpeech ? `<span class="text-[10px] font-bold uppercase bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded ml-2">${escapeHtml(partOfSpeech)}</span>` : ''}
                     </div>
                     <div class="flex gap-1.5 shrink-0">
-                        <button type="button" onclick="window.saveCurrentWordToVocabBank()" class="bg-amber-600/25 hover:bg-amber-600 text-amber-300 hover:text-white border border-amber-500/40 px-2.5 py-1 rounded-lg text-xs font-bold">⭐ Save Word (${savedVocabBank.length})</button>
+                        <button type="button" onclick="window.saveCurrentWordToVocabBank()" class="bg-amber-600/25 hover:bg-amber-600 text-amber-300 hover:text-white border border-amber-500/40 px-2.5 py-1 rounded-lg text-xs font-bold">⭐ Save Word</button>
                         <button type="button" onclick="window.speechSynthesis && window.speechSynthesis.speak(new SpeechSynthesisUtterance('${safePronounceWord}'))" class="bg-slate-800 hover:bg-slate-700 text-emerald-300 px-2.5 py-1 rounded-lg text-xs font-bold">🔊 Pronounce</button>
                     </div>
                 </div>
-
                 <div class="grid grid-cols-2 gap-2">
                     <div class="bg-slate-900 border border-blue-500/30 rounded-xl p-2.5">
                         <span class="text-[10px] font-extrabold uppercase text-blue-400">🇬🇧 English Meaning</span>
                         <p class="text-xs text-slate-100 mt-1 leading-relaxed">${escapeHtml(engDef || `Term: "${query}"`)}</p>
-                        ${example ? `<p class="text-[11px] italic text-slate-400 mt-1">"${escapeHtml(example)}"</p>` : ''}
-                        ${synonyms.length ? `<p class="text-[10px] text-cyan-300 mt-1 font-mono">Synonyms: ${escapeHtml(synonyms.join(', '))}</p>` : ''}
                     </div>
                     <div class="bg-slate-900 border border-emerald-500/30 rounded-xl p-2.5 text-right" dir="rtl">
                         <span class="text-[10px] font-extrabold uppercase text-emerald-400 block" dir="ltr">🇸🇦 Arabic (العربية)</span>
@@ -1234,7 +1054,6 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
                         <p class="text-base font-bold text-white mt-1">${escapeHtml(hiTrans || '—')}</p>
                     </div>
                 </div>
-
                 ${matchedRoots.length ? `<div class="flex flex-wrap gap-1.5 pt-1">${matchedRoots.join('')}</div>` : ''}
             </div>
         `;
@@ -1245,347 +1064,7 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
         savedVocabBank = savedVocabBank.filter(x => x.word.toLowerCase() !== window.lastDictLookupObj.word.toLowerCase());
         savedVocabBank.unshift({ ...window.lastDictLookupObj, savedAt: Date.now() });
         window.safeSet('pages_pomodoro_vocab_bank_v12', JSON.stringify(savedVocabBank));
-
-        // Also add to FSRS Flashcard Deck automatically!
-        const cards = JSON.parse(window.safeGet('pages_pomodoro_fsrs_cards_v15', '[]'));
-        cards.unshift({
-            id: 'fc_voc_' + Date.now(),
-            topic: 'Vocabulary Lexicon',
-            front: `Define "${window.lastDictLookupObj.word}"`,
-            back: `${window.lastDictLookupObj.engDef}\nArabic: ${window.lastDictLookupObj.arTrans || '—'} | Urdu: ${window.lastDictLookupObj.urTrans || '—'} | Hindi: ${window.lastDictLookupObj.hiTrans || '—'}`,
-            intervalDays: 1,
-            stabilityPct: 95,
-            lastReviewed: Date.now()
-        });
-        window.safeSet('pages_pomodoro_fsrs_cards_v15', JSON.stringify(cards));
-        window.showToast(`⭐ Saved "${window.lastDictLookupObj.word}" to Vocab Bank & Memory Beast Flashcards!`);
+        window.showToast(`⭐ Saved "${window.lastDictLookupObj.word}" to Vocab Bank!`);
     };
 })();
-
-// 8. MASTER 15-PRO COMMAND HUB (CTRL + K) + AUDIO SYNTH + OMR & SRS ENGINE
-(function initMaster15UpgradesAndPacksABC() {
-    var audioNodes = { playing: false, mode: 'off', ctx: null, gain: null, sources: [] };
-    window.toggleOfflineFocusAudio = function(mode = '40hz') {
-        try {
-            if (!audioNodes.ctx) audioNodes.ctx = window.fallbackCtx || new (window.AudioContext || window.webkitAudioContext)();
-            const ctx = audioNodes.ctx;
-            if (ctx.state === 'suspended') ctx.resume();
-
-            audioNodes.sources.forEach(s => { try { s.stop(); s.disconnect(); } catch (e) {} });
-            audioNodes.sources = [];
-
-            if (mode === 'off' || (audioNodes.playing && audioNodes.mode === mode)) {
-                audioNodes.playing = false;
-                audioNodes.mode = 'off';
-                window.showToast("🔇 Focus Audio Synthesizer Muted");
-                return;
-            }
-
-            const masterGain = ctx.createGain();
-            masterGain.gain.setValueAtTime(0.18, ctx.currentTime);
-            masterGain.connect(ctx.destination);
-            audioNodes.gain = masterGain;
-
-            if (mode === '40hz') {
-                const panL = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain();
-                const panR = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain();
-                if (panL.pan) panL.pan.value = -1;
-                if (panR.pan) panR.pan.value = 1;
-                const oscL = ctx.createOscillator();
-                const oscR = ctx.createOscillator();
-                oscL.type = 'sine'; oscL.frequency.value = 200;
-                oscR.type = 'sine'; oscR.frequency.value = 240;
-                oscL.connect(panL); panL.connect(masterGain);
-                oscR.connect(panR); panR.connect(masterGain);
-                oscL.start(); oscR.start();
-                audioNodes.sources.push(oscL, oscR);
-                window.showToast("🎧 40Hz Gamma Binaural Beats Active (Memory Beast Focus Wave)");
-            } else if (mode === 'brown' || mode === 'rain') {
-                const bufSize = ctx.sampleRate * 3;
-                const buffer = ctx.createBuffer(1, bufSize, ctx.sampleRate);
-                const data = buffer.getChannelData(0);
-                let lastOut = 0.0;
-                for (let i = 0; i < bufSize; i++) {
-                    const white = Math.random() * 2 - 1;
-                    if (mode === 'brown') {
-                        data[i] = (lastOut + (0.02 * white)) / 1.02;
-                        lastOut = data[i];
-                        data[i] *= 3.2;
-                    } else {
-                        data[i] = (lastOut + (0.12 * white)) / 1.12;
-                        lastOut = data[i];
-                        data[i] *= 1.5;
-                    }
-                }
-                const noise = ctx.createBufferSource();
-                noise.buffer = buffer;
-                noise.loop = true;
-                noise.connect(masterGain);
-                noise.start();
-                audioNodes.sources.push(noise);
-                window.showToast(mode === 'brown' ? "🌊 Deep Synthetic Brown Noise Active" : "🌧️ Forest Rainfall Soundscape Active");
-            }
-            audioNodes.playing = true;
-            audioNodes.mode = mode;
-        } catch (e) { window.showToast("Click anywhere first to enable Web Audio", true); }
-    };
-
-    window.scheduleChapterSpacedRepetition = function(chapterTitle, subj = 'Medical Science') {
-        const intervals = [1, 3, 7, 14, 30];
-        intervals.forEach((days, idx) => {
-            const dueIso = window.addDaysToTodayISO(days);
-            window.todos.unshift({
-                id: Date.now() + idx + Math.floor(Math.random() * 999),
-                title: `🔁 [SRS Stage ${idx + 1}/5 • +${days}d] ${subj}: ${chapterTitle}`,
-                completed: false,
-                important: idx <= 1,
-                myDayDate: days === 1 ? dueIso : '',
-                createdDate: window.getLocalTodayString(),
-                dueDate: dueIso,
-                durationMins: 30,
-                repeat: { type: 'none' },
-                steps: [],
-                note: `Memory Beast 1-3-7-14-30 Spaced Repetition Review #${idx + 1}`,
-                listId: 'tasks'
-            });
-        });
-        if (window.saveTodos) window.saveTodos();
-        if (window.renderTodos) window.renderTodos();
-        window.showToast(`🔁 Scheduled 1-3-7-14-30 Day Memory Beast Reviews for "${chapterTitle}"!`);
-    };
-
-    var streamerHudActive = false;
-    window.toggleObsStreamerHudMode = function() {
-        streamerHudActive = !streamerHudActive;
-        const hideIds = ['home-omni-bento-strip', 'home-reader-widget-card', 'ai-coach-card'];
-        hideIds.forEach(id => document.getElementById(id)?.classList.toggle('hidden', streamerHudActive));
-        window.showToast(streamerHudActive ? "🎥 Clean Streamer HUD Active" : "🎥 Standard Workspace Restored");
-    };
-
-    window.autoPackPomodoroCycles = function(cycles = 4, subjTitle = 'High-Yield Medical & Polymath Lock-In') {
-        if (!Array.isArray(window.schedule)) return;
-        for (let c = 1; c <= cycles; c++) {
-            const studyBlk = {
-                id: Date.now() + c * 10,
-                type: 'work',
-                category: 'study',
-                title: `🧠 Cycle ${c}/${cycles}: ${subjTitle} (50m Deep Focus)`,
-                duration: 50 * 60
-            };
-            window.schedule.push(studyBlk);
-            if (window.ensureProtocolBlockSyncedToTodo) window.ensureProtocolBlockSyncedToTodo(studyBlk);
-            window.schedule.push({
-                id: Date.now() + c * 10 + 1,
-                type: 'break',
-                category: 'break',
-                title: c % 3 === 0 ? `💧 Extended Recovery Break (15m)` : `💧 Short Pomodoro Break (10m)`,
-                duration: (c % 3 === 0 ? 15 : 10) * 60
-            });
-        }
-        window.safeSet('pages_pomodoro_schedule_v8', JSON.stringify(window.schedule));
-        if (window.renderSchedule) window.renderSchedule();
-        window.showToast(`🗓️ Auto-Packed ${cycles} Pomodoro Cycles (50m/10m) into Live Protocol!`);
-    };
-
-    window.mistakeAutopsyList = JSON.parse(window.safeGet('pages_pomodoro_autopsy_v12', '[]'));
-    window.formulaCheatBank = JSON.parse(window.safeGet('pages_pomodoro_formulas_v12', '[]'));
-
-    window.openMaster15UpgradesHub = function() {
-        let modal = document.getElementById('master-15-upgrades-modal');
-        if (!modal) {
-            modal = document.createElement('div');
-            modal.id = 'master-15-upgrades-modal';
-            modal.className = "hidden fixed inset-0 modal-backdrop z-[9995] flex items-center justify-center p-4";
-            document.body.appendChild(modal);
-        }
-
-        const vocabList = JSON.parse(window.safeGet('pages_pomodoro_vocab_bank_v12', '[]'));
-
-        modal.innerHTML = `
-            <div class="bg-slate-900 border-2 border-cyan-500/60 rounded-3xl w-full max-w-4xl max-h-[92dvh] shadow-2xl flex flex-col overflow-hidden">
-                <div class="flex flex-wrap items-center justify-between gap-2 px-5 py-3.5 bg-slate-950 border-b border-slate-800 shrink-0">
-                    <div>
-                        <span class="text-[9px] font-extrabold uppercase tracking-widest bg-cyan-500/20 text-cyan-300 px-2.5 py-0.5 rounded-full border border-cyan-500/40">🚀 Desktop Command Center (Ctrl + K)</span>
-                        <h3 class="text-base font-extrabold text-white mt-0.5">Master 15-Pro Hub • 40Hz Synth • OMR Sheet • 1-3-7-14-30 SRS</h3>
-                    </div>
-                    <button type="button" onclick="document.getElementById('master-15-upgrades-modal').classList.add('hidden')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-3 py-1.5 rounded-xl text-xs">✕ Close</button>
-                </div>
-
-                <div class="flex-1 p-4 native-scroll flex flex-col gap-3.5">
-                    <div class="bg-slate-950 border-2 border-cyan-500/60 rounded-2xl p-3 flex flex-wrap items-center gap-2">
-                        <span class="text-base">⌨️</span>
-                        <input type="text" id="ctrlk-cmd-inp" placeholder="Spotlight: Type 'dict word', 'pomo' (start timer), or press ? for Keyboard Shortcuts..." class="flex-1 min-w-[200px] bg-transparent text-xs font-mono text-white focus:outline-none">
-                        <button type="button" onclick="document.getElementById('master-15-upgrades-modal').classList.add('hidden'); window.openDesktopKeysModal && window.openDesktopKeysModal();" class="bg-slate-900 hover:bg-blue-600 text-cyan-300 hover:text-white border border-slate-700 px-3 py-1.5 rounded-lg text-[10px] font-extrabold">⌨️ All Shortcuts</button>
-                    </div>
-
-                    <div class="bg-slate-950 border border-emerald-500/40 rounded-2xl p-3.5 flex flex-col gap-2.5">
-                        <span class="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400">⚡ Pack A — 40Hz Gamma Binaural • Brown Noise • Forest Rain • Mini-PiP • Clean HUD</span>
-                        <div class="grid grid-cols-4 gap-2">
-                            <button type="button" onclick="window.toggleOfflineFocusAudio('40hz')" class="bg-emerald-600/25 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/40 p-2.5 rounded-xl text-xs font-extrabold">🧠 Play 40Hz Gamma</button>
-                            <button type="button" onclick="window.toggleOfflineFocusAudio('brown')" class="bg-amber-600/25 hover:bg-amber-600 text-amber-300 hover:text-white border border-amber-500/40 p-2.5 rounded-xl text-xs font-extrabold">🌊 Play Brown Noise</button>
-                            <button type="button" onclick="window.toggleOfflineFocusAudio('rain')" class="bg-cyan-600/25 hover:bg-cyan-600 text-cyan-300 hover:text-white border border-cyan-500/40 p-2.5 rounded-xl text-xs font-extrabold">🌧️ Play Forest Rain</button>
-                            <button type="button" onclick="window.toggleOfflineFocusAudio('off')" class="bg-slate-900 hover:bg-red-950 text-red-300 border border-slate-800 p-2.5 rounded-xl text-xs font-bold">🔇 Stop Audio</button>
-                        </div>
-                        <div class="grid grid-cols-3 gap-2 pt-1">
-                            <button type="button" onclick="document.getElementById('master-15-upgrades-modal').classList.add('hidden'); window.openDeviceWidgetStudioModal && window.openDeviceWidgetStudioModal();" class="bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-slate-700 p-2.5 rounded-xl text-xs font-bold">🔔 Notification Matrix & PiP</button>
-                            <button type="button" onclick="window.toggleObsStreamerHudMode()" class="bg-slate-900 hover:bg-slate-800 text-purple-300 border border-slate-700 p-2.5 rounded-xl text-xs font-bold">🎥 Toggle Clean HUD</button>
-                            <button type="button" onclick="window.autoPackPomodoroCycles(4, 'Medical & Polymath Deep Block'); document.getElementById('master-15-upgrades-modal').classList.add('hidden');" class="bg-blue-600 hover:bg-blue-500 text-white p-2.5 rounded-xl text-xs font-extrabold shadow">🗓️ Auto-Pack 4× (50m/10m) Cycles</button>
-                        </div>
-                    </div>
-
-                    <div class="bg-slate-950 border border-amber-500/40 rounded-2xl p-3.5 flex flex-col gap-2.5">
-                        <span class="text-[10px] font-extrabold uppercase tracking-wider text-amber-400">🎯 Pack B — 1-3-7-14-30 SRS • Mistake Autopsy • Formula Sheet • (+4/-1) OMR Simulator</span>
-                        <div class="flex flex-wrap gap-2">
-                            <input type="text" id="srs-quick-chap-inp" placeholder="Type chapter/topic completed today (e.g. Cardiac Cycle / French Revolution)..." class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white">
-                            <button type="button" onclick="const v=document.getElementById('srs-quick-chap-inp').value.trim(); if(v) window.scheduleChapterSpacedRepetition(v, window.activeTaskSubj||'Medical Science');" class="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold px-4 py-2 rounded-xl text-xs shadow">🔁 Schedule 1-3-7-14-30 SRS</button>
-                        </div>
-                        <div class="grid grid-cols-4 gap-2 pt-1">
-                            <button type="button" onclick="window.openDigitalOmrSimulatorModal()" class="bg-rose-600 hover:bg-rose-500 text-white p-2.5 rounded-xl text-xs font-extrabold shadow">📝 (+4/-1) OMR Sheet</button>
-                            <button type="button" onclick="window.renderMistakeAutopsySection()" class="bg-slate-900 hover:bg-slate-800 text-rose-300 border border-slate-700 p-2.5 rounded-xl text-xs font-bold">🩺 Mistake Autopsy (${window.mistakeAutopsyList.length})</button>
-                            <button type="button" onclick="window.renderFormulaCheatSheetSection()" class="bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-slate-700 p-2.5 rounded-xl text-xs font-bold">🧮 Formula Sheet (${window.formulaCheatBank.length})</button>
-                            <button type="button" onclick="window.renderVocabFlashcardsSection()" class="bg-slate-900 hover:bg-slate-800 text-amber-300 border border-slate-700 p-2.5 rounded-xl text-xs font-bold">🃏 Vocab Cards (${vocabList.length})</button>
-                        </div>
-                        <div id="pack-c-dynamic-viewer" class="mt-2"></div>
-                    </div>
-                </div>
-            </div>
-        `;
-        modal.classList.remove('hidden');
-
-        const cmdInp = document.getElementById('ctrlk-cmd-inp');
-        setTimeout(() => cmdInp?.focus(), 60);
-        cmdInp?.addEventListener('keydown', (e) => {
-            if (e.key !== 'Enter') return;
-            const val = cmdInp.value.trim();
-            modal.classList.add('hidden');
-            if (/^dict\s+(.+)/i.test(val)) {
-                window.openReaderDictionaryModal(val.replace(/^dict\s+/i, ''));
-            } else if (/^pomo/i.test(val)) {
-                window.startTimer && window.startTimer();
-            }
-        });
-    };
-
-    window.openDigitalOmrSimulatorModal = function() {
-        const box = document.getElementById('pack-c-dynamic-viewer');
-        if (!box) return;
-        let rowsHtml = '';
-        for (let q = 1; q <= 20; q++) {
-            rowsHtml += `
-                <div class="flex items-center justify-between bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
-                    <span class="font-mono text-xs font-extrabold text-slate-300">Q.${String(q).padStart(2, '0')}</span>
-                    <div class="flex gap-1.5">
-                        ${['A', 'B', 'C', 'D'].map(opt => `<label class="cursor-pointer"><input type="radio" name="omr_q_${q}" value="${opt}" class="peer hidden"><span class="w-7 h-7 rounded-full border border-slate-700 flex items-center justify-center text-[11px] font-mono font-bold text-slate-400 peer-checked:bg-rose-600 peer-checked:text-white peer-checked:border-rose-400">${opt}</span></label>`).join('')}
-                    </div>
-                    <select id="omr_res_${q}" class="bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-[10px] font-bold text-slate-300">
-                        <option value="un">⚪ Skip (0)</option>
-                        <option value="cor">✅ Correct (+4)</option>
-                        <option value="wro">❌ Wrong (-1)</option>
-                    </select>
-                </div>
-            `;
-        }
-        box.innerHTML = `
-            <div class="bg-slate-900 border border-rose-500/40 rounded-2xl p-3.5 flex flex-col gap-2.5">
-                <div class="flex items-center justify-between">
-                    <span class="text-xs font-extrabold text-rose-300">📝 Digital OMR Bubble Sheet (+4 Correct / -1 Wrong / 0 Skip)</span>
-                    <button type="button" onclick="window.calculateOmrSheetNetScore()" class="bg-emerald-600 text-white font-extrabold px-3 py-1 rounded-lg text-xs">⚡ Calculate +4/-1 Score</button>
-                </div>
-                <div id="omr-net-score-banner" class="hidden bg-slate-950 border border-emerald-500/50 rounded-xl p-2.5 text-center font-mono text-xs font-extrabold text-emerald-300"></div>
-                <div class="grid grid-cols-2 gap-2 max-h-60 native-scroll">${rowsHtml}</div>
-            </div>
-        `;
-    };
-
-    window.calculateOmrSheetNetScore = function() {
-        let cor = 0, wro = 0, skip = 0;
-        for (let q = 1; q <= 20; q++) {
-            const v = document.getElementById(`omr_res_${q}`)?.value || 'un';
-            if (v === 'cor') cor++;
-            else if (v === 'wro') wro++;
-            else skip++;
-        }
-        const net = (cor * 4) - (wro * 1);
-        const banner = document.getElementById('omr-net-score-banner');
-        if (banner) {
-            banner.classList.remove('hidden');
-            banner.textContent = `🎯 NET OMR SCORE: ${net} / 80 Marks  (✅ ${cor} Correct [+${cor * 4}] • ❌ ${wro} Wrong [-${wro}] • ⚪ ${skip} Skipped)`;
-        }
-    };
-
-    window.renderMistakeAutopsySection = function() {
-        const box = document.getElementById('pack-c-dynamic-viewer');
-        if (!box) return;
-        box.innerHTML = `
-            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3 flex flex-col gap-2">
-                <div class="flex gap-2">
-                    <input type="text" id="new-autopsy-q-inp" placeholder="Question / Concept you got wrong..." class="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white">
-                    <input type="text" id="new-autopsy-a-inp" placeholder="Correct Answer & Takeaway..." class="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-emerald-300">
-                    <button type="button" onclick="const q=document.getElementById('new-autopsy-q-inp').value.trim(), a=document.getElementById('new-autopsy-a-inp').value.trim(); if(q&&a){window.mistakeAutopsyList.unshift({id:Date.now(),subj:window.activeTaskSubj||'Medical Science',q,ans:a,explanation:'',date:window.getLocalTodayString()}); window.safeSet('pages_pomodoro_autopsy_v12',JSON.stringify(window.mistakeAutopsyList)); window.renderMistakeAutopsySection();}" class="bg-rose-600 text-white font-bold px-3 py-1.5 rounded-xl text-xs">＋ Log</button>
-                </div>
-                <div class="flex flex-col gap-1.5 max-h-48 native-scroll">
-                    ${window.mistakeAutopsyList.length ? window.mistakeAutopsyList.map(m => `
-                        <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-xs">
-                            <span class="text-[10px] font-mono text-amber-400">[${escapeHtml(m.subj)} • ${escapeHtml(m.date)}]</span>
-                            <p class="font-bold text-white mt-0.5">${escapeHtml(m.q)}</p>
-                            <p class="text-emerald-400 text-[11px] mt-0.5">✓ Fix: ${escapeHtml(m.ans)} ${escapeHtml(m.explanation || '')}</p>
-                        </div>
-                    `).join('') : `<p class="text-xs text-slate-400 italic">Log any MCQ mistake above to build your Mistake Autopsy Vault.</p>`}
-                </div>
-            </div>
-        `;
-    };
-
-    window.renderFormulaCheatSheetSection = function() {
-        const box = document.getElementById('pack-c-dynamic-viewer');
-        if (!box) return;
-        box.innerHTML = `
-            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3 flex flex-col gap-2">
-                <div class="flex gap-2">
-                    <input type="text" id="new-formula-inp" placeholder="Add formula, constant, historical date, or clinical pearl..." class="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white font-mono">
-                    <button type="button" onclick="const v=document.getElementById('new-formula-inp').value.trim(); if(v){window.formulaCheatBank.unshift({txt:v,subj:window.activeTaskSubj||'Medical Science'}); window.safeSet('pages_pomodoro_formulas_v12',JSON.stringify(window.formulaCheatBank)); window.renderFormulaCheatSheetSection();}" class="bg-cyan-600 text-white font-bold px-3 py-1.5 rounded-xl text-xs">＋ Pin</button>
-                </div>
-                <div class="flex flex-col gap-1.5 max-h-48 native-scroll">
-                    ${window.formulaCheatBank.map(f => `<div class="bg-slate-950 p-2 rounded-lg border border-slate-800 font-mono text-xs text-cyan-200"><b class="text-amber-300">[${escapeHtml(f.subj)}]</b> ${escapeHtml(f.txt)}</div>`).join('') || `<p class="text-xs text-slate-400 italic">No pinned formulas yet.</p>`}
-                </div>
-            </div>
-        `;
-    };
-
-    window.renderVocabFlashcardsSection = function() {
-        const box = document.getElementById('pack-c-dynamic-viewer');
-        if (!box) return;
-        const list = JSON.parse(window.safeGet('pages_pomodoro_vocab_bank_v12', '[]'));
-        box.innerHTML = `
-            <div class="grid grid-cols-2 gap-2 max-h-60 native-scroll">
-                ${list.length ? list.map(v => `
-                    <div class="bg-slate-900 p-3 rounded-xl border border-amber-500/40 flex flex-col gap-1">
-                        <span class="text-sm font-extrabold text-amber-300">${escapeHtml(v.word)}</span>
-                        <p class="text-xs text-slate-200">${escapeHtml(v.engDef)}</p>
-                        <p class="text-xs text-emerald-300 font-bold">${escapeHtml(v.arTrans)} • ${escapeHtml(v.urTrans)} • ${escapeHtml(v.hiTrans)}</p>
-                    </div>
-                `).join('') : `<p class="text-xs text-slate-400 italic col-span-2">Look up any word in the 📖 PomoLexicon Dictionary and click "⭐ Save Word" to build your flashcard deck!</p>`}
-            </div>
-        `;
-    };
-
-    const topHeaderLeft = document.getElementById('dim-toggle-btn')?.parentElement;
-    if (topHeaderLeft && !document.getElementById('master-15-pro-top-btn')) {
-        const proBtn = document.createElement('button');
-        proBtn.type = 'button';
-        proBtn.id = 'master-15-pro-top-btn';
-        proBtn.className = "bg-gradient-to-r from-cyan-600 to-purple-600 text-white px-2.5 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1 shadow active:scale-95";
-        proBtn.title = "Open Desktop Command Center (Ctrl+K)";
-        proBtn.innerHTML = `<span>🚀</span><span class="text-[10px]">15-Pro</span>`;
-        proBtn.onclick = () => window.openMaster15UpgradesHub();
-        topHeaderLeft.appendChild(proBtn);
-    }
-
-    window.addEventListener('keydown', (e) => {
-        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-            e.preventDefault();
-            window.openMaster15UpgradesHub();
-        }
-    });
-})();
-// ✅ END OF FILE (01-core-bus.js v16.0 Pure Desktop Edition) — 100% COMPLETE & UNCUT
+// ✅ END OF FILE (01-core-bus.js v17.0 Enterprise Desktop Edition) — 100% COMPLETE & UNCUT

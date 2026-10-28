@@ -1,11 +1,25 @@
-/* ================= CORE RESET & 100% OFFLINE CSS ENGINE (v16.1 PURE DESKTOP EDITION) ================= */
+/* ================= CORE RESET & 100% OFFLINE CSS ENGINE (v17.0 ENTERPRISE DESKTOP EDITION) ================= */
 :root {
     --shelf-cols: 7;
+    --shelf-card-max-h: 245px;
     --pdf-sel-bg: rgba(37, 99, 235, 0.32);
     --txt-sel-bg: rgba(37, 99, 235, 0.55);
     --txt-sel-fg: #ffffff;
     --txt-sheet-bg: #0f172a;
     --txt-sheet-fg: #e2e8f0;
+
+    /* PomoDoc Forge User-Customizable Semantic Colors & Styles */
+    --pf-chapter-color: #f59e0b;
+    --pf-headline-color: #38bdf8;
+    --pf-topic-color: #34d399;
+    --pf-subtopic-color: #a78bfa;
+    --pf-question-color: #fb7185;
+    --pf-question-bg: rgba(244, 63, 94, 0.14);
+    --pf-math-color: #22d3ee;
+    --pf-math-bg: rgba(6, 182, 212, 0.14);
+    --pf-quote-color: #fcd34d;
+    --pf-bracket-color: #c084fc;
+    --pf-bracket-bg: rgba(192, 132, 252, 0.14);
 }
 
 *, *::before, *::after { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -22,12 +36,13 @@ input, textarea, select, [contenteditable="true"] {
 }
 button { cursor: pointer; font-family: inherit; border: none; background: none; color: inherit; }
 
-/* Unlock Text Selection inside Dictionary, Quotes & Annotation Viewers */
+/* Unlock Text Selection inside Dictionary, Quotes, Notes & OneNote Studio */
 #reader-dictionary-modal,
 #line-item-viewer-modal,
 #a1-global-annotations-list,
 #book-toc-drawer-list,
-#fullbook-search-results {
+#fullbook-search-results,
+#onenote-studio-dock {
     user-select: text !important;
     -webkit-user-select: text !important;
 }
@@ -102,7 +117,7 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { scrollbar-width: none; }
 
-/* ================= FIXED HORIZONTAL SHELF SLIDER (ANTI-CUTOFF GUARANTEE) ================= */
+/* ================= HORIZONTAL SHELF SLIDER (ANTI-CUTOFF GUARANTEE) ================= */
 .shelves-scroll-strip {
     display: flex !important;
     flex-wrap: nowrap !important;
@@ -115,29 +130,14 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
     scrollbar-width: thin !important;
     scrollbar-color: #f59e0b rgba(15, 23, 42, 0.7) !important;
 }
-.shelves-scroll-strip::-webkit-scrollbar {
-    display: block !important;
-    height: 5px !important;
-}
-.shelves-scroll-strip::-webkit-scrollbar-track {
-    background: rgba(15, 23, 42, 0.7) !important;
-    border-radius: 9999px !important;
-}
-.shelves-scroll-strip::-webkit-scrollbar-thumb {
-    background: #f59e0b !important;
-    border-radius: 9999px !important;
-}
+.shelves-scroll-strip::-webkit-scrollbar { display: block !important; height: 5px !important; }
+.shelves-scroll-strip::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.7) !important; border-radius: 9999px !important; }
+.shelves-scroll-strip::-webkit-scrollbar-thumb { background: #f59e0b !important; border-radius: 9999px !important; }
 .shelves-wrap-grid {
-    display: flex !important;
-    flex-wrap: wrap !important;
-    align-items: center;
-    gap: 0.45rem;
-    padding: 0.25rem;
+    display: flex !important; flex-wrap: wrap !important; align-items: center; gap: 0.45rem; padding: 0.25rem;
 }
 .shelf-pill-item {
-    flex-shrink: 0 !important;
-    min-width: max-content !important;
-    white-space: nowrap !important;
+    flex-shrink: 0 !important; min-width: max-content !important; white-space: nowrap !important;
 }
 
 /* ================= PERMANENT WIDESCREEN DESKTOP PRO PAGES & DOCK ================= */
@@ -145,9 +145,9 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
     display: none; opacity: 0;
     position: absolute; inset: 0;
     flex-direction: column; align-items: center;
-    padding: 0.85rem 1.75rem 4.8rem 1.75rem;
+    padding: 0.65rem 1.5rem 4.2rem 1.5rem;
     background-color: #020617;
-    transition: opacity 0.18s ease;
+    transition: opacity 0.16s ease;
     overflow-x: hidden !important;
 }
 .app-page.active-page { display: flex; opacity: 1; }
@@ -158,22 +158,22 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
 
 .bottom-safe-spacer {
     width: 100%;
-    min-height: 4.5rem;
+    min-height: 3.8rem;
     flex-shrink: 0;
 }
 
 .bottom-nav {
     position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
-    height: 3.6rem;
-    width: 100%; max-width: 54rem;
-    background: rgba(15, 23, 42, 0.75) !important;
+    height: 3.4rem;
+    width: 100%; max-width: 52rem;
+    background: rgba(15, 23, 42, 0.85) !important;
     backdrop-filter: blur(18px) saturate(180%) !important;
     -webkit-backdrop-filter: blur(18px) saturate(180%) !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.16) !important;
-    border-left: 1px solid rgba(255, 255, 255, 0.14) !important;
-    border-right: 1px solid rgba(255, 255, 255, 0.14) !important;
-    border-radius: 1.5rem 1.5rem 0 0;
-    box-shadow: 0 -6px 28px rgba(0, 0, 0, 0.5) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.15) !important;
+    border-left: 1px solid rgba(255, 255, 255, 0.12) !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.12) !important;
+    border-radius: 1.35rem 1.35rem 0 0;
+    box-shadow: 0 -6px 28px rgba(0, 0, 0, 0.6) !important;
     display: flex; justify-content: space-around; align-items: center;
     z-index: 100;
     padding: 0 1rem;
@@ -184,17 +184,14 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
     transition: all 0.18s ease;
     color: #94a3b8;
 }
-.bottom-nav .nav-btn:hover {
-    background: rgba(30, 41, 59, 0.6);
-    color: #e2e8f0;
-}
+.bottom-nav .nav-btn:hover { background: rgba(30, 41, 59, 0.6); color: #e2e8f0; }
 .bottom-nav .nav-btn .nav-icon {
-    font-size: 1.25rem; line-height: 1;
+    font-size: 1.2rem; line-height: 1;
     filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.65));
 }
 .nav-item.active {
     color: #38bdf8 !important;
-    background: rgba(37, 99, 235, 0.15);
+    background: rgba(37, 99, 235, 0.18);
     transform: translateY(-2px);
 }
 .nav-item.active .nav-indicator { opacity: 1; transform: scale(1); }
@@ -218,9 +215,14 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
 }
 .salah-freeze-bg { animation: salahFreezePulse 3s infinite ease-in-out; }
 
-/* ================= POWER-SAVING OLED DIM MODE ================= */
-body.dim-mode, body.dim-mode #page-timer { background: #000000 !important; background-image: none !important; }
+/* ================= FIXED DEAD-CENTER OLED DIM MODE (NO LONGER STUCK ON LEFT SIDE) ================= */
+body.dim-mode, body.dim-mode #page-timer {
+    background: #000000 !important;
+    background-image: none !important;
+    overflow: hidden !important;
+}
 body.dim-mode .bottom-nav,
+body.dim-mode .cockpit-right,
 body.dim-mode #hud-balance-card,
 body.dim-mode #home-salah-strip,
 body.dim-mode #ai-coach-card,
@@ -229,60 +231,125 @@ body.dim-mode #animation-container,
 body.dim-mode #app-header-brand,
 body.dim-mode #controls-container,
 body.dim-mode #home-reader-widget-card,
-body.dim-mode #home-omni-bento-strip { display: none !important; }
-body.dim-mode #page-timer { justify-content: center !important; padding-bottom: 1rem !important; }
-body.dim-mode #time-display { color: #475569 !important; text-shadow: none !important; font-size: 16vw !important; }
-body.dim-mode #session-type { color: #334155 !important; }
-body.dim-mode #dim-controls-bar { display: flex !important; }
+body.dim-mode #home-omni-bento-strip,
+body.dim-mode .bottom-safe-spacer {
+    display: none !important;
+}
+body.dim-mode #page-timer {
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+body.dim-mode #timer-container,
+body.dim-mode .timer-cockpit-grid {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+body.dim-mode .cockpit-left {
+    flex: 0 0 auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+body.dim-mode #time-display {
+    color: #475569 !important;
+    text-shadow: none !important;
+    font-size: clamp(7rem, 17vw, 15rem) !important;
+    text-align: center !important;
+}
+body.dim-mode #session-type { color: #334155 !important; text-align: center !important; }
+body.dim-mode #dim-controls-bar { display: flex !important; align-items: center; justify-content: center; }
 body:not(.dim-mode) #dim-controls-bar { display: none !important; }
 
-/* ================= DESKTOP PRO WIDESCREEN MULTI-COLUMN GRIDS ================= */
+/* ================= ENTERPRISE HOME COCKPIT LAYOUTS (ZERO GAPS, ZERO BOTTOM CUTOFF) ================= */
 .timer-cockpit-grid {
-    display: flex; flex-direction: column; width: 100%; max-width: 100%; gap: 1.25rem;
-    min-width: 0; overflow: hidden;
+    display: flex; flex-direction: column; width: 100%; max-width: 100%; gap: 0.85rem;
+    min-width: 0; overflow: visible;
 }
 .cockpit-left, .cockpit-right, #home-reader-widget-card, #home-omni-bento-strip {
-    min-width: 0 !important; max-width: 100% !important; overflow-x: hidden !important;
+    min-width: 0 !important; max-width: 100% !important;
 }
 
 @media (min-width: 820px) {
     html { font-size: 16px; }
 
-    /* PAGE 1: Full-Screen Widescreen Timer Cockpit */
+    /* Default Split Bento Cockpit (Zero Awkward Empty Gaps, Fits 100% Above Dock) */
     .timer-cockpit-grid {
-        flex-direction: row !important;
+        display: grid !important;
+        grid-template-columns: 45% 1fr !important;
         align-items: stretch !important;
-        justify-content: space-between !important;
         width: 96vw !important;
         max-width: 96vw !important;
-        min-height: calc(100dvh - 8.8rem) !important;
-        gap: 1.5rem !important;
-        margin-top: 0.25rem;
+        gap: 1.15rem !important;
+        margin-top: 0.1rem;
     }
     .cockpit-left {
-        flex: 0 0 47% !important;
-        max-width: 47% !important;
+        width: 100% !important;
+        max-width: 100% !important;
         display: flex; flex-direction: column; align-items: center; justify-content: center;
-        background: radial-gradient(circle at center, rgba(30, 58, 138, 0.22) 0%, rgba(15, 23, 42, 0.65) 100%);
+        background: radial-gradient(circle at center, rgba(30, 58, 138, 0.24) 0%, rgba(15, 23, 42, 0.78) 100%);
         border: 1px solid rgba(59, 130, 246, 0.35);
-        border-radius: 2rem; padding: 2.25rem 1.75rem;
-        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+        border-radius: 1.75rem; padding: 1.5rem 1.25rem;
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
     }
     .cockpit-right {
-        flex: 0 0 51.5% !important;
-        max-width: 51.5% !important;
-        display: flex; flex-direction: column; justify-content: space-between;
+        width: 100% !important;
+        max-width: 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: flex-start !important;
+        gap: 0.6rem !important;
+    }
+
+    /* Manual Layout Mode 2: Full-Width Stacked Bento Mode */
+    body[data-cockpit-layout="bento"] .timer-cockpit-grid {
+        grid-template-columns: 1fr !important;
+    }
+    body[data-cockpit-layout="bento"] .cockpit-left {
+        padding: 1.15rem !important;
+    }
+    body[data-cockpit-layout="bento"] .cockpit-right {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
         gap: 0.75rem !important;
     }
+    body[data-cockpit-layout="bento"] #home-omni-bento-strip {
+        grid-column: 1 / -1 !important;
+        grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    }
+
+    /* Manual Layout Mode 3: Minimalist Zen Focus Mode */
+    body[data-cockpit-layout="zen"] #home-omni-bento-strip,
+    body[data-cockpit-layout="zen"] #ai-coach-card {
+        display: none !important;
+    }
+
     #time-display {
-        font-size: clamp(6rem, 10vw, 9.8rem) !important;
+        font-size: clamp(5.5rem, 8.8vw, 8.6rem) !important;
         line-height: 0.9 !important;
     }
     #session-type {
-        font-size: 1.05rem !important; margin-top: 0.85rem !important;
+        font-size: 0.95rem !important; margin-top: 0.65rem !important;
     }
 
-    /* PAGE 2: Widescreen 2-Column Split Plan (Live Protocol Left | Build Daily Template Right) */
+    /* PAGE 2: Widescreen 2-Column Split Plan */
     #page-schedule > div {
         display: grid !important;
         grid-template-columns: 1fr 1.15fr !important;
@@ -314,7 +381,7 @@ body:not(.dim-mode) #dim-controls-bar { display: none !important; }
         gap: 0.85rem !important;
     }
 
-    /* PAGE 4: Widescreen Bento Grid for Life Compass, Memory Beast Vault & RPG Arena */
+    /* PAGE 4: Widescreen Bento Grid for Life Compass */
     #compass-subview:not(.hidden) {
         display: grid !important;
         grid-template-columns: 1fr 1fr !important;
@@ -328,13 +395,6 @@ body:not(.dim-mode) #dim-controls-bar { display: none !important; }
         display: grid !important;
         grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)) !important;
         gap: 1rem !important;
-    }
-
-    /* PAGE 6: Edge-to-Edge 3D Wooden Bookshelf */
-    .wood-shelf-container {
-        width: 100% !important;
-        max-height: calc(100dvh - 13rem) !important;
-        min-height: calc(100dvh - 13.5rem) !important;
     }
 
     #ilovepdf-studio-modal > div,
@@ -369,17 +429,21 @@ body:not(.dim-mode) #dim-controls-bar { display: none !important; }
 .todo-check-circle.checked { background-color: #3b82f6; border-color: #3b82f6; color: #ffffff; transform: scale(1.05); }
 .modal-backdrop { background: rgba(2, 6, 23, 0.88); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
 
-/* ================= 3D WOODEN BOOKSHELF (COMPACT 6–8 BOOKS PER ROW) ================= */
+/* ================= FULL-HEIGHT 3D WOODEN BOOKSHELF (ZERO EMPTY SPACE BELOW) ================= */
 #page-reader { background: radial-gradient(circle at top, #1e1b18 0%, #090d16 100%); }
 
 .wood-shelf-container {
-    background: linear-gradient(180deg, #2b1d12 0%, #1f140c 100%);
-    border: 2px solid #4a321f;
-    box-shadow: inset 0 0 40px rgba(0,0,0,0.85), 0 12px 30px rgba(0,0,0,0.6);
+    background: linear-gradient(180deg, #2b1d12 0%, #1a110a 100%);
+    border: 2px solid #5c3a21;
+    box-shadow: inset 0 0 45px rgba(0,0,0,0.88), 0 14px 32px rgba(0,0,0,0.7);
     border-radius: 1.25rem;
-    padding: 1rem 1rem 0.65rem 1rem;
-    max-height: calc(100dvh - 13.5rem) !important;
-    min-height: 62vh !important;
+    padding: 0.9rem 1rem 0.5rem 1rem;
+    height: calc(100dvh - 11.4rem) !important;
+    min-height: calc(100dvh - 11.4rem) !important;
+    max-height: calc(100dvh - 11.4rem) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
     overflow-y: auto !important;
     overflow-x: hidden !important;
     scrollbar-width: thin !important;
@@ -392,30 +456,40 @@ body:not(.dim-mode) #dim-controls-bar { display: none !important; }
     border-radius: 8px !important; border: 2px solid #1a110a !important;
 }
 
-/* Exact-Fit Multi-Book Plank Grid (Defaults to --shelf-cols: 7 on Widescreen) */
 .wood-shelf-row {
     position: relative;
     display: grid !important;
     grid-template-columns: repeat(var(--shelf-cols, 7), minmax(0, 1fr)) !important;
     gap: 0.75rem !important;
-    padding: 0.35rem 0.5rem 1.15rem 0.5rem !important;
-    margin-bottom: 1.15rem;
-    border-bottom: 15px solid #5c3a21;
-    box-shadow: 0 12px 16px -4px rgba(0, 0, 0, 0.85), inset 0 -4px 6px rgba(0,0,0,0.45);
+    padding: 0.35rem 0.5rem 1.1rem 0.5rem !important;
+    margin-bottom: 1.1rem;
+    border-bottom: 16px solid #5c3a21;
+    box-shadow: 0 12px 16px -4px rgba(0, 0, 0, 0.88), inset 0 -4px 6px rgba(0,0,0,0.45);
     background-image: repeating-linear-gradient(90deg, rgba(255,255,255,0.015) 0px, rgba(255,255,255,0.015) 2px, transparent 2px, transparent 14px);
 }
-@media (max-width: 1280px) {
-    .wood-shelf-row {
-        grid-template-columns: repeat(min(var(--shelf-cols, 6), 6), minmax(0, 1fr)) !important;
-    }
-}
-@media (max-width: 900px) {
-    .wood-shelf-row {
-        grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-    }
-}
 .wood-shelf-row::after {
-    content: ''; position: absolute; left: 0; right: 0; bottom: -15px; height: 5px;
+    content: ''; position: absolute; left: 0; right: 0; bottom: -16px; height: 5px;
+    background: linear-gradient(90deg, #3d2514, #734829, #3d2514);
+}
+
+/* Realistic Empty Wooden Planks so the Bookshelf Never Has Dead Brown Space */
+.wood-shelf-empty-plank {
+    position: relative;
+    min-height: 155px;
+    margin-bottom: 1.1rem;
+    border-bottom: 16px solid #5c3a21;
+    box-shadow: 0 12px 16px -4px rgba(0, 0, 0, 0.85), inset 0 -4px 6px rgba(0,0,0,0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(251, 191, 36, 0.22);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+.wood-shelf-empty-plank::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: -16px; height: 5px;
     background: linear-gradient(90deg, #3d2514, #734829, #3d2514);
 }
 
@@ -427,12 +501,11 @@ body:not(.dim-mode) #dim-controls-bar { display: none !important; }
     display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem;
 }
 
-/* Realistic, Compact 3D Book Spine Proportions */
 .book-card-3d {
     position: relative;
     width: 100%;
     aspect-ratio: 1 / 1.42;
-    max-height: 245px;
+    max-height: var(--shelf-card-max-h, 245px);
     border-radius: 5px 10px 10px 5px;
     background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
     box-shadow: -4px 5px 12px rgba(0,0,0,0.78), inset 3px 0 6px rgba(255,255,255,0.12);
@@ -445,16 +518,10 @@ body:not(.dim-mode) #dim-controls-bar { display: none !important; }
     box-shadow: -6px 12px 20px rgba(0,0,0,0.92), 0 0 16px rgba(59, 130, 246, 0.4);
     z-index: 10;
 }
-.book-card-3d > div {
-    padding: 0.45rem !important;
-}
+.book-card-3d > div { padding: 0.45rem !important; }
 .book-card-3d h4 {
-    font-size: 0.7rem !important;
-    line-height: 1.2 !important;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+    font-size: 0.7rem !important; line-height: 1.2 !important;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 .book-corner-menu-btn {
     position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border-radius: 6px;
@@ -464,7 +531,7 @@ body:not(.dim-mode) #dim-controls-bar { display: none !important; }
 }
 .book-corner-menu-btn:hover { background: #2563eb; border-color: #60a5fa; }
 
-/* Full-Screen Active Reader Viewport */
+/* ================= FULL-SCREEN READER & TRUE 50/50 SPLIT-SCREEN HOST ================= */
 #reader-fullscreen-overlay {
     position: fixed; inset: 0; z-index: 260; background-color: #0b0f19;
     display: flex; flex-direction: column; overflow: hidden; user-select: none;
@@ -474,8 +541,12 @@ body:not(.dim-mode) #dim-controls-bar { display: none !important; }
 #reader-fullscreen-overlay.theme-night { background-color: #0f172a; color: #e2e8f0; }
 #reader-fullscreen-overlay.theme-amoled { background-color: #000000; color: #cbd5e1; }
 
-#reader-viewport {
+#reader-split-host {
     flex: 1; width: 100%; height: 100%;
+    display: flex; flex-direction: row; overflow: hidden; position: relative;
+}
+#reader-viewport {
+    flex: 1 1 auto; width: 100%; height: 100%;
     display: block !important; overflow: auto !important;
     text-align: center; position: relative; scroll-behavior: smooth;
 }
@@ -483,30 +554,21 @@ body:not(.dim-mode) #dim-controls-bar { display: none !important; }
 #reader-viewport.lock-h-scroll { overflow-x: hidden !important; }
 
 #reader-pages-stage {
-    display: inline-flex !important;
-    flex-direction: column;
-    align-items: center;
-    max-width: none !important;
-    width: auto !important;
-    min-width: 100%;
-    padding: 0.75rem 1.5rem 2.5rem 1.5rem !important;
+    display: inline-flex !important; flex-direction: column; align-items: center;
+    max-width: none !important; width: auto !important; min-width: 100%;
+    padding: 0.75rem 1.25rem 2.5rem 1.25rem !important;
 }
 #reader-viewport.mode-dual #reader-pages-stage {
-    display: inline-grid !important;
-    grid-template-columns: repeat(2, auto);
-    justify-content: center;
-    gap: 1.25rem;
-    align-items: start;
+    display: inline-grid !important; grid-template-columns: repeat(2, auto);
+    justify-content: center; gap: 1.25rem; align-items: start;
 }
-#reader-fullscreen-overlay.orient-landscape #reader-pages-stage { max-width: 96vw !important; }
-#reader-fullscreen-overlay.orient-portrait #reader-pages-stage { max-width: 52rem !important; }
 
 #reader-bluelight-shield {
     position: fixed; inset: 0; pointer-events: none; z-index: 285;
     background: rgba(255, 145, 0, 0); mix-blend-mode: multiply; transition: background 0.25s ease;
 }
 
-/* ================= CALIBRATED SUB-PIXEL PDF SELECTION vs VISIBLE TXT/PBOOK SELECTION ================= */
+/* ================= CALIBRATED SUB-PIXEL PDF SELECTION & 100% TRANSPARENT OCCLUSION REVEAL ================= */
 .v4-page-card {
     position: relative; margin: 0.5rem auto; background: #ffffff;
     box-shadow: 0 12px 32px rgba(0,0,0,0.72); border-radius: 6px;
@@ -521,34 +583,21 @@ body:not(.dim-mode) #dim-controls-bar { display: none !important; }
     overflow: hidden; line-height: 1.0;
 }
 .pomo-pdf-text-layer.disabled-layer {
-    pointer-events: none !important;
-    user-select: none !important; -webkit-user-select: none !important;
+    pointer-events: none !important; user-select: none !important; -webkit-user-select: none !important;
 }
 .pomo-pdf-text-layer span {
-    position: absolute;
-    white-space: pre;
-    color: transparent;
-    cursor: text;
-    transform-origin: 0% 0%;
-    line-height: 1.0;
-    font-family: Georgia, 'Times New Roman', serif;
-    pointer-events: all;
-    user-select: text !important; -webkit-user-select: text !important;
+    position: absolute; white-space: pre; color: transparent; cursor: text;
+    transform-origin: 0% 0%; line-height: 1.0; font-family: Georgia, 'Times New Roman', serif;
+    pointer-events: all; user-select: text !important; -webkit-user-select: text !important;
 }
-
-/* 1. PDF Invisible Text Overlay Selection (Keeps transparent glyph color so PDF canvas underneath shows through) */
 .pomo-pdf-text-layer span::selection {
     background: var(--pdf-sel-bg, rgba(37, 99, 235, 0.32)) !important;
     color: transparent !important;
 }
-
-/* 2. Visible Text Selection for .TXT, .MD, .EPUB, and .PBOOK (NEVER hides text while selecting!) */
-.pbook-page-sheet::selection,
-.pbook-page-sheet *::selection {
+.pbook-page-sheet::selection, .pbook-page-sheet *::selection {
     background: var(--txt-sel-bg, rgba(37, 99, 235, 0.55)) !important;
     color: var(--txt-sel-fg, #ffffff) !important;
     -webkit-text-fill-color: var(--txt-sel-fg, #ffffff) !important;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5) !important;
 }
 
 .v4-interactive-svg {
@@ -556,13 +605,31 @@ body:not(.dim-mode) #dim-controls-bar { display: none !important; }
     z-index: 25; pointer-events: none; touch-action: none;
 }
 .v4-interactive-svg.active-draw-layer {
-    z-index: 32 !important;
-    pointer-events: auto !important;
-    cursor: crosshair;
+    z-index: 32 !important; pointer-events: auto !important; cursor: crosshair;
 }
 .v4-interactive-svg.mode-select { cursor: default !important; }
 .v4-shape-node { cursor: pointer; pointer-events: all; transition: filter 0.12s ease; }
 .v4-shape-node:hover { filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.9)); }
+
+/* Fixed Image Occlusion Mask: 100% Transparent on Reveal */
+.v4-occlusion-node {
+    cursor: pointer !important;
+    pointer-events: all !important;
+    z-index: 34 !important;
+}
+.v4-occlusion-node[data-revealed="true"] rect {
+    fill: transparent !important;
+    fill-opacity: 0 !important;
+    stroke: #f59e0b !important;
+    stroke-width: 2.5px !important;
+    stroke-dasharray: 7 5 !important;
+}
+.v4-occlusion-node[data-revealed="false"] rect {
+    fill: #0f172a !important;
+    fill-opacity: 0.97 !important;
+    stroke: #f59e0b !important;
+    stroke-width: 3px !important;
+}
 
 #reader-fullscreen-overlay:not(.theme-night):not(.theme-amoled) .v4-shape-node[data-hl="true"],
 .v4-page-card canvas.v4-pdf-canvas ~ svg .v4-shape-node[data-hl="true"] {
@@ -576,42 +643,29 @@ body:not(.dim-mode) #dim-controls-bar { display: none !important; }
     font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 9999px; color: #020617;
     box-shadow: 0 4px 12px rgba(0,0,0,0.55); cursor: pointer; border: 1.5px solid #ffffff; transition: transform 0.15s ease;
 }
-.v4-margin-chip:hover { transform: scale(1.08); }
 
-/* ================= 100% TRANSPARENT FLOATING HIGHLIGHT BAR & INSPECTOR ================= */
+/* 100% Transparent Floating Selection Bar */
 #reader-floating-sel-bar, #v5-clicked-ann-inspector {
-    background: transparent !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    border: none !important;
-    box-shadow: none !important;
-    pointer-events: none;
+    background: transparent !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+    border: none !important; box-shadow: none !important; pointer-events: none;
 }
-#reader-floating-sel-bar > div,
-#v5-clicked-ann-inspector > * {
-    pointer-events: auto;
-    border-color: rgba(148, 163, 184, 0.22) !important;
+#reader-floating-sel-bar > div, #v5-clicked-ann-inspector > * {
+    pointer-events: auto; border-color: rgba(148, 163, 184, 0.22) !important;
 }
 #reader-floating-sel-bar span {
-    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.95), 0 0 8px rgba(0, 0, 0, 0.9);
-    font-weight: 800;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.95), 0 0 8px rgba(0, 0, 0, 0.9); font-weight: 800;
 }
 .sym-dock-btn {
     width: 32px; height: 32px; border-radius: 9px;
     display: inline-flex; align-items: center; justify-content: center;
-    background: rgba(2, 6, 23, 0.22) !important;
-    border: 1px solid rgba(148, 163, 184, 0.42);
+    background: rgba(2, 6, 23, 0.28) !important; border: 1px solid rgba(148, 163, 184, 0.45);
     font-size: 15px; transition: all 0.14s ease;
-    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.95);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.95); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 .sym-dock-btn:hover {
     transform: translateY(-2px) scale(1.1);
-    background: rgba(37, 99, 235, 0.75) !important;
-    border-color: #60a5fa;
-    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.45);
+    background: rgba(37, 99, 235, 0.8) !important; border-color: #60a5fa;
 }
-
 .v13-bot-sym-btn {
     width: 32px; height: 32px; border-radius: 8px;
     display: inline-flex; align-items: center; justify-content: center;
@@ -619,89 +673,159 @@ body:not(.dim-mode) #dim-controls-bar { display: none !important; }
     font-size: 13px; transition: all 0.15s ease; flex-shrink: 0;
 }
 .v13-bot-sym-btn:hover, .v13-bot-sym-btn.active-tool {
-    background: #2563eb; border-color: #60a5fa; color: #ffffff;
-    transform: translateY(-1px);
+    background: #2563eb; border-color: #60a5fa; color: #ffffff; transform: translateY(-1px);
 }
 
-/* ================= PAGE-TRUE STRUCTURED BOOK (.pbook / .txt) LAYOUT & CUSTOM BACKGROUNDS ================= */
+/* ================= POMODOC FORGE SEMANTIC LINE STYLER & DATA TABLES ================= */
 .pbook-page-sheet {
     width: 100%; min-height: 780px; padding: 2.5rem 3rem 3rem 3rem;
-    text-align: left; line-height: 1.76;
-    background: var(--txt-sheet-bg, #fcfaf2);
-    color: var(--txt-sheet-fg, #1e293b);
-    font-family: 'Inter', Georgia, serif;
-    position: relative;
+    text-align: left; line-height: 1.78;
+    background: var(--txt-sheet-bg, #fcfaf2); color: var(--txt-sheet-fg, #1e293b);
+    font-family: 'Inter', Georgia, serif; position: relative;
     user-select: text !important; -webkit-user-select: text !important;
-    transition: background-color 0.2s ease, color 0.2s ease;
 }
 #reader-fullscreen-overlay.theme-day .pbook-page-sheet:not([data-custom-bg="true"]) { background: #fcfaf2; color: #1e293b; }
 #reader-fullscreen-overlay.theme-night .pbook-page-sheet:not([data-custom-bg="true"]) { background: #0f172a; color: #e2e8f0; }
 #reader-fullscreen-overlay.theme-amoled .pbook-page-sheet:not([data-custom-bg="true"]) { background: #050505; color: #d1d5db; border: 1px solid #1e293b; }
 #reader-fullscreen-overlay.theme-sepia .pbook-page-sheet:not([data-custom-bg="true"]) { background: #f4ecd8; color: #3b2f2f; }
 
-/* Custom User-Selectable .TXT / .PBOOK Sheet Background Presets */
 .pbook-page-sheet.txt-bg-black { background: #050505 !important; color: #e5e7eb !important; }
 .pbook-page-sheet.txt-bg-blue { background: #0a192f !important; color: #dbeafe !important; }
 .pbook-page-sheet.txt-bg-green { background: #06281e !important; color: #d1fae5 !important; }
 .pbook-page-sheet.txt-bg-sepia { background: #f4ecd8 !important; color: #3b2f2f !important; }
 .pbook-page-sheet.txt-bg-paper { background: #ffffff !important; color: #0f172a !important; }
 
-.pbook-headline-h1 {
-    font-size: 1.45em; font-weight: 800; color: #2563eb;
-    border-bottom: 2px solid rgba(59, 130, 246, 0.35);
-    padding-bottom: 0.35rem; margin: 1.1rem 0 0.75rem 0; line-height: 1.3;
-    text-align: left;
-    user-select: text !important; -webkit-user-select: text !important;
+.pf-chapter-banner {
+    font-size: 1.55em; font-weight: 900; color: var(--pf-chapter-color, #f59e0b) !important;
+    border-left: 5px solid var(--pf-chapter-color, #f59e0b);
+    border-bottom: 2px solid rgba(245, 158, 11, 0.35);
+    padding: 0.4rem 0 0.4rem 0.85rem; margin: 1.25rem 0 0.9rem 0;
+    text-transform: uppercase; letter-spacing: 0.04em;
 }
-#reader-fullscreen-overlay.theme-night .pbook-headline-h1,
-#reader-fullscreen-overlay.theme-amoled .pbook-headline-h1,
-.pbook-page-sheet.txt-bg-black .pbook-headline-h1,
-.pbook-page-sheet.txt-bg-blue .pbook-headline-h1,
-.pbook-page-sheet.txt-bg-green .pbook-headline-h1 { color: #60a5fa; }
-
-.pbook-headline-h2 {
-    font-size: 1.18em; font-weight: 700; color: #059669;
-    margin: 0.9rem 0 0.45rem 0; line-height: 1.35;
-    text-align: left;
-    user-select: text !important; -webkit-user-select: text !important;
+.pbook-headline-h1, .pf-headline {
+    font-size: 1.38em; font-weight: 800; color: var(--pf-headline-color, #38bdf8) !important;
+    border-bottom: 2px solid rgba(56, 189, 248, 0.3);
+    padding-bottom: 0.3rem; margin: 1.1rem 0 0.7rem 0; line-height: 1.32;
 }
-#reader-fullscreen-overlay.theme-night .pbook-headline-h2,
-#reader-fullscreen-overlay.theme-amoled .pbook-headline-h2,
-.pbook-page-sheet.txt-bg-black .pbook-headline-h2,
-.pbook-page-sheet.txt-bg-blue .pbook-headline-h2,
-.pbook-page-sheet.txt-bg-green .pbook-headline-h2 { color: #34d399; }
+.pbook-headline-h2, .pf-topic {
+    font-size: 1.18em; font-weight: 800; color: var(--pf-topic-color, #34d399) !important;
+    margin: 0.95rem 0 0.45rem 0; line-height: 1.35;
+}
+.pf-subtopic {
+    font-size: 1.06em; font-weight: 700; color: var(--pf-subtopic-color, #a78bfa) !important;
+    margin: 0.7rem 0 0.35rem 0; padding-left: 0.6rem; border-left: 3px solid var(--pf-subtopic-color, #a78bfa);
+}
+.pf-question-line {
+    background: var(--pf-question-bg, rgba(244, 63, 94, 0.14));
+    color: var(--pf-question-color, #fb7185) !important;
+    border-left: 4px solid var(--pf-question-color, #fb7185);
+    padding: 0.55rem 0.85rem; margin: 0.75rem 0; border-radius: 0.5rem;
+    font-weight: 800;
+}
+.pf-math-data {
+    color: var(--pf-math-color, #22d3ee) !important;
+    background: var(--pf-math-bg, rgba(6, 182, 212, 0.14));
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-weight: 800; padding: 0.05rem 0.35rem; border-radius: 0.3rem;
+}
+.pf-quoted-span {
+    color: var(--pf-quote-color, #fcd34d) !important;
+    font-style: italic; font-weight: 700;
+}
+.pf-bracket-span {
+    color: var(--pf-bracket-color, #c084fc) !important;
+    background: var(--pf-bracket-bg, rgba(192, 132, 252, 0.14));
+    font-weight: 700; padding: 0.02rem 0.3rem; border-radius: 0.25rem;
+}
+.pf-data-table {
+    width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.88em;
+    border: 1px solid rgba(148, 163, 184, 0.4); border-radius: 0.5rem; overflow: hidden;
+}
+.pf-data-table th, .pf-data-table td {
+    border: 1px solid rgba(148, 163, 184, 0.3); padding: 0.5rem 0.75rem; text-align: left;
+}
+.pf-data-table tr:first-child {
+    background: rgba(37, 99, 235, 0.22); font-weight: 800; color: #38bdf8;
+}
 
-/* Fixed PomoDoc Forge Paragraph Alignment (No pre-wrap gaps, clean inter-word justification) */
 .pbook-paragraph {
-    margin: 0 0 0.85rem 0;
-    text-align: justify !important;
-    text-justify: inter-word;
-    white-space: normal !important;
-    word-spacing: normal;
-    hyphens: auto;
+    margin: 0 0 0.85rem 0; text-align: justify !important; text-justify: inter-word;
+    white-space: normal !important; word-spacing: normal; hyphens: auto;
     user-select: text !important; -webkit-user-select: text !important;
 }
-.pbook-paragraph.pbook-centered-quote {
-    text-align: center !important;
-    font-style: italic;
-    padding: 0 1.5rem;
-}
-.pbook-paragraph.pbook-first-indent {
-    text-indent: 1.6em;
-}
-
+.pbook-paragraph.pbook-centered-quote { text-align: center !important; font-style: italic; padding: 0 1.5rem; }
+.pbook-paragraph.pbook-first-indent { text-indent: 1.6em; }
 .pbook-diagram-figure {
-    margin: 1rem auto; padding: 0.65rem;
-    background: rgba(15, 23, 42, 0.06);
-    border: 1px dashed rgba(100, 116, 139, 0.45);
-    border-radius: 0.75rem; text-align: center;
+    margin: 1rem auto; padding: 0.65rem; background: rgba(15, 23, 42, 0.08);
+    border: 1px dashed rgba(100, 116, 139, 0.5); border-radius: 0.75rem; text-align: center;
 }
 .pbook-diagram-figure img {
-    max-width: 100%; height: auto; border-radius: 0.5rem;
-    margin: 0 auto; display: block; box-shadow: 0 4px 14px rgba(0,0,0,0.2);
+    max-width: 100%; height: auto; border-radius: 0.5rem; margin: 0 auto; display: block;
 }
 
-/* ================= RPG ARENA CARD GLOW ================= */
+/* ================= TRUE 50/50 SPLIT-SCREEN ONENOTE & ROUGH NOTEBOOK STUDIO ================= */
+#onenote-studio-dock.split-docked {
+    position: relative !important;
+    top: auto !important; right: auto !important; bottom: auto !important; left: auto !important;
+    height: 100% !important;
+    flex-shrink: 0;
+    border-left: 2px solid #06b6d4;
+    border-radius: 0 !important;
+}
+#onenote-studio-dock.floating-resizable {
+    position: fixed !important;
+    resize: both !important;
+    overflow: hidden !important;
+    min-width: 360px !important;
+    min-height: 360px !important;
+    border: 2px solid #06b6d4;
+    border-radius: 1rem;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.85);
+}
+#onenote-split-resizer {
+    width: 8px; background: #0f172a; border-left: 1px solid #1e293b; border-right: 1px solid #1e293b;
+    cursor: col-resize; display: flex; align-items: center; justify-content: center;
+    z-index: 50; flex-shrink: 0; transition: background 0.15s ease;
+}
+#onenote-split-resizer:hover, #onenote-split-resizer.dragging { background: #06b6d4; }
+
+/* A4 Paper Templates for Rough & OneNote Revision Studio */
+.onenote-a4-page {
+    position: relative; width: 100%; min-height: 840px; padding: 2rem 2.25rem;
+    border-radius: 6px; box-shadow: 0 8px 25px rgba(0,0,0,0.5);
+    outline: none; font-size: 14px; line-height: 28px;
+}
+.a4-tpl-ruled {
+    background-color: #0f172a; color: #f8fafc;
+    background-image: linear-gradient(rgba(56, 189, 248, 0.16) 1px, transparent 1px);
+    background-size: 100% 28px;
+}
+.a4-tpl-grid {
+    background-color: #090d16; color: #f8fafc;
+    background-image: radial-gradient(rgba(148, 163, 184, 0.35) 1.2px, transparent 1.2px);
+    background-size: 20px 20px;
+}
+.a4-tpl-graph {
+    background-color: #0b1324; color: #f8fafc;
+    background-image:
+        linear-gradient(rgba(59, 130, 246, 0.15) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(59, 130, 246, 0.15) 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+.a4-tpl-cornell {
+    background-color: #0f172a; color: #f8fafc;
+    padding-left: 26% !important;
+    background-image:
+        linear-gradient(90deg, transparent 23%, rgba(244, 63, 94, 0.55) 23%, rgba(244, 63, 94, 0.55) calc(23% + 2px), transparent calc(23% + 2px)),
+        linear-gradient(rgba(56, 189, 248, 0.15) 1px, transparent 1px);
+    background-size: 100% 100%, 100% 28px;
+}
+.a4-tpl-white {
+    background-color: #fcfaf2; color: #0f172a;
+    background-image: linear-gradient(rgba(59, 130, 246, 0.2) 1px, transparent 1px);
+    background-size: 100% 28px;
+}
+
 .rpg-card-glow {
     background: radial-gradient(circle at top right, rgba(59, 130, 246, 0.18), rgba(15, 23, 42, 0.95) 70%);
     border: 1px solid rgba(59, 130, 246, 0.4);

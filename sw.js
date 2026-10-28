@@ -1,14 +1,16 @@
-const CACHE_NAME = 'deentimer-pro-desktop-v16.0';
+const CACHE_NAME = 'deentimer-pro-desktop-v17.0';
 const CORE_ASSETS = [
     './',
     './index.html',
-    './styles.css?v=16.0',
+    './styles.css?v=17.0',
     './manifest.json',
     './icon.svg',
-    './src/01-core-bus.js?v=16.0',
-    './src/02-pomo-core.js?v=16.0',
-    './src/03-vault-rpg.js?v=16.0',
-    './src/04-reader-pro.js?v=16.0',
+    './src/01-core-bus.js?v=17.0',
+    './src/02-pomo-core.js?v=17.0',
+    './src/03-vault-rpg.js?v=17.0',
+    './src/04-reader-pro.js?v=17.0',
+    './src/05-pomodoc-forge.js?v=17.0',
+    './src/06-onenote-studio.js?v=17.0',
     'https://cdn.tailwindcss.com',
     'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
     'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',
@@ -66,7 +68,6 @@ self.addEventListener('fetch', (event) => {
     const isSameOrigin = reqUrl.origin === self.location.origin;
     const isStaticCdn = STATIC_CDN_HOSTS.some((host) => reqUrl.hostname.includes(host));
 
-    // Strictly bypass live REST APIs (Firebase, Telegram, Google Drive, Dropbox, AlAdhan, Dictionary, Translate)
     if (!isSameOrigin && !isStaticCdn) {
         return;
     }

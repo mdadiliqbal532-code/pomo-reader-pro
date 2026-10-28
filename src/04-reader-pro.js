@@ -2334,7 +2334,7 @@
     };
 
     window.runTurboRamCleaner = function(silent = false) {
-        if (!activeReaderBook) { if (!silent) showToast("🚀 16GB Unleashed Buffer Ready"); return; }
+        if (!activeReaderBook) { if (!silent) showToast(`🚀 Dynamic RAM Buffer Ready (${winSize}-Page Window)`); return; }
         const curP = activeReaderBook.currentPage || 1;
         let freed = 0;
         document.querySelectorAll('.v4-page-card').forEach(card => {

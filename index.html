@@ -4,15 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#020617">
-    <title>DeenTimeR & PomoReader Pro (v16.0 Desktop) — Polymath Life OS & Memory Beast</title>
+    <title>DeenTimeR & PomoReader Pro (v17.0 Desktop) — Polymath Life OS & Memory Beast</title>
 
     <!-- Desktop PWA Manifest & App Icon -->
     <link rel="manifest" href="./manifest.json">
     <link rel="icon" type="image/svg+xml" href="./icon.svg">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Crect width='120' height='120' rx='28' fill='%23020617'/%3E%3Ccircle cx='60' cy='64' r='38' fill='none' stroke='%233b82f6' stroke-width='8'/%3E%3Cpath d='M60 42v22l14 10' fill='none' stroke='%23ff4757' stroke-width='8' stroke-linecap='round'/%3E%3Crect x='48' y='14' width='24' height='8' rx='4' fill='%233b82f6'/%3E%3C/svg%3E">
 
-    <!-- Master Desktop Stylesheet (v16.0) -->
-    <link rel="stylesheet" href="./styles.css?v=16.0">
+    <!-- Master Desktop Stylesheet (v17.0) -->
+    <link rel="stylesheet" href="./styles.css?v=17.0">
 
     <!-- Libraries (Cached 100% Offline by sw.js after first load) -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -50,7 +50,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/11.1.1/marked.min.js"></script>
 </head>
 
-<body class="flex flex-col">
+<body class="flex flex-col" data-cockpit-layout="split">
 
     <!-- ========================================================================= -->
     <!-- MAIN DESKTOP VIEWPORT CONTAINER (6 MODULAR PAGES)                         -->
@@ -62,10 +62,13 @@
             <div id="timer-container" class="w-full flex flex-col items-center relative">
 
                 <!-- Top Desktop Header Bar -->
-                <div id="app-header-brand" class="w-full flex items-center justify-between mb-2.5 gap-2">
+                <div id="app-header-brand" class="w-full flex items-center justify-between mb-2 gap-2">
                     <div class="flex items-center gap-1.5 flex-wrap">
-                        <button id="dim-toggle-btn" class="bg-slate-800/80 hover:bg-slate-700 text-amber-300 px-3 py-2 rounded-xl border border-slate-700/70 text-xs font-bold flex items-center gap-1.5 active:scale-95 transition-all shadow-sm" title="Toggle Power-Saving OLED Dim Mode (Shortcut: D)">
+                        <button id="dim-toggle-btn" class="bg-slate-800/80 hover:bg-slate-700 text-amber-300 px-3 py-2 rounded-xl border border-slate-700/70 text-xs font-bold flex items-center gap-1.5 active:scale-95 transition-all shadow-sm" title="Toggle Centered OLED Dim Mode (Shortcut: D)">
                             <span>🌙</span><span>Dim</span>
+                        </button>
+                        <button type="button" id="cockpit-layout-toggle-btn" class="bg-slate-900/90 hover:bg-slate-800 text-emerald-300 border border-emerald-500/40 px-2.5 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1 active:scale-95" title="Toggle Cockpit Layout Mode (Split / Bento Grid / Zen Focus)">
+                            <span>📐</span><span id="cockpit-layout-label" class="text-[10px]">Layout: Split</span>
                         </button>
                         <button type="button" id="desktop-keys-top-btn" class="bg-slate-900/90 hover:bg-slate-800 text-cyan-300 border border-cyan-500/40 px-2.5 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1 active:scale-95" title="Desktop Keyboard Shortcuts Cheat-Sheet (Shortcut: ? or Alt+K)">
                             <span>⌨️</span><span class="text-[10px]">Keys</span>
@@ -98,7 +101,7 @@
                 </div>
 
                 <!-- DRIFT / SALAH WARNING BANNER -->
-                <div id="drift-alert-banner" class="hidden w-full mb-2.5 bg-gradient-to-r from-red-950/95 via-amber-950/90 to-red-950/95 border border-red-500/60 rounded-2xl p-3 shadow-lg">
+                <div id="drift-alert-banner" class="hidden w-full mb-2 bg-gradient-to-r from-red-950/95 via-amber-950/90 to-red-950/95 border border-red-500/60 rounded-2xl p-3 shadow-lg">
                     <div class="flex items-start justify-between gap-2">
                         <div class="flex items-center gap-2.5">
                             <span class="text-xl animate-bounce">⚠️</span>
@@ -115,23 +118,23 @@
                 <div class="timer-cockpit-grid">
                     <!-- LEFT COLUMN: TIMER & TRANSPORT CONTROLS -->
                     <div class="cockpit-left w-full flex flex-col items-center">
-                        <div id="timer-wrapper" class="relative w-full my-1.5 flex flex-col items-center justify-center">
-                            <div id="animation-container" class="min-h-[3rem] mb-1 flex items-center justify-center overflow-visible p-1.5 pointer-events-none">
+                        <div id="timer-wrapper" class="relative w-full my-1 flex flex-col items-center justify-center">
+                            <div id="animation-container" class="min-h-[2.5rem] mb-1 flex items-center justify-center overflow-visible p-1 pointer-events-none">
                                 <div id="anim-study" class="hidden text-tomato animate-float">
-                                    <svg class="w-12 h-12 animate-glow overflow-visible" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.048 8.287 8.287 0 009 9.6a8.983 8.983 0 013.361-6.866 8.21 8.21 0 003 2.48z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 18a3.75 3.75 0 00.495-7.467 5.99 5.99 0 00-1.925 3.546 5.974 5.974 0 01-2.133-1A3.75 3.75 0 0012 18z"></path></svg>
+                                    <svg class="w-11 h-11 animate-glow overflow-visible" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.048 8.287 8.287 0 009 9.6a8.983 8.983 0 013.361-6.866 8.21 8.21 0 003 2.48z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 18a3.75 3.75 0 00.495-7.467 5.99 5.99 0 00-1.925 3.546 5.974 5.974 0 01-2.133-1A3.75 3.75 0 0012 18z"></path></svg>
                                 </div>
                                 <div id="anim-deen" class="hidden text-emerald-400 animate-float">
                                     <span class="text-4xl">🕌</span>
                                 </div>
                                 <div id="anim-break" class="hidden text-blue-400 animate-float">
-                                    <svg class="w-12 h-12 animate-glow overflow-visible" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 4v10a4 4 0 004 4h8a4 4 0 004-4V4H4z M10 4v6m4-6v6"></path></svg>
+                                    <svg class="w-11 h-11 animate-glow overflow-visible" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 4v10a4 4 0 004 4h8a4 4 0 004-4V4H4z M10 4v6m4-6v6"></path></svg>
                                 </div>
                             </div>
-                            <span id="time-display" class="text-[7rem] leading-[0.88] font-extrabold font-sans tracking-tighter text-white tabular-nums transition-colors duration-300">00:00</span>
-                            <span id="session-type" class="text-sm font-semibold text-slate-400 mt-2.5 uppercase tracking-[0.18em] text-center px-2 truncate max-w-full">Select Session</span>
+                            <span id="time-display" class="text-[6.5rem] leading-[0.88] font-extrabold font-sans tracking-tighter text-white tabular-nums transition-colors duration-300">00:00</span>
+                            <span id="session-type" class="text-sm font-semibold text-slate-400 mt-2 uppercase tracking-[0.18em] text-center px-2 truncate max-w-full">Select Session</span>
                         </div>
 
-                        <div id="controls-container" class="flex justify-center items-center gap-3.5 w-full my-2.5">
+                        <div id="controls-container" class="flex justify-center items-center gap-3.5 w-full my-2">
                             <button id="undo-btn" class="bg-slate-800/90 hover:bg-slate-700 text-slate-300 p-3.5 rounded-full border border-slate-700/60 active:scale-95 transition-all" title="Previous Session (Shortcut: U)">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
                             </button>
@@ -202,7 +205,7 @@
                             <div id="home-salah-pills" class="grid grid-cols-5 gap-1.5"></div>
                         </div>
 
-                        <div id="ai-coach-card" class="w-full bg-slate-800/45 border border-slate-700/80 p-3 rounded-2xl shadow-inner min-w-0">
+                        <div id="ai-coach-card" class="w-full bg-slate-800/45 border border-slate-700/80 p-2.5 rounded-2xl shadow-inner min-w-0">
                             <h3 id="guide-box-title" class="text-[10px] uppercase font-bold tracking-widest text-slate-400 mb-0.5 flex items-center gap-1.5">⚡ Focus Protocol Standby</h3>
                             <p id="deep-guide-text" class="text-xs text-slate-200 font-medium italic leading-relaxed truncate">Waiting for protocol to begin...</p>
                         </div>
@@ -553,7 +556,7 @@
         <!-- PAGE 6: READER PRO & 3D WOODEN BOOKSHELF -->
         <div id="page-reader" class="app-page native-scroll">
             <div class="w-full flex flex-col">
-                <div class="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2.5 border-b border-slate-800 shrink-0">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-2 pb-2 border-b border-slate-800 shrink-0">
                     <div class="flex items-center gap-2.5">
                         <span class="text-2xl">📖</span>
                         <div>
@@ -561,12 +564,12 @@
                                 Pomo Reader Pro
                                 <span id="reader-folder-sync-badge" class="text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full">🛡️ Detecting SSD & RAM...</span>
                             </h2>
-                            <p id="reader-main-folder-label" class="text-[11px] text-slate-400">Wooden Shelf • Smooth Sliding Genres • PomoDoc Forge • Firebase & Telegram Bridge</p>
+                            <p id="reader-main-folder-label" class="text-[11px] text-slate-400">Wooden Shelf • PomoDoc Forge Semantic Styler • Split-Screen OneNote & Rough Studio</p>
                         </div>
                     </div>
                     <div class="flex items-center gap-1.5 flex-wrap">
                         <button id="shelf-quick-import-btn" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-2 rounded-xl shadow flex items-center gap-1.5 active:scale-95"><span>➕</span> <span>Import Books</span></button>
-                        <button id="shelf-open-ilovepdf-btn" type="button" class="bg-rose-600/25 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/50 text-xs font-extrabold px-3 py-2 rounded-xl flex items-center gap-1.5 active:scale-95 shadow" title="Open PomoDoc Forge & True-Layout Book Converter"><span>🛠️</span> <span>PomoDoc Forge</span></button>
+                        <button id="shelf-open-ilovepdf-btn" type="button" class="bg-rose-600/25 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/50 text-xs font-extrabold px-3 py-2 rounded-xl flex items-center gap-1.5 active:scale-95 shadow" title="Open Modular PomoDoc Forge & Semantic Book Styler"><span>🛠️</span> <span>PomoDoc Forge</span></button>
                         <button id="shelf-scan-folder-btn" class="bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 active:scale-95"><span>📂</span> <span>Main Folder</span></button>
                         <button id="shelf-open-a1-hub-btn" class="bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 text-xs font-bold px-2.5 py-2 rounded-xl flex items-center gap-1 active:scale-95"><span>🔖</span> <span>Notes Hub</span></button>
                         <button id="shelf-open-a9-stats-btn" class="bg-slate-800 hover:bg-slate-700 text-purple-300 border border-slate-700 text-xs font-bold px-2.5 py-2 rounded-xl flex items-center gap-1 active:scale-95"><span>📊</span> <span>6M Stats</span></button>
@@ -576,7 +579,7 @@
                 </div>
 
                 <!-- Shelf Filter, Search & Sort Bar -->
-                <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5 bg-slate-900/90 border border-slate-800 p-2.5 rounded-2xl shrink-0">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-2 bg-slate-900/90 border border-slate-800 p-2 rounded-2xl shrink-0">
                     <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
                         <button class="shelf-filter-tab bg-amber-600 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow shrink-0" data-filter="all">🪵 All Shelf (<span id="shelf-count-all">0</span>)</button>
                         <button class="shelf-filter-tab bg-slate-950 text-slate-300 border border-slate-800 text-xs font-bold px-3 py-1.5 rounded-xl shrink-0" data-filter="fav">❤️ Favorites (<span id="shelf-count-fav">0</span>)</button>
@@ -586,7 +589,7 @@
                         <button class="shelf-filter-tab bg-slate-950 text-teal-400 border border-slate-800 text-xs font-bold px-3 py-1.5 rounded-xl shrink-0" data-filter="completed">✅ Completed</button>
                     </div>
                     <div class="flex items-center gap-2 flex-1 sm:flex-initial justify-end">
-                        <input type="text" id="shelf-search-input" placeholder="🔎 Search Book, Author, or Genre..." class="w-64 bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none">
+                        <input type="text" id="shelf-search-input" placeholder="🔎 Search Book, Author, or Genre..." class="w-56 bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none">
                         <select id="shelf-sort-select" class="bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 font-bold focus:outline-none">
                             <option value="sequence">Sort: Reading Sequence (#1, #2...)</option>
                             <option value="recent">Sort: Last Read</option>
@@ -599,7 +602,7 @@
                 </div>
 
                 <!-- Custom Genres / Shelves Bar -->
-                <div id="custom-shelves-bar" class="w-full mb-3 bg-slate-900/95 border border-amber-500/30 p-2 rounded-2xl shrink-0"></div>
+                <div id="custom-shelves-bar" class="w-full mb-2.5 bg-slate-900/95 border border-amber-500/30 p-2 rounded-2xl shrink-0"></div>
 
                 <!-- Hidden File Inputs -->
                 <input type="file" id="reader-book-file-input" multiple accept=".pdf,.epub,.txt,.md,.docx,.html,.htm" class="hidden">
@@ -611,11 +614,10 @@
                 <input type="file" id="ilovepdf-images-input" multiple accept="image/*" class="hidden">
                 <input type="file" id="ilovepdf-insert-page-file-input" accept=".pdf,image/*" class="hidden">
 
-                <!-- 3D Wooden Bookshelf -->
-                <div id="wooden-bookshelf-wrapper" class="wood-shelf-container flex flex-col justify-between">
-                    <div id="wooden-bookshelf-rows" class="flex flex-col"></div>
+                <!-- Full-Height 3D Wooden Bookshelf -->
+                <div id="wooden-bookshelf-wrapper" class="wood-shelf-container">
+                    <div id="wooden-bookshelf-rows" class="flex flex-col flex-1"></div>
                 </div>
-                <div class="bottom-safe-spacer"></div>
             </div>
         </div>
 
@@ -1031,7 +1033,7 @@
         </div>
     </div>
 
-    <!-- 12. FULL-SCREEN ACTIVE BOOK READER OVERLAY -->
+    <!-- 12. FULL-SCREEN ACTIVE BOOK READER OVERLAY (WITH 50/50 SPLIT-SCREEN HOST) -->
     <div id="reader-fullscreen-overlay" class="hidden theme-night">
         <div id="reader-bluelight-shield"></div>
 
@@ -1055,7 +1057,7 @@
                 <button id="reader-open-dict-top-btn" type="button" class="bg-emerald-600/25 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/50 px-2.5 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1 active:scale-95" title="Open 4-Language Scholar Lexicon (Shortcut: L)">
                     <span>📖</span>
                 </button>
-                <button id="reader-open-ilovepdf-btn" type="button" class="bg-rose-600/25 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/50 px-2.5 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1 active:scale-95" title="Open PomoDoc Forge & True-Layout Book Converter">
+                <button id="reader-open-ilovepdf-btn" type="button" class="bg-rose-600/25 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/50 px-2.5 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1 active:scale-95" title="Open Modular PomoDoc Forge & Semantic Book Styler">
                     <span>🛠️</span>
                 </button>
                 <button id="reader-pencil-toggle-btn" class="bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 px-2.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1" title="Toggle 60FPS Pencil & Shape Studio (Shortcut: P)"><span>✏️</span></button>
@@ -1085,8 +1087,8 @@
         <!-- PENCIL & SHAPE STUDIO BAR -->
         <div id="reader-pencil-toolbar" class="hidden w-full bg-slate-900/95 border-b border-amber-500/40 px-3 py-2 flex-wrap items-center justify-between gap-2 z-40"></div>
 
-        <!-- TRANSPARENT GLASS SYMBOL-ONLY FLOATING ANNOTATION DOCK (PURE STUDY & BRIDGE EDITION) -->
-        <div id="reader-floating-sel-bar" class="hidden fixed z-[280] rounded-2xl shadow-2xl px-2.5 py-2 flex-col gap-1.5">
+        <!-- 100% TRANSPARENT FLOATING ANNOTATION DOCK -->
+        <div id="reader-floating-sel-bar" class="hidden fixed z-[280] rounded-2xl px-2.5 py-2 flex-col gap-1.5">
             <div class="flex items-center justify-between gap-2 border-b border-slate-700/60 pb-1">
                 <div class="flex items-center gap-1.5">
                     <button class="hl-color-swatch w-4 h-4 rounded-full bg-yellow-400 border-2 border-white shadow" data-color="#facc15" title="Yellow Highlight"></button>
@@ -1096,8 +1098,8 @@
                     <button class="hl-color-swatch w-4 h-4 rounded-full bg-orange-400 border border-slate-700" data-color="#fb923c" title="Orange Highlight"></button>
                     <button class="hl-color-swatch w-4 h-4 rounded-full bg-purple-400 border border-slate-700" data-color="#c084fc" title="Purple Highlight"></button>
                 </div>
-                <span class="text-[9px] font-mono text-slate-300">Selection Tools</span>
-                <button id="close-floating-sel-bar" class="text-slate-300 hover:text-white text-xs font-bold px-1" title="Close">✕</button>
+                <span class="text-[9px] font-mono text-slate-200">Selection Tools</span>
+                <button id="close-floating-sel-bar" class="text-slate-200 hover:text-white text-xs font-bold px-1" title="Close">✕</button>
             </div>
             <div class="flex items-center gap-1 flex-wrap max-w-[340px]">
                 <button id="sel-action-highlight" class="sym-dock-btn text-yellow-300" title="🖍️ Highlight Selected Text">🖍️</button>
@@ -1108,13 +1110,17 @@
                 <button id="sel-action-attach" class="sym-dock-btn text-teal-300" title="📎 Attach Image/Audio/File to Line">📎</button>
                 <button id="sel-action-todo" class="sym-dock-btn text-blue-400" title="☑️ Send Line to PomoTasks">☑️</button>
                 <button id="sel-action-vault" class="sym-dock-btn text-purple-400" title="📌 Send Line to Memory Beast Vault">📌</button>
-                <button id="sel-action-bridge" class="sym-dock-btn text-cyan-300" title="📤 Send Passage & Book Citation to External Studio Bridge (Firebase / BroadcastChannel)">📤</button>
+                <button id="sel-action-bridge" class="sym-dock-btn text-cyan-300" title="📤 Send Passage & Book Citation to External Studio Bridge">📤</button>
             </div>
         </div>
 
-        <!-- MAIN BOOK PAGE RENDERING VIEWPORT -->
-        <div id="reader-viewport" class="native-scroll">
-            <div id="reader-pages-stage" class="w-full px-6 py-3 flex flex-col items-center"></div>
+        <!-- MAIN SPLIT-SCREEN HOST (LEFT: BOOK VIEWPORT | RIGHT: ONENOTE & ROUGH STUDIO) -->
+        <div id="reader-split-host">
+            <div id="reader-viewport" class="native-scroll">
+                <div id="reader-pages-stage" class="w-full px-6 py-3 flex flex-col items-center"></div>
+            </div>
+            <div id="onenote-split-resizer" class="hidden" title="Drag to resize Book vs. OneNote Studio width"><span class="text-[10px] text-slate-400">⋮</span></div>
+            <div id="onenote-studio-dock" class="hidden"></div>
         </div>
 
         <!-- FLOATING TEXT-TO-SPEECH BAR -->
@@ -1129,7 +1135,7 @@
             <button id="tts-stop-close-btn" class="text-red-400 font-bold text-xs px-1.5">✕</button>
         </div>
 
-        <!-- BOTTOM READER DASHBOARD BAR (SINGLE-LINE SYMBOL-ONLY DOCK) -->
+        <!-- BOTTOM READER DASHBOARD BAR -->
         <div id="reader-bottom-bar" class="w-full bg-slate-950/90 backdrop-blur-md border-t border-slate-800 px-3 py-1.5 flex items-center justify-between gap-2 z-40 transition-all duration-200 overflow-x-auto no-scrollbar">
             <button id="reader-bottom-toc-btn" class="v13-bot-sym-btn text-white" title="☰ Editable Chapters, Full Bookmarks & Notes (Shortcut: T)"><span class="text-sm leading-none">☰</span></button>
             <div class="flex items-center gap-1.5 flex-1 max-w-md shrink-0">
@@ -1254,13 +1260,13 @@
         </div>
     </div>
 
-    <!-- 16. BUILT-IN POMODOC FORGE & PAGE-TRUE BOOK CONVERTER MODAL -->
+    <!-- 16. MODULAR POMODOC FORGE & SEMANTIC STYLER MODAL -->
     <div id="ilovepdf-studio-modal" class="hidden fixed inset-0 modal-backdrop z-[365] flex items-center justify-center p-4">
         <div class="bg-slate-900 border border-rose-500/50 rounded-3xl w-full max-w-5xl max-h-[92dvh] shadow-2xl flex flex-col overflow-hidden">
             <div class="flex items-center justify-between px-5 py-3.5 bg-slate-950 border-b border-slate-800 shrink-0">
                 <div>
-                    <span class="text-[9px] font-extrabold uppercase tracking-widest bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-full border border-rose-500/30">🛠️ 100% Offline PDF & True-Format Structured Book Engine</span>
-                    <h3 class="text-base font-extrabold text-white mt-0.5">PomoDoc Forge & True-Layout Book Converter</h3>
+                    <span class="text-[9px] font-extrabold uppercase tracking-widest bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-full border border-rose-500/30">🛠️ Modular PomoDoc Forge v17.0 — Selective Visual Extractor & Deep Semantic Line Styler</span>
+                    <h3 class="text-base font-extrabold text-white mt-0.5">PomoDoc Forge • Keep Diagrams/Tables/Charts/Mind-Maps • Custom Line Colors</h3>
                 </div>
                 <button type="button" id="close-ilovepdf-modal-btn" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-3 py-1.5 rounded-xl text-xs">✕ Close</button>
             </div>
@@ -1268,7 +1274,7 @@
         </div>
     </div>
 
-    <!-- 17. 4-LANGUAGE MASTER DICTIONARY MODAL (ARABIC • URDU • ENGLISH • HINDI) -->
+    <!-- 17. 4-LANGUAGE MASTER DICTIONARY MODAL -->
     <div id="reader-dictionary-modal" class="hidden fixed inset-0 modal-backdrop z-[375] flex items-center justify-center p-4">
         <div class="bg-slate-900 border border-emerald-500/50 rounded-3xl p-5 w-full max-w-lg shadow-2xl flex flex-col gap-3 max-h-[88dvh] native-scroll">
             <div class="flex justify-between items-center border-b border-slate-800 pb-2.5">
@@ -1301,15 +1307,17 @@
     <div id="custom-toast" class="hidden fixed top-5 right-5 bg-slate-800/95 backdrop-blur-md border border-slate-700 text-white font-bold py-3 px-5 rounded-xl shadow-2xl z-[999] text-sm text-center transition-opacity"></div>
 
     <!-- ========================================================================= -->
-    <!-- MODULAR FEATURE-SLICED SCRIPTS (LOADED IN STRICT ORDER v16.0 DESKTOP)     -->
+    <!-- 6 MODULAR FEATURE-SLICED SCRIPTS (LOADED IN STRICT ORDER v17.0 DESKTOP)   -->
     <!-- ========================================================================= -->
-    <script src="./src/01-core-bus.js?v=16.0"></script>
-    <script src="./src/02-pomo-core.js?v=16.0"></script>
-    <script src="./src/03-vault-rpg.js?v=16.0"></script>
-    <script src="./src/04-reader-pro.js?v=16.0"></script>
+    <script src="./src/01-core-bus.js?v=17.0"></script>
+    <script src="./src/02-pomo-core.js?v=17.0"></script>
+    <script src="./src/03-vault-rpg.js?v=17.0"></script>
+    <script src="./src/04-reader-pro.js?v=17.0"></script>
+    <script src="./src/05-pomodoc-forge.js?v=17.0"></script>
+    <script src="./src/06-onenote-studio.js?v=17.0"></script>
     <script>
         if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
-            navigator.serviceWorker.register('./sw.js?v=16.0').then(reg => {
+            navigator.serviceWorker.register('./sw.js?v=17.0').then(reg => {
                 reg.update();
             }).catch(() => {});
         }

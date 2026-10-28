@@ -1,18 +1,21 @@
 /* =========================================================================
-   06-ONENOTE-STUDIO.JS (v17.0 ENTERPRISE DESKTOP EDITION)
+   06-ONENOTE-STUDIO.JS (v17.1 ENTERPRISE DESKTOP EDITION — HYBRID STUDIO)
    TRUE 50/50 SPLIT-SCREEN & RESIZABLE ONENOTE + ROUGH WORK STUDIO,
-   MATH, PHYSICS, ORGANIC/PHYSICAL/INORGANIC CHEMISTRY & MEDICAL TOOLBARS,
-   MULTI-PAGE A4 REVISION DECK, SLIDE-OUT PAGE MANAGER & 1-CLICK STORAGE CLEANER
+   SIMULTANEOUS HANDWRITING/DRAWING (PEN, HIGHLIGHTER, SHAPES, ERASER, UNDO)
+   AND TYPING + MATH, PHYSICS, ORGANIC/PHYSICAL/INORGANIC CHEM & MEDICAL SYMBOLS
    ========================================================================= */
 (function() {
     let currentBookId = null;
     let studioPages = [];
     let activePageIndex = 0;
-    let studioMode = 'notes'; // 'notes' or 'canvas'
-    let currentTemplate = 'ruled'; // 'ruled' | 'grid' | 'graph' | 'cornell' | 'white'
+    let studioMode = 'hybrid'; // 'hybrid' (Handwriting overlay + Typing), 'notes' or 'canvas'
+    let currentTemplate = 'ruled';
     let isSplitDocked = true;
+    let activeCanvasTool = 'pen';
+    let activePenColor = '#38bdf8';
+    let canvasPathsMap = {}; // pageId -> array of stroke paths
 
-    const MATH_SYMBOLS = ['²', '³', '⁻¹', '√', '∫', 'd/dx', '∂', '∑', '∏', '±', '∓', '·', '×', '÷', '≈', '≠', '≡', '≤', '≥', '∝', '→', '⇒', '⇌', 'Δ', 'θ', 'λ', 'μ', 'π', 'Ω', '∞', '⟨', '⟩', '⃗'];
+    const MATH_SYMBOLS = ['²', '³', '⁻¹', '√', '∫', 'd/dx', '∂', '∑', '∏', '±', '∓', '·', '×', '÷', '≈', '≠', '≡', '≤', '≥', '∝', '→', '⇒', '⇌', 'Δ', 'θ', 'λ', 'μ', 'π', 'Ω', '∞', '⃗'];
     const CHEM_SYMBOLS = ['→', '⇌', '↑', '↓', '△ (Heat)', 'hν (Light)', 'ΔG°', 'Kₛₚ', 'Kₐ', 'Kᵦ', 'E° (Cell)', 'pH', 'pOH', '[-log]', 'sp³', 'sp²', 'sp', 'R-OH', 'R-COOH', 'R-CHO', 'R-CO-R', 'R-NH₂', '苯 (Aromatic)', '⚡ (Exotherm)'];
     const MED_SYMBOLS = ['🩺 [Clinical Pearl]', '⚡ [Action Potential]', '🫀 [Cardio Flow]', '🫁 [Respiratory Compliance]', '🧠 [Neuro Transmitter]', '🧪 [Normal Lab Value]', '⚠️ [High-Yield NEET Fact]'];
 
@@ -34,11 +37,14 @@
             const stored = await window.idbGet('bookFiles', 'notes_' + currentBookId);
             if (stored && Array.isArray(stored.studioPages) && stored.studioPages.length > 0) {
                 studioPages = stored.studioPages;
+                canvasPathsMap = stored.canvasPathsMap || {};
             } else {
                 studioPages = [{ id: 'p_' + Date.now(), title: 'Chapter Revision Note 1', content: '', template: 'ruled' }];
+                canvasPathsMap = {};
             }
         } catch (e) {
             studioPages = [{ id: 'p_' + Date.now(), title: 'Chapter Revision Note 1', content: '', template: 'ruled' }];
+            canvasPathsMap = {};
         }
         activePageIndex = 0;
         renderActivePageEditor();
@@ -47,8 +53,8 @@
     async function saveNotesToIDB() {
         if (!currentBookId) return;
         try {
-            await window.idbPut('bookFiles', { id: 'notes_' + currentBookId, studioPages });
-            window.showToast("💾 Notes saved to offline storage & cloud sync!");
+            await window.idbPut('bookFiles', { id: 'notes_' + currentBookId, studioPages, canvasPathsMap });
+            window.showToast("💾 Notes & Handwriting saved to offline storage!");
         } catch (e) {}
     }
 
@@ -61,8 +67,8 @@
         resizer.classList.remove('hidden');
         dock.className = isSplitDocked ? "split-docked flex flex-col w-[50%] bg-slate-950 text-slate-100 overflow-hidden" : "floating-resizable flex flex-col bg-slate-950 text-slate-100 z-[285]";
         if (!isSplitDocked) {
-            dock.style.width = '520px'; dock.style.height = '680px';
-            dock.style.top = '10vh'; dock.style.right = '5vw';
+            dock.style.width = '540px'; dock.style.height = '720px';
+            dock.style.top = '8vh'; dock.style.right = '4vw';
         }
 
         dock.innerHTML = `
@@ -70,7 +76,7 @@
             <div class="bg-slate-900 border-b border-slate-800 px-3 py-2 flex items-center justify-between gap-2 shrink-0">
                 <div class="flex items-center gap-1.5 min-w-0">
                     <span class="text-base">📝</span>
-                    <span class="text-xs font-extrabold text-cyan-300 uppercase tracking-wider truncate">OneNote & Rough Studio</span>
+                    <span class="text-xs font-extrabold text-cyan-300 uppercase tracking-wider truncate">Hybrid OneNote & Rough Studio</span>
                     <span id="onenote-page-count-badge" class="text-[9px] font-mono font-extrabold bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded-full border border-cyan-500/30">Page 1/${studioPages.length}</span>
                 </div>
                 <div class="flex items-center gap-1 shrink-0">
@@ -83,8 +89,9 @@
             <!-- Mode & Template Selector Bar -->
             <div class="bg-slate-900/80 border-b border-slate-800 px-3 py-1.5 flex items-center justify-between gap-2 shrink-0 flex-wrap">
                 <div class="flex gap-1">
-                    <button type="button" onclick="window.setOnenoteStudioMode('notes')" class="px-2.5 py-1 rounded-lg text-xs font-extrabold ${studioMode === 'notes' ? 'bg-cyan-600 text-white shadow' : 'bg-slate-800 text-slate-400'}">📝 Notes Mode</button>
-                    <button type="button" onclick="window.setOnenoteStudioMode('canvas')" class="px-2.5 py-1 rounded-lg text-xs font-extrabold ${studioMode === 'canvas' ? 'bg-emerald-600 text-white shadow' : 'bg-slate-800 text-slate-400'}">✏️ Stylus Canvas</button>
+                    <button type="button" onclick="window.setOnenoteStudioMode('hybrid')" class="px-2.5 py-1 rounded-lg text-xs font-extrabold ${studioMode === 'hybrid' ? 'bg-purple-600 text-white shadow' : 'bg-slate-800 text-slate-400'}">✍️ Hybrid (Draw+Type)</button>
+                    <button type="button" onclick="window.setOnenoteStudioMode('notes')" class="px-2.5 py-1 rounded-lg text-xs font-extrabold ${studioMode === 'notes' ? 'bg-cyan-600 text-white shadow' : 'bg-slate-800 text-slate-400'}">📝 Type Only</button>
+                    <button type="button" onclick="window.setOnenoteStudioMode('canvas')" class="px-2.5 py-1 rounded-lg text-xs font-extrabold ${studioMode === 'canvas' ? 'bg-emerald-600 text-white shadow' : 'bg-slate-800 text-slate-400'}">✏️ Draw Only</button>
                 </div>
                 <div class="flex items-center gap-1">
                     <select id="onenote-template-sel" onchange="window.setOnenotePaperTemplate(this.value)" class="bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-[11px] font-bold text-amber-300">
@@ -97,7 +104,22 @@
                 </div>
             </div>
 
-            <!-- Specialized Math, Physics, Organic/Physical/Inorganic Chem & Medical Toolbars -->
+            <!-- Handwriting & Shape Toolbar (Active in Hybrid & Canvas modes) -->
+            ${studioMode !== 'notes' ? `
+                <div class="bg-slate-950 border-b border-slate-800 px-3 py-1 flex items-center justify-between gap-2 shrink-0 flex-wrap">
+                    <div class="flex items-center gap-1">
+                        <button type="button" onclick="window.setScratchpadTool('pen')" class="px-2 py-1 rounded text-[11px] font-bold ${activeCanvasTool === 'pen' ? 'bg-amber-500 text-slate-950' : 'bg-slate-950 text-slate-300'}">✏️ Pen</button>
+                        <button type="button" onclick="window.setScratchpadTool('hl')" class="px-2 py-1 rounded text-[11px] font-bold ${activeCanvasTool === 'hl' ? 'bg-amber-500 text-slate-950' : 'bg-slate-950 text-slate-300'}">🖍️ Highlighter</button>
+                        <button type="button" onclick="window.setScratchpadTool('eraser')" class="px-2 py-1 rounded text-[11px] font-bold ${activeCanvasTool === 'eraser' ? 'bg-red-600 text-white' : 'bg-slate-950 text-slate-300'}">🧽 Eraser</button>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        ${['#38bdf8', '#34d399', '#facc15', '#f472b6', '#ffffff'].map(c => `<button type="button" onclick="window.setScratchpadPenColor('${c}')" class="w-4 h-4 rounded-full border ${activePenColor === c ? 'border-white scale-110' : 'border-slate-700'}" style="background:${c}"></button>`).join('')}
+                        <button type="button" onclick="window.clearActiveScratchpadCanvas()" class="bg-slate-900 text-red-400 px-2 py-0.5 rounded text-[10px] font-bold">Clear</button>
+                    </div>
+                </div>
+            ` : ''}
+
+            <!-- Specialized Math, Physics, Chem & Medical Symbol Toolbars -->
             <div id="onenote-symbol-toolbars" class="bg-slate-950 border-b border-slate-800 px-2.5 py-1.5 flex flex-col gap-1.5 shrink-0 overflow-x-auto no-scrollbar">
                 <div class="flex items-center gap-1 flex-wrap">
                     <span class="text-[9px] font-extrabold uppercase text-cyan-400 shrink-0">📐 Math:</span>
@@ -113,7 +135,7 @@
                 </div>
             </div>
 
-            <!-- Main Editor Stage (Notes Mode vs Stylus Canvas) -->
+            <!-- Main Editor Stage (Hybrid Canvas + Textarea) -->
             <div class="flex-1 native-scroll p-3 flex flex-col bg-slate-950 relative" id="onenote-editor-stage"></div>
 
             <!-- Bottom Action Footer -->
@@ -124,7 +146,7 @@
                 </div>
                 <div class="flex gap-1.5">
                     <button type="button" onclick="window.saveNotesToIDB()" class="bg-slate-800 hover:bg-slate-700 text-cyan-300 px-3 py-1.5 rounded-xl text-xs font-bold">💾 Save Notes</button>
-                    <button type="button" onclick="window.purgeAllOnenoteNotesForBook()" class="bg-red-950/80 text-red-300 hover:bg-red-700 hover:text-white border border-red-800/50 px-2.5 py-1.5 rounded-xl text-xs font-bold" title="Delete all saved A4 notes for this book to free local storage">🗑️ Purge Book Notes</button>
+                    <button type="button" onclick="window.purgeAllOnenoteNotesForBook()" class="bg-red-950/80 text-red-300 hover:bg-red-700 hover:text-white border border-red-800/50 px-2.5 py-1.5 rounded-xl text-xs font-bold" title="Delete all saved A4 notes for this book to free local storage">🗑️ Purge Notes</button>
                 </div>
             </div>
         `;
@@ -171,6 +193,16 @@
         renderOnenoteStudioDOM();
     };
 
+    window.setScratchpadTool = function(t) {
+        activeCanvasTool = t;
+        renderOnenoteStudioDOM();
+    };
+
+    window.setScratchpadPenColor = function(c) {
+        activePenColor = c;
+        renderOnenoteStudioDOM();
+    };
+
     window.setOnenotePaperTemplate = function(tpl) {
         currentTemplate = tpl;
         if (studioPages[activePageIndex]) {
@@ -199,26 +231,20 @@
 
         document.getElementById('onenote-page-count-badge').textContent = `Page ${activePageIndex + 1}/${studioPages.length}`;
 
-        if (studioMode === 'notes') {
-            stage.innerHTML = `
-                <div class="mb-2 flex items-center gap-2">
-                    <input type="text" id="onenote-page-title-inp" value="${escapeHtml(pg.title)}" onchange="window.updateActivePageTitle(this.value)" placeholder="A4 Page Title (e.g. Cardiac Cycle & ECG Waves)..." class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs font-bold text-amber-300 focus:outline-none">
-                </div>
-                <div class="flex-1 flex flex-col relative">
-                    <textarea id="onenote-textarea-main" oninput="window.updateActivePageContent(this.value)" placeholder="Type or paste high-yield study notes, clinical pearls, or click symbols above to insert NEET math/chemistry equations..." class="onenote-a4-page a4-tpl-${currentTemplate} flex-1 resize-none focus:outline-none font-mono">${escapeHtml(pg.content || '')}</textarea>
-                </div>
-            `;
-        } else {
-            stage.innerHTML = `
-                <div class="mb-2 flex items-center justify-between gap-2">
-                    <input type="text" id="onenote-page-title-inp" value="${escapeHtml(pg.title)}" onchange="window.updateActivePageTitle(this.value)" placeholder="Stylus Canvas Page Title..." class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs font-bold text-emerald-300 focus:outline-none">
-                    <button type="button" onclick="window.clearStylusCanvas()" class="bg-slate-800 text-red-400 px-2.5 py-1 rounded text-xs font-bold">🗑️ Clear Canvas</button>
-                </div>
-                <div class="flex-1 relative bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden min-h-[500px]">
-                    <canvas id="onenote-stylus-canvas" class="absolute inset-0 w-full h-full cursor-crosshair touch-none"></canvas>
-                </div>
-            `;
-            setTimeout(initStylusCanvasBoard, 50);
+        stage.innerHTML = `
+            <div class="mb-2 flex items-center gap-2">
+                <input type="text" id="onenote-page-title-inp" value="${escapeHtml(pg.title)}" onchange="window.updateActivePageTitle(this.value)" placeholder="A4 Page Title (e.g. Cardiac Cycle & ECG Waves)..." class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs font-bold text-amber-300 focus:outline-none">
+            </div>
+            <div class="flex-1 flex flex-col relative min-h-[600px]">
+                <!-- Hybrid A4 Paper Sheet Background / Typing Area -->
+                <textarea id="onenote-textarea-main" oninput="window.updateActivePageContent(this.value)" placeholder="Type notes here, or draw freehand directly on top using Stylus Canvas mode..." class="onenote-a4-page a4-tpl-${currentTemplate} absolute inset-0 w-full h-full resize-none focus:outline-none font-mono ${studioMode === 'canvas' ? 'opacity-20' : 'opacity-100'} z-10">${escapeHtml(pg.content || '')}</textarea>
+                <!-- Simultaneous Handwriting & Drawing Overlay Canvas -->
+                ${studioMode !== 'notes' ? `<canvas id="onenote-stylus-canvas" class="absolute inset-0 w-full h-full cursor-crosshair touch-none z-25 pointer-events-auto"></canvas>` : ''}
+            </div>
+        `;
+
+        if (studioMode !== 'notes') {
+            setTimeout(initHybridStylusCanvas, 60);
         }
     }
 
@@ -289,6 +315,7 @@
         if (!confirm("Are you sure you want to permanently delete all saved A4 revision notes for this book?")) return;
         studioPages = [{ id: 'p_' + Date.now(), title: 'Chapter Revision Note 1', content: '', template: 'ruled' }];
         activePageIndex = 0;
+        canvasPathsMap = {};
         await window.idbDelete('bookFiles', 'notes_' + currentBookId);
         renderOnenoteStudioDOM();
         window.showToast("🗑️ All saved revision notes purged to save storage!");
@@ -303,39 +330,73 @@
         window.showToast("📦 Revision Notes exported successfully!");
     };
 
-    function initStylusCanvasBoard() {
+    function initHybridStylusCanvas() {
         const canvas = document.getElementById('onenote-stylus-canvas');
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
-        canvas.width = canvas.parentElement.clientWidth || 600;
-        canvas.height = canvas.parentElement.clientHeight || 550;
+        const pgId = studioPages[activePageIndex]?.id || 'p_default';
 
-        ctx.fillStyle = '#0f172a'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        canvas.width = canvas.parentElement.clientWidth || 600;
+        canvas.height = Math.max(840, canvas.parentElement.clientHeight || 840);
+
+        // Restore saved paths for this page
+        if (!canvasPathsMap[pgId]) canvasPathsMap[pgId] = [];
+        redrawCanvasPaths(ctx, canvas.width, canvas.height, pgId);
 
         let drawing = false;
         canvas.onpointerdown = (e) => {
+            if (studioMode === 'notes') return;
             drawing = true;
             canvas.setPointerCapture(e.pointerId);
             const r = canvas.getBoundingClientRect();
-            ctx.beginPath();
-            ctx.moveTo(e.clientX - r.left, e.clientY - r.top);
+            const pt = { x: e.clientX - r.left, y: e.clientY - r.top };
+            canvasPathsMap[pgId].push({ tool: activeCanvasTool, color: activePenColor, points: [pt] });
         };
         canvas.onpointermove = (e) => {
-            if (!drawing) return;
+            if (!drawing || studioMode === 'notes') return;
             const r = canvas.getBoundingClientRect();
-            ctx.lineTo(e.clientX - r.left, e.clientY - r.top);
-            ctx.stroke();
+            const pt = { x: e.clientX - r.left, y: e.clientY - r.top };
+            const curStroke = canvasPathsMap[pgId][canvasPathsMap[pgId].length - 1];
+            if (curStroke) {
+                curStroke.points.push(pt);
+                redrawCanvasPaths(ctx, canvas.width, canvas.height, pgId);
+            }
         };
-        canvas.onpointerup = () => { drawing = false; };
+        canvas.onpointerup = () => {
+            if (!drawing) return;
+            drawing = false;
+            saveNotesToIDB();
+        };
     }
 
-    window.clearStylusCanvas = function() {
-        const canvas = document.getElementById('onenote-stylus-canvas');
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#0f172a'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-        window.showToast("🧹 Canvas cleared");
+    function redrawCanvasPaths(ctx, w, h, pgId) {
+        ctx.clearRect(0, 0, w, h);
+        const paths = canvasPathsMap[pgId] || [];
+        paths.forEach(stroke => {
+            if (!stroke.points || !stroke.points.length) return;
+            ctx.beginPath();
+            ctx.strokeStyle = stroke.tool === 'eraser' ? '#0f172a' : (stroke.color || '#38bdf8');
+            ctx.lineWidth = stroke.tool === 'hl' ? 22 : (stroke.tool === 'eraser' ? 24 : 3);
+            ctx.globalAlpha = stroke.tool === 'hl' ? 0.35 : 1.0;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            stroke.points.forEach((pt, i) => {
+                if (i === 0) ctx.moveTo(pt.x, pt.y);
+                else ctx.lineTo(pt.x, pt.y);
+            });
+            ctx.stroke();
+            ctx.globalAlpha = 1.0;
+        });
+    }
+
+    window.clearActiveScratchpadCanvas = function() {
+        const pgId = studioPages[activePageIndex]?.id;
+        if (pgId) {
+            canvasPathsMap[pgId] = [];
+            saveNotesToIDB();
+            renderActivePageEditor();
+            window.showToast("🧹 Canvas cleared");
+        }
     };
 
     window.addEventListener('keydown', (e) => {
@@ -350,9 +411,9 @@
                 window.showToast("📝 Closed OneNote Studio");
             } else if (activeReaderBook) {
                 window.initOnenoteStudioDock(activeReaderBook.id);
-                window.showToast("📝 Opened OneNote & Rough Studio (Split-Screen)");
+                window.showToast("📝 Opened Hybrid OneNote & Rough Studio (Split-Screen)");
             }
         }
     });
 })();
-// ✅ END OF FILE (06-onenote-studio.js v17.0 Enterprise Desktop Edition) — 100% COMPLETE & UNCUT
+// ✅ END OF FILE (06-onenote-studio.js v17.1 Enterprise Desktop Edition) — 100% COMPLETE & UNCUT

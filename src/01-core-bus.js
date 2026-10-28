@@ -1,7 +1,8 @@
 /* =========================================================================
-   01-CORE-BUS.JS (v16.0 PURE DESKTOP EDITION) — EVENT BUS, 16GB INDEXEDDB,
-   DESKTOP KEYBOARD SHORTCUTS ENGINE, FORCE ACHIEVEMENT NOTIFICATIONS,
-   POMOWAKE MISSION OS, 4-LANGUAGE DICTIONARY & EXTERNAL STUDIO BRIDGE
+   01-CORE-BUS.JS (v16.0 PURE DESKTOP EDITION — ZERO AI CLUTTER)
+   EVENT BUS, 16GB INDEXEDDB, SAFE STORAGE, KEEP-SCREEN-ON, PRIVACY PIN,
+   GRANULAR FORCE ACHIEVEMENT NOTIFICATIONS, POMOWAKE MISSION OS,
+   4-LANGUAGE SCHOLAR DICTIONARY (FIXED URL) & MASTER 15-PRO COMMAND HUB
    ========================================================================= */
 
 // 1. CENTRAL EVENT BUS
@@ -18,9 +19,9 @@ window.PomoEventBus = {
     }
 };
 
-// 2. 16GB-READY NON-BLOCKING UNIFIED INDEXEDDB ENGINE (SHARED WITH EXTERNAL STUDIO BRIDGE)
+// 2. 16GB-READY NON-BLOCKING UNIFIED INDEXEDDB ENGINE
 const DB_NAME = 'PomoReaderProDB_v1';
-const DB_VERSION = 6;
+const DB_VERSION = 5;
 let idbInstance = null;
 window.coverMemoryCache = {};
 
@@ -47,8 +48,10 @@ function openUnifiedIDB() {
                 if (!db.objectStoreNames.contains('handles')) db.createObjectStore('handles', { keyPath: 'key' });
                 if (!db.objectStoreNames.contains('bookCovers')) db.createObjectStore('bookCovers', { keyPath: 'id' });
                 if (!db.objectStoreNames.contains('steelSnapshots')) db.createObjectStore('steelSnapshots', { keyPath: 'key' });
+                if (!db.objectStoreNames.contains('nlmCache')) db.createObjectStore('nlmCache', { keyPath: 'key' });
+                if (!db.objectStoreNames.contains('pomoAiSources')) db.createObjectStore('pomoAiSources', { keyPath: 'id' });
+                if (!db.objectStoreNames.contains('localAiBrainStore')) db.createObjectStore('localAiBrainStore', { keyPath: 'id' });
                 if (!db.objectStoreNames.contains('flashcardsStore')) db.createObjectStore('flashcardsStore', { keyPath: 'id' });
-                if (!db.objectStoreNames.contains('pageTextIndex')) db.createObjectStore('pageTextIndex', { keyPath: 'bookId' });
             };
             req.onsuccess = (e) => { clearTimeout(safetyTimer); finish(e.target.result); };
             req.onblocked = () => { clearTimeout(safetyTimer); finish(null); };
@@ -126,7 +129,7 @@ if (navigator.storage && navigator.storage.persist) {
     }).catch(() => {});
 }
 
-// 3. SAFE LOCALSTORAGE ENGINE + ESCAPE UTILITIES
+// 3. SAFE LOCALSTORAGE ENGINE + APOSTROPHE-SAFE ESCAPE UTILITIES
 const MEM_CACHE = {};
 window.safeGet = function(key, def) {
     try {
@@ -153,7 +156,6 @@ window.escapeHtml = function(str) {
         .replace(/'/g, '&#39;');
 };
 
-// Safe JS string literal escaper for inline onclick="fn('...')" attributes
 window.escapeJsStr = function(str) {
     if (str === null || str === undefined) return '';
     return String(str)
@@ -190,125 +192,19 @@ window.addDaysToTodayISO = function(days) {
     return window.getLocalTodayString(target);
 };
 
-// No-op on Desktop to keep legacy calls clean
 window.haptic = function() {};
 
 window.showToast = function(msg, isError = false) {
     const toast = document.getElementById('custom-toast');
     if (!toast) return;
     toast.textContent = msg;
-    toast.className = `fixed top-5 right-5 backdrop-blur-md border font-bold py-3 px-5 rounded-xl shadow-2xl z-[99999] text-sm text-center transition-opacity ${isError ? 'bg-red-900/95 border-red-500 text-red-100' : 'bg-emerald-900/95 border-emerald-500 text-emerald-100'}`;
+    toast.className = `fixed top-5 right-5 backdrop-blur-md border font-bold py-3 px-5 rounded-xl shadow-2xl z-[99999] text-xs sm:text-sm text-center transition-opacity ${isError ? 'bg-red-900/95 border-red-500 text-red-100' : 'bg-emerald-900/95 border-emerald-500 text-emerald-100'}`;
     toast.classList.remove('hidden');
     clearTimeout(window._toastTimer);
     window._toastTimer = setTimeout(() => toast.classList.add('hidden'), 3200);
 };
 
-// 4. EXTERNAL POMOAI STUDIO & HYBRID BOARD BRIDGE (FIREBASE + BROADCASTCHANNEL + IDB)
-window.PomoStudioBridge = {
-    _channel: (typeof BroadcastChannel !== 'undefined') ? new BroadcastChannel('pomo_studio_bridge_v1') : null,
-
-    async syncBookPageIndexToBridge(bookObj, pagesTextArray) {
-        if (!bookObj || !bookObj.id || !Array.isArray(pagesTextArray) || !pagesTextArray.length) return;
-        try {
-            // 1. Save full per-page text index into shared 16GB IndexedDB
-            await window.idbPut('pageTextIndex', {
-                bookId: bookObj.id,
-                title: bookObj.title,
-                shelfName: bookObj.shelfName || 'General Shelf',
-                readSeq: bookObj.readSeq || 1,
-                totalPages: bookObj.totalPages || pagesTextArray.length,
-                telegramFileId: bookObj.telegramFileId || '',
-                gdriveFileId: bookObj.gdriveFileId || '',
-                dropboxPath: bookObj.dropboxPath || '',
-                outline: bookObj.outline || [],
-                pagesText: pagesTextArray,
-                updatedAt: Date.now()
-            });
-
-            // 2. Broadcast live update to any open PomoAI Studio tab on the same desktop
-            if (this._channel) {
-                this._channel.postMessage({
-                    type: 'BOOK_INDEX_UPDATED',
-                    bookId: bookObj.id,
-                    title: bookObj.title,
-                    shelfName: bookObj.shelfName,
-                    totalPages: bookObj.totalPages
-                });
-            }
-
-            // 3. Push lightweight chunked page index to Firebase PomoCloud Room so external Studio can query page ranges wirelessly
-            const roomId = window.safeGet('pages_pomodoro_sync_room', '');
-            if (roomId && typeof firebase !== 'undefined' && firebase.apps?.length && navigator.onLine) {
-                const db = firebase.firestore();
-                const docRef = db.collection('artifacts').doc('neettimercloud')
-                    .collection('public').doc('data')
-                    .collection('sync_rooms').doc(roomId)
-                    .collection('reader_page_index').doc(bookObj.id);
-
-                // Store up to 120 pages per batch in compact JSON chunks
-                const batchSize = 50;
-                const totalBatches = Math.ceil(pagesTextArray.length / batchSize);
-                await docRef.set({
-                    bookId: bookObj.id,
-                    title: bookObj.title,
-                    shelfName: bookObj.shelfName || 'General Shelf',
-                    readSeq: bookObj.readSeq || 1,
-                    totalPages: bookObj.totalPages || pagesTextArray.length,
-                    totalBatches,
-                    telegramFileId: bookObj.telegramFileId || '',
-                    gdriveFileId: bookObj.gdriveFileId || '',
-                    dropboxPath: bookObj.dropboxPath || '',
-                    outlineJson: JSON.stringify(bookObj.outline || []),
-                    updatedAt: Date.now()
-                }, { merge: true });
-
-                for (let bIdx = 0; bIdx < Math.min(totalBatches, 12); bIdx++) {
-                    const slice = pagesTextArray.slice(bIdx * batchSize, (bIdx + 1) * batchSize).map(t => String(t || '').slice(0, 3500));
-                    await docRef.collection('page_batches').doc(String(bIdx)).set({
-                        batchIndex: bIdx,
-                        startPage: bIdx * batchSize + 1,
-                        pagesJson: JSON.stringify(slice)
-                    });
-                }
-            }
-        } catch (e) {}
-    },
-
-    async sendSelectionToExternalStudio(payload) {
-        if (!payload) return;
-        const item = {
-            id: 'clip_' + Date.now(),
-            bookId: payload.bookId || '',
-            bookTitle: payload.bookTitle || 'Book',
-            shelfName: payload.shelfName || 'General Shelf',
-            page: payload.page || 1,
-            text: payload.text || '',
-            createdAt: Date.now()
-        };
-
-        try {
-            if (this._channel) {
-                this._channel.postMessage({ type: 'SELECTION_CLIP', payload: item });
-            }
-            const citationText = `📘 [${item.shelfName}] ${item.bookTitle} (Page ${item.page}):\n"${item.text}"`;
-            try { await navigator.clipboard.writeText(citationText); } catch (e) {}
-
-            const roomId = window.safeGet('pages_pomodoro_sync_room', '');
-            if (roomId && typeof firebase !== 'undefined' && firebase.apps?.length && navigator.onLine) {
-                const db = firebase.firestore();
-                await db.collection('artifacts').doc('neettimercloud')
-                    .collection('public').doc('data')
-                    .collection('sync_rooms').doc(roomId)
-                    .collection('studio_inbox').doc('latest_clip').set(item);
-            }
-            window.showToast(`📤 Sent Page ${item.page} passage to External Studio Bridge & Clipboard!`);
-        } catch (e) {
-            window.showToast("📋 Copied passage citation to clipboard!");
-        }
-    }
-};
-
-// 5. STRICT KEEP-SCREEN-ON ENGINE & PRIVACY PIN SHIELD
+// 4. STRICT KEEP-SCREEN-ON ENGINE & DESKTOP PRIVACY PIN SHIELD
 let wakeLockSentinel = null;
 let keepAwakeOsc = null;
 window.fallbackCtx = null;
@@ -351,10 +247,6 @@ window.enforceKeepScreenOn();
 window.addEventListener('error', (e) => console.warn('[Steel Shield Intercepted]:', e.message));
 window.addEventListener('unhandledrejection', (e) => console.warn('[Steel Shield Promise]:', e.reason));
 
-window.triggerPrivacyLockShortcut = function() {
-    document.getElementById('privacy-lock-top-btn')?.click();
-};
-
 document.getElementById('privacy-lock-top-btn')?.addEventListener('click', () => {
     const savedPin = localStorage.getItem('pages_pomodoro_privacy_pin') || '';
     if (!savedPin) {
@@ -379,7 +271,6 @@ document.getElementById('privacy-lock-top-btn')?.addEventListener('click', () =>
         };
     } else {
         document.getElementById('pomo-privacy-lock-overlay').classList.remove('hidden');
-        setTimeout(() => document.getElementById('privacy-unlock-pin-input')?.focus(), 60);
     }
 });
 
@@ -394,12 +285,9 @@ document.getElementById('privacy-unlock-submit-btn')?.addEventListener('click', 
         window.showToast("❌ Incorrect Passcode", true);
     }
 });
-document.getElementById('privacy-unlock-pin-input')?.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') document.getElementById('privacy-unlock-submit-btn')?.click();
-});
 
-// 6. GRANULAR FORCE ACHIEVEMENT NOTIFICATION ENGINE (DESKTOP EDITION)
-(function initForceNotificationsAndDesktopControls() {
+// 5. GRANULAR FORCE ACHIEVEMENT NOTIFICATION ENGINE (DESKTOP EDITION)
+(function initForceNotificationsAndAlertStudio() {
     const HTTPS = 'https:' + '//';
     window.unlockedAchievementsLog = JSON.parse(window.safeGet('pages_pomodoro_achievements_v15', '[]'));
 
@@ -527,7 +415,7 @@ document.getElementById('privacy-unlock-pin-input')?.addEventListener('keydown',
                     <div class="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-400 flex items-center justify-center text-2xl shrink-0 animate-bounce">${badgeIcon}</div>
                     <div class="min-w-0">
                         <span class="text-[9px] font-mono font-extrabold uppercase tracking-widest bg-amber-500 text-slate-950 px-2 py-0.5 rounded-full">⚡ ACHIEVEMENT UNLOCKED</span>
-                        <h4 class="text-sm font-extrabold text-white mt-1 truncate">${escapeHtml(title)}</h4>
+                        <h4 class="text-xs sm:text-sm font-extrabold text-white mt-1 truncate">${escapeHtml(title)}</h4>
                         <p class="text-[11px] text-amber-200/90 leading-snug mt-0.5">${escapeHtml(body)}</p>
                     </div>
                 </div>
@@ -585,7 +473,7 @@ document.getElementById('privacy-unlock-pin-input')?.addEventListener('keydown',
             { key: 'wake_recheck', icon: '☀️', label: 'PomoWake 5-Minute Recheck Passed' }
         ];
 
-        titleEl.textContent = "🔔 Granular Force Achievement Notification Controls";
+        titleEl.textContent = "🔔 Granular Force Notification Controls & Mini-PiP";
         bodyEl.innerHTML = `
             <div class="flex flex-col gap-3 text-xs">
                 <div class="bg-slate-950 border border-amber-500/50 rounded-2xl p-3.5 flex flex-col gap-2.5">
@@ -610,7 +498,7 @@ document.getElementById('privacy-unlock-pin-input')?.addEventListener('keydown',
                             `).join('')}
                         </div>
 
-                        <span class="text-[10px] font-extrabold uppercase text-purple-400 mt-1">2. Notification Categories:</span>
+                        <span class="text-[10px] font-extrabold uppercase text-purple-400 mt-1">2. Notification Types:</span>
                         <div class="flex flex-col gap-1.5">
                             ${categoryRows.map(r => `
                                 <div class="flex items-center justify-between bg-slate-900 px-3 py-2 rounded-xl border border-slate-800">
@@ -625,15 +513,22 @@ document.getElementById('privacy-unlock-pin-input')?.addEventListener('keydown',
                         🔔 Test Active Notification Channels Now
                     </button>
                 </div>
+
+                <div class="bg-slate-950 border border-cyan-500/40 rounded-2xl p-3 flex items-center justify-between gap-2">
+                    <div>
+                        <span class="text-[10px] font-extrabold uppercase text-cyan-400">🖼️ Desktop Floating PiP Mini-Cockpit</span>
+                        <p class="text-[10px] text-slate-400 mt-0.5">Always-on-top mini timer window while studying in other apps.</p>
+                    </div>
+                    <button type="button" onclick="document.getElementById('reader-suboptions-modal').classList.add('hidden'); window.launchPipMiniCockpitWidget && window.launchPipMiniCockpitWidget();" class="bg-cyan-600 hover:bg-cyan-500 text-white font-extrabold px-4 py-2 rounded-xl text-xs shadow shrink-0">
+                        🖼️ Pop Out PiP
+                    </button>
+                </div>
             </div>
         `;
         modal.classList.remove('hidden');
     };
 
     document.getElementById('mobile-widget-hub-btn')?.addEventListener('click', window.openDeviceWidgetStudioModal);
-    document.getElementById('desktop-pip-top-btn')?.addEventListener('click', () => {
-        if (window.launchPipMiniCockpitWidget) window.launchPipMiniCockpitWidget();
-    });
 
     window.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
@@ -642,10 +537,11 @@ document.getElementById('privacy-unlock-pin-input')?.addEventListener('keydown',
             if (!wCmd) return;
             if (wCmd === 'start50' && window.startTimer) {
                 window.startTimer();
-            } else if (wCmd === 'flashcards') {
-                if (window.switchPage) window.switchPage('page-vault');
-                if (window.activateVaultSubview) window.activateVaultSubview('neet');
-                document.querySelector('.task-tab[data-tab="revision"]')?.click();
+            } else if (wCmd === 'flashcards' && window.activateVaultSubview) {
+                window.switchPage && window.switchPage('page-vault');
+                window.activateVaultSubview('neet');
+                window.activeTaskTab = 'revision';
+                window.renderTasks && window.renderTasks('revision');
             } else if (wCmd === 'resume_book' && window.readerBooks?.length && window.openBookAtPage) {
                 const latest = [...window.readerBooks].sort((a, b) => (b.lastOpened || 0) - (a.lastOpened || 0))[0];
                 if (latest) window.openBookAtPage(latest.id, latest.currentPage || 1);
@@ -654,7 +550,7 @@ document.getElementById('privacy-unlock-pin-input')?.addEventListener('keydown',
     });
 })();
 
-// 7. POMOWAKE MISSION OS (WITH 60s/90s QUIET-SOLVE, ALGEBRA/ROOTS & 5-MIN WAKE RECHECK)
+// 6. POMOWAKE MISSION OS (WITH 60s/90s QUIET-SOLVE, ALGEBRA/ROOTS & 5-MIN WAKE RECHECK)
 (function initPomoWakeMissionOS() {
     window.sendDesktopNotification = function(title, body, tag = 'pomo-os', requireInteraction = false) {
         try {
@@ -860,7 +756,7 @@ document.getElementById('privacy-unlock-pin-input')?.addEventListener('keydown',
             <div class="bg-slate-900 border border-rose-500/50 rounded-3xl p-5 w-full max-w-lg shadow-2xl flex flex-col gap-3.5 max-h-[92dvh] native-scroll">
                 <div class="flex justify-between items-center border-b border-slate-800 pb-2.5">
                     <div>
-                        <span class="text-[9px] font-extrabold uppercase tracking-widest bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-full border border-rose-500/30">⏰ PomoWake Mission OS (v16.0)</span>
+                        <span class="text-[9px] font-extrabold uppercase tracking-widest bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-full border border-rose-500/30">⏰ PomoWake Mission OS (v16.0 Desktop)</span>
                         <h3 class="text-base font-extrabold text-white mt-1">Mission Alarms, 60s/90s Quiet-Solve & 5m Recheck</h3>
                     </div>
                     <button type="button" onclick="document.getElementById('alarmy-studio-modal').classList.add('hidden')" class="bg-slate-800 text-slate-300 px-3 py-1 rounded-xl text-xs font-bold">✕ Close</button>
@@ -1059,7 +955,7 @@ document.getElementById('privacy-unlock-pin-input')?.addEventListener('keydown',
                         💡 Start typing or click "Mute 60s / 90s" above to silence siren while solving!
                     </div>
                     <div class="bg-slate-900 border border-amber-500/50 rounded-2xl p-4">
-                        <p class="text-base font-mono font-extrabold text-amber-300 whitespace-pre-wrap">${escapeHtml(missionPrompt)}</p>
+                        <p class="text-sm sm:text-base font-mono font-extrabold text-amber-300 whitespace-pre-wrap">${escapeHtml(missionPrompt)}</p>
                         ${expectedAnswer ? `
                             <input type="text" id="alarmy-mission-ans-inp" placeholder="Type answer (auto-mutes siren for ${defaultMuteSec}s)..." class="w-full mt-3 bg-slate-950 border-2 border-blue-500 rounded-xl px-4 py-3 text-center font-mono text-base font-extrabold text-white focus:outline-none" autocomplete="off">
                         ` : ''}
@@ -1145,6 +1041,7 @@ document.getElementById('privacy-unlock-pin-input')?.addEventListener('keydown',
             b.className = "fixed bottom-20 right-4 w-96 z-[450] bg-slate-900 border-2 border-amber-500 rounded-2xl p-4 shadow-2xl flex flex-col gap-2.5";
             document.body.appendChild(b);
         }
+        const safeId = window.escapeJsStr(taskObj.id);
         b.innerHTML = `
             <div class="flex justify-between items-start gap-2">
                 <div>
@@ -1154,14 +1051,14 @@ document.getElementById('privacy-unlock-pin-input')?.addEventListener('keydown',
                 <button type="button" onclick="this.closest('#live-task-reminder-popup').remove()" class="text-slate-400 hover:text-white text-xs font-bold">✕</button>
             </div>
             <div class="flex gap-2">
-                <button type="button" onclick="document.getElementById('live-task-reminder-popup')?.remove(); window.openProtocolRunModal && window.openProtocolRunModal('todo', '${escapeJsStr(taskObj.id)}')" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-2 rounded-xl text-xs shadow">▶️ Run Now on Timer</button>
+                <button type="button" onclick="document.getElementById('live-task-reminder-popup')?.remove(); window.openProtocolRunModal && window.openProtocolRunModal('todo', '${safeId}')" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-2 rounded-xl text-xs shadow">▶️ Run Now on Timer</button>
                 <button type="button" onclick="document.getElementById('live-task-reminder-popup')?.remove()" class="bg-slate-800 text-slate-300 font-bold px-3 py-2 rounded-xl text-xs">Later</button>
             </div>
         `;
     };
 })();
 
-// 8. POMOLEXICON 4-LANGUAGE MASTER DICTIONARY (ARABIC • URDU • ENGLISH • HINDI — FIXED CLEAN URLS)
+// 7. POMOLEXICON 4-LANGUAGE MASTER DICTIONARY (ARABIC • URDU • ENGLISH • HINDI — FIXED URL)
 (function initFourLanguageScholarDictionary() {
     const HTTPS = 'https:' + '//';
     const MEDICAL_ROOTS = {
@@ -1182,7 +1079,7 @@ document.getElementById('privacy-unlock-pin-input')?.addEventListener('keydown',
         trophy: 'Suffix: Growth or nourishment'
     };
 
-    let savedVocabBank = JSON.parse(window.safeGet('pages_pomodoro_vocab_bank_v12', '[]'));
+    var savedVocabBank = JSON.parse(window.safeGet('pages_pomodoro_vocab_bank_v12', '[]'));
 
     function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
         return new Promise((resolve, reject) => {
@@ -1253,7 +1150,7 @@ document.getElementById('privacy-unlock-pin-input')?.addEventListener('keydown',
                 }
             } catch (e) {}
 
-            // Fixed Clean URL (Zero Markdown corruption)
+            // FIXED CLEAN TRANSLATE ENDPOINT URL
             const fetchTrans = async (langCode) => {
                 try {
                     const transUrl = `${HTTPS}translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${langCode}&dt=t&q=${encodeURIComponent(query)}`;
@@ -1270,6 +1167,7 @@ document.getElementById('privacy-unlock-pin-input')?.addEventListener('keydown',
         }
 
         window.lastDictLookupObj = { word: firstWordClean, engDef: engDef || query, arTrans, urTrans, hiTrans };
+        const safePronounceWord = window.escapeJsStr(firstWordClean);
 
         body.innerHTML = `
             <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 flex flex-col gap-2.5">
@@ -1281,7 +1179,7 @@ document.getElementById('privacy-unlock-pin-input')?.addEventListener('keydown',
                     </div>
                     <div class="flex gap-1.5 shrink-0">
                         <button type="button" onclick="window.saveCurrentWordToVocabBank()" class="bg-amber-600/25 hover:bg-amber-600 text-amber-300 hover:text-white border border-amber-500/40 px-2.5 py-1 rounded-lg text-xs font-bold">⭐ Save Word (${savedVocabBank.length})</button>
-                        <button type="button" onclick="window.speechSynthesis && window.speechSynthesis.speak(new SpeechSynthesisUtterance('${escapeJsStr(firstWordClean)}'))" class="bg-slate-800 hover:bg-slate-700 text-emerald-300 px-2.5 py-1 rounded-lg text-xs font-bold">🔊 Pronounce</button>
+                        <button type="button" onclick="window.speechSynthesis && window.speechSynthesis.speak(new SpeechSynthesisUtterance('${safePronounceWord}'))" class="bg-slate-800 hover:bg-slate-700 text-emerald-300 px-2.5 py-1 rounded-lg text-xs font-bold">🔊 Pronounce</button>
                     </div>
                 </div>
 
@@ -1317,23 +1215,24 @@ document.getElementById('privacy-unlock-pin-input')?.addEventListener('keydown',
         savedVocabBank.unshift({ ...window.lastDictLookupObj, savedAt: Date.now() });
         window.safeSet('pages_pomodoro_vocab_bank_v12', JSON.stringify(savedVocabBank));
 
-        // Also add to FSRS Flashcards Deck automatically!
+        // Also add to FSRS Flashcard Deck automatically!
         const cards = JSON.parse(window.safeGet('pages_pomodoro_fsrs_cards_v15', '[]'));
         cards.unshift({
-            id: 'fc_vocab_' + Date.now(),
-            front: `Define "${window.lastDictLookupObj.word}" (English / Arabic / Urdu / Hindi):`,
-            back: `${window.lastDictLookupObj.engDef}\n• AR: ${window.lastDictLookupObj.arTrans || '—'} | UR: ${window.lastDictLookupObj.urTrans || '—'} | HI: ${window.lastDictLookupObj.hiTrans || '—'}`,
-            topic: 'Lexicon Vocab',
+            id: 'fc_voc_' + Date.now(),
+            topic: 'Vocabulary Lexicon',
+            front: `Define "${window.lastDictLookupObj.word}"`,
+            back: `${window.lastDictLookupObj.engDef}\nArabic: ${window.lastDictLookupObj.arTrans || '—'} | Urdu: ${window.lastDictLookupObj.urTrans || '—'} | Hindi: ${window.lastDictLookupObj.hiTrans || '—'}`,
             intervalDays: 1,
-            stabilityPct: 95
+            stabilityPct: 95,
+            lastReviewed: Date.now()
         });
         window.safeSet('pages_pomodoro_fsrs_cards_v15', JSON.stringify(cards));
         window.showToast(`⭐ Saved "${window.lastDictLookupObj.word}" to Vocab Bank & Memory Beast Flashcards!`);
     };
 })();
 
-// 9. MASTER 15-PRO COMMAND HUB + 40HZ GAMMA SYNTH + OMR & SRS + DESKTOP SHORTCUTS ENGINE
-(function initMaster15UpgradesAndDesktopShortcuts() {
+// 8. MASTER 15-PRO COMMAND HUB (CTRL + K) + AUDIO SYNTH + OMR & SRS ENGINE
+(function initMaster15UpgradesAndPacksABC() {
     var audioNodes = { playing: false, mode: 'off', ctx: null, gain: null, sources: [] };
     window.toggleOfflineFocusAudio = function(mode = '40hz') {
         try {
@@ -1429,7 +1328,7 @@ document.getElementById('privacy-unlock-pin-input')?.addEventListener('keydown',
         streamerHudActive = !streamerHudActive;
         const hideIds = ['home-omni-bento-strip', 'home-reader-widget-card', 'ai-coach-card'];
         hideIds.forEach(id => document.getElementById(id)?.classList.toggle('hidden', streamerHudActive));
-        window.showToast(streamerHudActive ? "🎥 OBS Broadcast HUD Active (Clean Streamer Layout)" : "🎥 Standard Workspace Restored");
+        window.showToast(streamerHudActive ? "🎥 Clean Streamer HUD Active" : "🎥 Standard Workspace Restored");
     };
 
     window.autoPackPomodoroCycles = function(cycles = 4, subjTitle = 'High-Yield Medical & Polymath Lock-In') {
@@ -1475,21 +1374,21 @@ document.getElementById('privacy-unlock-pin-input')?.addEventListener('keydown',
             <div class="bg-slate-900 border-2 border-cyan-500/60 rounded-3xl w-full max-w-4xl max-h-[92dvh] shadow-2xl flex flex-col overflow-hidden">
                 <div class="flex flex-wrap items-center justify-between gap-2 px-5 py-3.5 bg-slate-950 border-b border-slate-800 shrink-0">
                     <div>
-                        <span class="text-[9px] font-extrabold uppercase tracking-widest bg-cyan-500/20 text-cyan-300 px-2.5 py-0.5 rounded-full border border-cyan-500/40">🚀 Polymath Command Center (Ctrl + K)</span>
-                        <h3 class="text-base font-extrabold text-white mt-0.5">Master 15-Pro Hub • 40Hz Synth • (+4/-1) OMR • SRS & Formula Vault</h3>
+                        <span class="text-[9px] font-extrabold uppercase tracking-widest bg-cyan-500/20 text-cyan-300 px-2.5 py-0.5 rounded-full border border-cyan-500/40">🚀 Desktop Command Center (Ctrl + K)</span>
+                        <h3 class="text-base font-extrabold text-white mt-0.5">Master 15-Pro Hub • 40Hz Synth • OMR Sheet • 1-3-7-14-30 SRS</h3>
                     </div>
                     <button type="button" onclick="document.getElementById('master-15-upgrades-modal').classList.add('hidden')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-3 py-1.5 rounded-xl text-xs">✕ Close</button>
                 </div>
 
                 <div class="flex-1 p-4 native-scroll flex flex-col gap-3.5">
-                    <div class="bg-slate-950 border-2 border-cyan-500/60 rounded-2xl p-3 flex items-center gap-2">
+                    <div class="bg-slate-950 border-2 border-cyan-500/60 rounded-2xl p-3 flex flex-wrap items-center gap-2">
                         <span class="text-base">⌨️</span>
-                        <input type="text" id="ctrlk-cmd-inp" placeholder="Spotlight: Type 'dict word', 'pomo' to start timer, 'keys' for shortcuts..." class="flex-1 bg-transparent text-xs font-mono text-white focus:outline-none">
-                        <button type="button" onclick="document.getElementById('master-15-upgrades-modal').classList.add('hidden'); window.openDesktopShortcutsModal();" class="bg-slate-900 hover:bg-blue-600 text-cyan-300 hover:text-white border border-slate-700 px-3 py-1 rounded-lg text-xs font-extrabold">⌨️ All Shortcuts (?)</button>
+                        <input type="text" id="ctrlk-cmd-inp" placeholder="Spotlight: Type 'dict word', 'pomo' (start timer), or press ? for Keyboard Shortcuts..." class="flex-1 min-w-[200px] bg-transparent text-xs font-mono text-white focus:outline-none">
+                        <button type="button" onclick="document.getElementById('master-15-upgrades-modal').classList.add('hidden'); window.openDesktopKeysModal && window.openDesktopKeysModal();" class="bg-slate-900 hover:bg-blue-600 text-cyan-300 hover:text-white border border-slate-700 px-3 py-1.5 rounded-lg text-[10px] font-extrabold">⌨️ All Shortcuts</button>
                     </div>
 
                     <div class="bg-slate-950 border border-emerald-500/40 rounded-2xl p-3.5 flex flex-col gap-2.5">
-                        <span class="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400">⚡ Pack A — 40Hz Gamma Binaural • Brown Noise • Forest Rain • PiP • OBS HUD</span>
+                        <span class="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400">⚡ Pack A — 40Hz Gamma Binaural • Brown Noise • Forest Rain • Mini-PiP • Clean HUD</span>
                         <div class="grid grid-cols-4 gap-2">
                             <button type="button" onclick="window.toggleOfflineFocusAudio('40hz')" class="bg-emerald-600/25 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/40 p-2.5 rounded-xl text-xs font-extrabold">🧠 Play 40Hz Gamma</button>
                             <button type="button" onclick="window.toggleOfflineFocusAudio('brown')" class="bg-amber-600/25 hover:bg-amber-600 text-amber-300 hover:text-white border border-amber-500/40 p-2.5 rounded-xl text-xs font-extrabold">🌊 Play Brown Noise</button>
@@ -1497,15 +1396,15 @@ document.getElementById('privacy-unlock-pin-input')?.addEventListener('keydown',
                             <button type="button" onclick="window.toggleOfflineFocusAudio('off')" class="bg-slate-900 hover:bg-red-950 text-red-300 border border-slate-800 p-2.5 rounded-xl text-xs font-bold">🔇 Stop Audio</button>
                         </div>
                         <div class="grid grid-cols-3 gap-2 pt-1">
-                            <button type="button" onclick="document.getElementById('master-15-upgrades-modal').classList.add('hidden'); window.launchPipMiniCockpitWidget && window.launchPipMiniCockpitWidget();" class="bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-slate-700 p-2.5 rounded-xl text-xs font-bold">🖼️ Pop Out Mini-PiP Window</button>
-                            <button type="button" onclick="window.toggleObsStreamerHudMode()" class="bg-slate-900 hover:bg-slate-800 text-purple-300 border border-slate-700 p-2.5 rounded-xl text-xs font-bold">🎥 Toggle OBS Streamer HUD</button>
+                            <button type="button" onclick="document.getElementById('master-15-upgrades-modal').classList.add('hidden'); window.openDeviceWidgetStudioModal && window.openDeviceWidgetStudioModal();" class="bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-slate-700 p-2.5 rounded-xl text-xs font-bold">🔔 Notification Matrix & PiP</button>
+                            <button type="button" onclick="window.toggleObsStreamerHudMode()" class="bg-slate-900 hover:bg-slate-800 text-purple-300 border border-slate-700 p-2.5 rounded-xl text-xs font-bold">🎥 Toggle Clean HUD</button>
                             <button type="button" onclick="window.autoPackPomodoroCycles(4, 'Medical & Polymath Deep Block'); document.getElementById('master-15-upgrades-modal').classList.add('hidden');" class="bg-blue-600 hover:bg-blue-500 text-white p-2.5 rounded-xl text-xs font-extrabold shadow">🗓️ Auto-Pack 4× (50m/10m) Cycles</button>
                         </div>
                     </div>
 
                     <div class="bg-slate-950 border border-amber-500/40 rounded-2xl p-3.5 flex flex-col gap-2.5">
                         <span class="text-[10px] font-extrabold uppercase tracking-wider text-amber-400">🎯 Pack B — 1-3-7-14-30 SRS • Mistake Autopsy • Formula Sheet • (+4/-1) OMR Simulator</span>
-                        <div class="flex gap-2">
+                        <div class="flex flex-wrap gap-2">
                             <input type="text" id="srs-quick-chap-inp" placeholder="Type chapter/topic completed today (e.g. Cardiac Cycle / French Revolution)..." class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white">
                             <button type="button" onclick="const v=document.getElementById('srs-quick-chap-inp').value.trim(); if(v) window.scheduleChapterSpacedRepetition(v, window.activeTaskSubj||'Medical Science');" class="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold px-4 py-2 rounded-xl text-xs shadow">🔁 Schedule 1-3-7-14-30 SRS</button>
                         </div>
@@ -1530,8 +1429,6 @@ document.getElementById('privacy-unlock-pin-input')?.addEventListener('keydown',
             modal.classList.add('hidden');
             if (/^dict\s+(.+)/i.test(val)) {
                 window.openReaderDictionaryModal(val.replace(/^dict\s+/i, ''));
-            } else if (/^keys/i.test(val)) {
-                window.openDesktopShortcutsModal();
             } else if (/^pomo/i.test(val)) {
                 window.startTimer && window.startTimer();
             }
@@ -1592,17 +1489,17 @@ document.getElementById('privacy-unlock-pin-input')?.addEventListener('keydown',
             <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3 flex flex-col gap-2">
                 <div class="flex gap-2">
                     <input type="text" id="new-autopsy-q-inp" placeholder="Question / Concept you got wrong..." class="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white">
-                    <input type="text" id="new-autopsy-a-inp" placeholder="Correct Mechanism / Fact..." class="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-emerald-300">
-                    <button type="button" onclick="const q=document.getElementById('new-autopsy-q-inp').value.trim(), a=document.getElementById('new-autopsy-a-inp').value.trim(); if(q){window.mistakeAutopsyList.unshift({id:Date.now(),subj:window.activeTaskSubj||'Medical',q,ans:a,explanation:'',date:window.getLocalTodayString()}); window.safeSet('pages_pomodoro_autopsy_v12',JSON.stringify(window.mistakeAutopsyList)); window.renderMistakeAutopsySection();}" class="bg-rose-600 text-white font-bold px-3 py-1.5 rounded-xl text-xs">＋ Log</button>
+                    <input type="text" id="new-autopsy-a-inp" placeholder="Correct Answer & Takeaway..." class="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-emerald-300">
+                    <button type="button" onclick="const q=document.getElementById('new-autopsy-q-inp').value.trim(), a=document.getElementById('new-autopsy-a-inp').value.trim(); if(q&&a){window.mistakeAutopsyList.unshift({id:Date.now(),subj:window.activeTaskSubj||'Medical Science',q,ans:a,explanation:'',date:window.getLocalTodayString()}); window.safeSet('pages_pomodoro_autopsy_v12',JSON.stringify(window.mistakeAutopsyList)); window.renderMistakeAutopsySection();}" class="bg-rose-600 text-white font-bold px-3 py-1.5 rounded-xl text-xs">＋ Log</button>
                 </div>
                 <div class="flex flex-col gap-1.5 max-h-48 native-scroll">
                     ${window.mistakeAutopsyList.length ? window.mistakeAutopsyList.map(m => `
                         <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-xs">
                             <span class="text-[10px] font-mono text-amber-400">[${escapeHtml(m.subj)} • ${escapeHtml(m.date)}]</span>
                             <p class="font-bold text-white mt-0.5">${escapeHtml(m.q)}</p>
-                            <p class="text-emerald-400 text-[11px] mt-0.5">✓ ${escapeHtml(m.ans)}</p>
+                            <p class="text-emerald-400 text-[11px] mt-0.5">✓ Fix: ${escapeHtml(m.ans)} ${escapeHtml(m.explanation || '')}</p>
                         </div>
-                    `).join('') : `<p class="text-xs text-slate-400 italic">No mistakes logged yet. Add one above!</p>`}
+                    `).join('') : `<p class="text-xs text-slate-400 italic">Log any MCQ mistake above to build your Mistake Autopsy Vault.</p>`}
                 </div>
             </div>
         `;
@@ -1641,180 +1538,23 @@ document.getElementById('privacy-unlock-pin-input')?.addEventListener('keydown',
         `;
     };
 
-    // DESKTOP KEYBOARD SHORTCUTS CHEAT-SHEET MODAL
-    window.openDesktopShortcutsModal = function() {
-        const modal = document.getElementById('reader-suboptions-modal');
-        const titleEl = document.getElementById('suboptions-modal-title');
-        const bodyEl = document.getElementById('suboptions-modal-body');
-        if (!modal || !titleEl || !bodyEl) return;
-
-        titleEl.textContent = "⌨️ Desktop Pro Keyboard Shortcuts Cheat-Sheet";
-        const shortcuts = [
-            { key: 'Alt + 1 … 6', desc: 'Switch tabs: 1 Timer • 2 Plan • 3 Tasks • 4 Vault • 5 Reader • 6 Profile' },
-            { key: 'Ctrl + K', desc: 'Open Master 15-Pro Command Center & Spotlight' },
-            { key: '? or Alt + K', desc: 'Open this Keyboard Shortcuts Cheat-Sheet' },
-            { key: 'Alt + L', desc: 'Lock Workspace immediately with Privacy PIN Shield' },
-            { key: 'Space', desc: 'Start / Pause Pomodoro Timer (when on Timer page)' },
-            { key: 'C / S / U', desc: 'Complete Session (C) • Skip Session (S) • Undo Session (U)' },
-            { key: 'D / W', desc: 'Toggle OLED Dim Mode (D) • Pop Out Mini-PiP Window (W)' },
-            { key: 'N', desc: 'Focus New PomoTask / New Vault Chapter Input' },
-            { key: '← / → or J / K', desc: 'Previous / Next Book Page in Reader Pro' },
-            { key: '+ / - or Ctrl+Wheel', desc: 'Zoom In / Zoom Out isolated to Book Page' },
-            { key: 'B / P / T / F / L', desc: 'Reader: Bookmark (B) • Pencil Studio (P) • TOC (T) • Search (F) • Lexicon (L)' },
-            { key: 'Ctrl + Z', desc: 'Undo last Highlight, Image Occlusion Mask, or Drawing in Reader' }
-        ];
-
-        bodyEl.innerHTML = `
-            <div class="grid grid-cols-1 gap-1.5 text-xs">
-                ${shortcuts.map(s => `
-                    <div class="flex items-center justify-between bg-slate-950 px-3 py-2 rounded-xl border border-slate-800">
-                        <span class="text-slate-300 font-medium">${escapeHtml(s.desc)}</span>
-                        <kbd class="bg-slate-900 border border-cyan-500/40 text-cyan-300 font-mono font-extrabold px-2.5 py-1 rounded-lg text-[11px] shrink-0 ml-2">${escapeHtml(s.key)}</kbd>
-                    </div>
-                `).join('')}
-            </div>
-        `;
-        modal.classList.remove('hidden');
-    };
-
-    document.getElementById('desktop-keys-top-btn')?.addEventListener('click', window.openDesktopShortcutsModal);
-
     const topHeaderLeft = document.getElementById('dim-toggle-btn')?.parentElement;
     if (topHeaderLeft && !document.getElementById('master-15-pro-top-btn')) {
         const proBtn = document.createElement('button');
         proBtn.type = 'button';
         proBtn.id = 'master-15-pro-top-btn';
         proBtn.className = "bg-gradient-to-r from-cyan-600 to-purple-600 text-white px-2.5 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1 shadow active:scale-95";
-        proBtn.title = "Open Polymath Command Center (Shortcut: Ctrl+K)";
+        proBtn.title = "Open Desktop Command Center (Ctrl+K)";
         proBtn.innerHTML = `<span>🚀</span><span class="text-[10px]">15-Pro</span>`;
         proBtn.onclick = () => window.openMaster15UpgradesHub();
         topHeaderLeft.appendChild(proBtn);
     }
 
-    // GLOBAL DESKTOP KEYBOARD SHORTCUTS ROUTER
     window.addEventListener('keydown', (e) => {
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
             e.preventDefault();
             window.openMaster15UpgradesHub();
-            return;
-        }
-        if (e.altKey && e.key.toLowerCase() === 'l') {
-            e.preventDefault();
-            window.triggerPrivacyLockShortcut();
-            return;
-        }
-        if (e.altKey && e.key.toLowerCase() === 'k') {
-            e.preventDefault();
-            window.openDesktopShortcutsModal();
-            return;
-        }
-
-        // Alt + 1..6 Page Navigation
-        if (e.altKey && ['1', '2', '3', '4', '5', '6'].includes(e.key)) {
-            e.preventDefault();
-            const pageMap = {
-                '1': 'page-timer',
-                '2': 'page-schedule',
-                '3': 'page-todo',
-                '4': 'page-vault',
-                '5': 'page-reader',
-                '6': 'page-settings'
-            };
-            const readerOv = document.getElementById('reader-fullscreen-overlay');
-            if (readerOv && !readerOv.classList.contains('hidden') && e.key !== '5') {
-                document.getElementById('reader-back-to-shelf-btn')?.click();
-            }
-            if (window.switchPage) window.switchPage(pageMap[e.key]);
-            return;
-        }
-
-        // Pause single-key shortcuts when typing inside inputs, textareas, selects, or contentEditable
-        const tag = (e.target?.tagName || '').toLowerCase();
-        if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target?.isContentEditable) {
-            return;
-        }
-
-        if (e.key === '?') {
-            e.preventDefault();
-            window.openDesktopShortcutsModal();
-            return;
-        }
-
-        const readerOv = document.getElementById('reader-fullscreen-overlay');
-        const isReaderOpen = readerOv && !readerOv.classList.contains('hidden');
-
-        // Reader Pro Active Book Shortcuts
-        if (isReaderOpen) {
-            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
-                e.preventDefault();
-                if (window.undoLastReaderAnnotation) window.undoLastReaderAnnotation();
-                return;
-            }
-            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
-                e.preventDefault();
-                document.getElementById('reader-bottom-search-btn')?.click();
-                return;
-            }
-            if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'j') {
-                e.preventDefault();
-                document.getElementById('reader-prev-page-btn')?.click();
-            } else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'k') {
-                e.preventDefault();
-                document.getElementById('reader-next-page-btn')?.click();
-            } else if (e.key === '+' || e.key === '=') {
-                e.preventDefault();
-                document.getElementById('reader-zoom-in-btn')?.click();
-            } else if (e.key === '-') {
-                e.preventDefault();
-                document.getElementById('reader-zoom-out-btn')?.click();
-            } else if (e.key.toLowerCase() === 'b') {
-                e.preventDefault();
-                document.getElementById('reader-quick-bookmark-btn')?.click();
-            } else if (e.key.toLowerCase() === 'p') {
-                e.preventDefault();
-                document.getElementById('reader-pencil-toggle-btn')?.click();
-            } else if (e.key.toLowerCase() === 't') {
-                e.preventDefault();
-                document.getElementById('reader-bottom-toc-btn')?.click();
-            } else if (e.key.toLowerCase() === 'f') {
-                e.preventDefault();
-                document.getElementById('reader-bottom-search-btn')?.click();
-            } else if (e.key.toLowerCase() === 'l') {
-                e.preventDefault();
-                document.getElementById('reader-open-dict-top-btn')?.click();
-            }
-            return;
-        }
-
-        // Timer Cockpit Shortcuts
-        if (window.currentPageId === 'page-timer') {
-            if (e.code === 'Space') {
-                e.preventDefault();
-                if (window.isRunning) window.stopTimer();
-                else window.startTimer();
-            } else if (e.key.toLowerCase() === 'c') {
-                e.preventDefault();
-                if (window.completeSession) window.completeSession();
-            } else if (e.key.toLowerCase() === 's') {
-                e.preventDefault();
-                document.getElementById('skip-btn')?.click();
-            } else if (e.key.toLowerCase() === 'u') {
-                e.preventDefault();
-                document.getElementById('undo-btn')?.click();
-            } else if (e.key.toLowerCase() === 'd') {
-                e.preventDefault();
-                document.body.classList.toggle('dim-mode');
-            } else if (e.key.toLowerCase() === 'w') {
-                e.preventDefault();
-                if (window.launchPipMiniCockpitWidget) window.launchPipMiniCockpitWidget();
-            }
-        } else if (window.currentPageId === 'page-todo' && e.key.toLowerCase() === 'n') {
-            e.preventDefault();
-            document.getElementById('todo-new-input')?.focus();
-        } else if (window.currentPageId === 'page-vault' && e.key.toLowerCase() === 'n') {
-            e.preventDefault();
-            document.getElementById('task-title-input')?.focus();
         }
     });
 })();
-// ✅ END OF FILE (01-core-bus.js v16.0 Desktop) — 100% COMPLETE & UNCUT
+// ✅ END OF FILE (01-core-bus.js v16.0 Pure Desktop Edition) — 100% COMPLETE & UNCUT

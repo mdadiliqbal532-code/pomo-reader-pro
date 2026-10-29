@@ -1,9 +1,8 @@
 /* =========================================================================
-   05-POMODOC-FORGE.JS (v17.2 FULL MASTER RESTORATION — ZERO FEATURES CUT)
-   RESTORES ALL BOTTOM READER BAR TOOLS (SELECT, OCCLUSION, BIONIC, TELEPROMPTER,
-   2-PDF SPLIT COMPARATOR, SCRATCHPAD TOGGLE, INTERACTIVE DIAGRAM SNIP & CROP,
-   RAM CLEANER) + FULL POMODOC FORGE (DIAGRAMS, TABLES, CHARTS, MIND MAPS, MATH)
-   + PDF UTILITY SUITE (MERGE, IMAGES TO PDF, COMPRESS, SPLIT, PAGE OPS)
+   05-POMODOC-FORGE-PART1.JS (v17.2 FULL MASTER RESTORATION — PART 1 OF 2)
+   MODULAR POMODOC FORGE, SELECTIVE VISUAL & TABLE EXTRACTOR (DIAGRAMS,
+   DATA TABLES, CHARTS, MIND MAPS, FORMULAS), DEEP LINE-BY-LINE SEMANTIC
+   ANALYZER & USER-CUSTOMIZABLE TYPOGRAPHY / COLOR STUDIO
    ========================================================================= */
 (function() {
     const DEFAULT_SEMANTIC_STYLES = {
@@ -40,12 +39,6 @@
     window.pomoForgeKeepMatrix = JSON.parse(window.safeGet('pages_pomodoro_forge_keep_v17', 'null')) || { ...DEFAULT_KEEP_MATRIX };
 
     let activeILovePdfBookId = null;
-    let teleprompterActive = false;
-    let teleprompterTimer = null;
-    let splitViewActive = false;
-    let splitSecondPdfDoc = null;
-    let splitSecondPageNum = 1;
-    let activeSnipCallback = null;
 
     /* =========================================================================
        1. LIVE CSS VARIABLE INJECTOR FOR USER SEMANTIC STYLES
@@ -85,201 +78,8 @@
     window.applyPomoSemanticStyles();
 
     /* =========================================================================
-       2. RESTORE ALL READER BOTTOM BAR BUTTONS & ADVANCED TOOLS
+       2. DEEP LINE-BY-LINE & INLINE SEMANTIC PARSER
        ========================================================================= */
-    window.mountReaderV45Upgrades = function() {
-        const bottomBar = document.querySelector('#reader-fullscreen-overlay #reader-bottom-bar > div:last-child');
-        if (!bottomBar || document.getElementById('reader-v45-toolbar-cluster')) return;
-
-        const cluster = document.createElement('div');
-        cluster.id = 'reader-v45-toolbar-cluster';
-        cluster.className = "flex items-center gap-1 shrink-0 flex-wrap";
-        cluster.innerHTML = `
-            <button type="button" id="v45-select-mode-btn" class="v13-bot-sym-btn text-blue-300" title="Toggle Select Mode: Official Highlight vs Direct Box Select">🎯</button>
-            <button type="button" id="v45-occlusion-toggle-btn" class="v13-bot-sym-btn text-amber-300" title="Toggle Image Occlusion 'Click to Reveal' Mask Creator (Shortcut: O)">🎭</button>
-            <button type="button" id="v45-bionic-toggle-btn" class="v13-bot-sym-btn text-cyan-300" title="Toggle Bionic Reading Speed Bold Highlighting">👁️</button>
-            <button type="button" id="v45-teleprompter-btn" class="v13-bot-sym-btn text-purple-300" title="Toggle Auto-Scroll Teleprompter Mode">🎬</button>
-            <button type="button" id="v45-splitview-btn" class="v13-bot-sym-btn text-emerald-300" title="Toggle 2-PDF Split View (Compare Two Books Side-by-Side)">🗔</button>
-            <button type="button" id="v45-scratchpad-btn" class="v13-bot-sym-btn text-amber-400" title="Toggle True 50/50 Split-Screen OneNote & Rough Studio (Shortcut: N)">📝 Scratchpad</button>
-            <button type="button" id="v45-snip-region-btn" class="v13-bot-sym-btn text-rose-300" title="📸 Snip Diagram / Region and Send to Scratchpad or Vault">📸 Snip</button>
-            <button type="button" id="v45-ram-cleaner-btn" class="v13-bot-sym-btn text-teal-300" title="🧹 Turbo RAM Cleaner (Optimizes 32GB Workstation Buffer)">🧹 RAM</button>
-        `;
-        bottomBar.insertBefore(cluster, bottomBar.firstChild);
-
-        document.getElementById('v45-select-mode-btn').onclick = () => {
-            const cur = window.getReaderSelectionMode();
-            const nxt = cur === 'official' ? 'direct' : 'official';
-            window.setReaderSelectionMode(nxt);
-            showToast(nxt === 'official' ? "🎯 Select Mode: Official Text Highlight" : "🖍️ Select Mode: Direct Box Select");
-        };
-
-        document.getElementById('v45-occlusion-toggle-btn').onclick = () => {
-            const act = !window.getOcclusionModeActive();
-            window.setOcclusionModeActive(act);
-            showToast(act ? "🎭 Occlusion Mask Mode ON — Drag boxes over diagrams to hide labels!" : "🎭 Occlusion Mode OFF");
-        };
-
-        document.getElementById('v45-bionic-toggle-btn').onclick = () => {
-            const act = !window.getBionicReadingActive();
-            window.setBionicReadingActive(act);
-            showToast(act ? "👁️ Bionic Reading Active" : "👁️ Bionic Reading Off");
-        };
-
-        document.getElementById('v45-teleprompter-btn').onclick = () => {
-            teleprompterActive = !teleprompterActive;
-            clearInterval(teleprompterTimer);
-            if (teleprompterActive) {
-                teleprompterTimer = setInterval(() => {
-                    const vp = document.getElementById('reader-viewport');
-                    if (vp && teleprompterActive) vp.scrollBy({ top: 1.2, behavior: 'smooth' });
-                }, 40);
-                showToast("🎬 Auto-Scroll Teleprompter Active");
-            } else {
-                showToast("🎬 Teleprompter Paused");
-            }
-        };
-
-        document.getElementById('v45-splitview-btn').onclick = async () => {
-            splitViewActive = !splitViewActive;
-            const host = document.getElementById('reader-split-host');
-            if (!host) return;
-            if (splitViewActive) {
-                const input = document.createElement('input');
-                input.type = 'file'; input.accept = '.pdf';
-                input.onchange = async (e) => {
-                    const f = e.target.files?.[0];
-                    if (!f) return;
-                    const buf = await f.arrayBuffer();
-                    splitSecondPdfDoc = await pdfjsLib.getDocument({ data: buf }).promise;
-                    splitSecondPageNum = 1;
-                    renderSecondPdfSplitPane();
-                    showToast(`🗔 Loaded Secondary Comparison PDF: ${f.name}`);
-                };
-                input.click();
-            } else {
-                document.getElementById('reader-second-pdf-pane')?.remove();
-                showToast("📖 Single Book View Restored");
-            }
-        };
-
-        document.getElementById('v45-scratchpad-btn').onclick = () => {
-            const dock = document.getElementById('onenote-studio-dock');
-            if (dock && !dock.classList.contains('hidden')) {
-                window.closeOnenoteStudioDock();
-                showToast("📝 Closed OneNote Studio");
-            } else {
-                const book = window.getActiveReaderBook();
-                if (book && window.initOnenoteStudioDock) {
-                    window.initOnenoteStudioDock(book.id);
-                    showToast("📝 Opened OneNote & Rough Studio (Split-Screen)");
-                } else {
-                    showToast("Open a book first to use Scratchpad", true);
-                }
-            }
-        };
-
-        document.getElementById('v45-snip-region-btn').onclick = () => {
-            showToast("📸 Snip Mode: Drag a box around any diagram or table to capture it!");
-            window._activeDiagramSnipMode = true;
-            window.setReaderSelectionMode('direct');
-        };
-
-        document.getElementById('v45-ram-cleaner-btn').onclick = () => {
-            window.runTurboRamCleaner(true);
-        };
-    };
-
-    window.completeInteractiveDiagramSnip = async function(pageNum, rx, ry, rw, rh) {
-        window._activeDiagramSnipMode = false;
-        const card = document.querySelector(`.v4-page-card[data-page="${pageNum}"]`);
-        if (!card) return;
-        const canvas = card.querySelector('canvas.v4-pdf-canvas');
-        if (!canvas) { showToast("Snip requires rendered PDF page canvas", true); return; }
-
-        const cW = canvas.width, cH = canvas.height;
-        const sx = Math.round(rx * cW), sy = Math.round(ry * cH);
-        const sW = Math.round(rw * cW), sH = Math.round(rh * cH);
-
-        const cropCanvas = document.createElement('canvas');
-        cropCanvas.width = sW; cropCanvas.height = sH;
-        const cropCtx = cropCanvas.getContext('2d');
-        cropCtx.drawImage(canvas, sx, sy, sW, sH, 0, 0, sW, sH);
-        const dataUrl = cropCanvas.toDataURL('image/png', 0.92);
-
-        try { await navigator.clipboard.writeText(`[Snipped Diagram p.${pageNum}]`); } catch (e) {}
-
-        const book = window.getActiveReaderBook();
-        if (book && window.saveNotebookLmReportToVault) {
-            window.saveNotebookLmReportToVault(
-                `[Snipped Diagram] ${book.title} p.${pageNum}`,
-                window.activeTaskSubj || 'Biology',
-                `![Snipped Diagram](${dataUrl})`,
-                book.id,
-                pageNum
-            );
-        }
-        showToast("📸 Snipped diagram saved to Vault & copied!");
-    };
-
-    function renderSecondPdfSplitPane() {
-        let pane = document.getElementById('reader-second-pdf-pane');
-        if (!pane) {
-            pane = document.createElement('div');
-            pane.id = 'reader-second-pdf-pane';
-            pane.className = "w-1/2 h-full bg-slate-950 border-l border-cyan-500/50 flex flex-col relative overflow-hidden";
-            document.getElementById('reader-split-host')?.appendChild(pane);
-        }
-        pane.innerHTML = `
-            <div class="bg-slate-900 px-3 py-1.5 flex items-center justify-between border-b border-slate-800 text-xs font-bold text-cyan-300">
-                <span>🗔 Secondary Comparison PDF</span>
-                <div class="flex items-center gap-2">
-                    <button type="button" onclick="window.shiftSecondPdfPage(-1)" class="bg-slate-800 px-2 py-0.5 rounded text-white">◀</button>
-                    <span id="second-pdf-page-label" class="font-mono">Page ${splitSecondPageNum}</span>
-                    <button type="button" onclick="window.shiftSecondPdfPage(1)" class="bg-slate-800 px-2 py-0.5 rounded text-white">▶</button>
-                    <button type="button" onclick="document.getElementById('reader-second-pdf-pane').remove();" class="text-red-400 px-1">✕</button>
-                </div>
-            </div>
-            <div class="flex-1 native-scroll p-4 text-center" id="second-pdf-canvas-wrap"></div>
-        `;
-        renderSecondPdfCanvasPage();
-    }
-
-    async function renderSecondPdfCanvasPage() {
-        if (!splitSecondPdfDoc) return;
-        const wrap = document.getElementById('second-pdf-canvas-wrap');
-        if (!wrap) return;
-        wrap.innerHTML = '';
-        try {
-            const page = await splitSecondPdfDoc.getPage(splitSecondPageNum);
-            const vp = page.getViewport({ scale: 1.25 });
-            const canvas = document.createElement('canvas');
-            canvas.width = vp.width; canvas.height = vp.height;
-            await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
-            wrap.appendChild(canvas);
-            const lbl = document.getElementById('second-pdf-page-label');
-            if (lbl) lbl.textContent = `Page ${splitSecondPageNum} / ${splitSecondPdfDoc.numPages}`;
-            try { page.cleanup(); } catch (e) {}
-        } catch (e) {}
-    }
-
-    window.shiftSecondPdfPage = function(delta) {
-        if (!splitSecondPdfDoc) return;
-        splitSecondPageNum = Math.max(1, Math.min(splitSecondPdfDoc.numPages, splitSecondPageNum + delta));
-        renderSecondPdfCanvasPage();
-    };
-
-    window.runTurboRamCleaner = function(silent = false) {
-        const rendered = window.getRenderedCanvasPages ? window.getRenderedCanvasPages() : null;
-        if (rendered) {
-            const activeBook = window.getActiveReaderBook();
-            const curP = activeBook?.currentPage || 1;
-            rendered.forEach(p => {
-                if (Math.abs(p - curP) > 12) rendered.delete(p);
-            });
-        }
-        if (!silent) showToast("🧹 Turbo RAM Cleaner executed! Workstation buffer optimized.");
-    };
-
     window.formatInlineSemanticSpans = function(rawText) {
         if (!rawText) return '';
         let safe = window.escapeHtml(rawText);
@@ -287,6 +87,27 @@
         safe = safe.replace(/(\([^()]{2,140}?\)|\[[^[\]]{2,140}?\])/g, '<span class="pf-bracket-span">$1</span>');
         safe = safe.replace(/\b(\d+(?:\.\d+)?(?:\/\d+(?:\.\d+)?)?\s*(?:mmHg|bpm|mL\/min|L\/min|mL|mg\/dL|g\/dL|mmol\/L|mEq\/L|kPa|atm|Hz|kHz|ms|sec|min|hrs?|%|°C|°F|K|mol\/L|M|N|J|kJ|cal|kcal|W|V|mV|Ω|A|mA|nm|μm|mm|cm|m\/s²?|kg|g|mg|μg))\b/gi, '<span class="pf-math-data">$1</span>');
         return safe;
+    };
+
+    window.classifyAndRenderSemanticLine = function(rawLine) {
+        const clean = String(rawLine || '').replace(/\s+/g, ' ').trim();
+        if (!clean) return '';
+        if (/^(chapter|unit|part|module|section)\s+([0-9ivxlcdm]+|one|two|three|four|five|six|seven|eight|nine|ten)\b/i.test(clean) && clean.length < 110) {
+            return `<div class="pf-chapter-banner">📘 ${window.formatInlineSemanticSpans(clean)}</div>`;
+        }
+        if (/\?\s*$/.test(clean) && clean.length < 260) {
+            return `<div class="pf-question-line">❓ ${window.formatInlineSemanticSpans(clean)}</div>`;
+        }
+        if (/^#\s+/.test(clean) || (clean === clean.toUpperCase() && /[A-Z]{4,}/.test(clean) && clean.length >= 5 && clean.length <= 85)) {
+            return `<h2 class="pbook-headline-h1 pf-headline">${window.formatInlineSemanticSpans(clean.replace(/^#+\s*/, ''))}</h2>`;
+        }
+        if (/^##\s+/.test(clean) || (/^([0-9]+\.[0-9]+|[IVX]+\.)\s+[A-Z]/.test(clean) && clean.length <= 95)) {
+            return `<h3 class="pbook-headline-h2 pf-topic">${window.formatInlineSemanticSpans(clean.replace(/^#+\s*/, ''))}</h3>`;
+        }
+        if (/^###\s+/.test(clean) || (/^[A-Z][A-Za-z0-9\s\-(),/]{3,60}:$/.test(clean))) {
+            return `<h4 class="pf-subtopic">▸ ${window.formatInlineSemanticSpans(clean.replace(/^#+\s*/, ''))}</h4>`;
+        }
+        return `<p class="pbook-paragraph">${window.formatInlineSemanticSpans(clean)}</p>`;
     };
 
     window.renderSemanticStructuredSheet = function(pageNum, pData, rawFallbackText = '') {
@@ -329,15 +150,66 @@
             });
         } else {
             const textSource = pData?.plainText || rawFallbackText || '';
-            html = textSource.split(/\n+/).map(ln => `<p class="pbook-paragraph">${window.formatInlineSemanticSpans(ln)}</p>`).join('');
+            html = textSource.split(/\n+/).map(ln => window.classifyAndRenderSemanticLine(ln)).join('');
         }
         sheet.innerHTML = html || `<p class="pbook-paragraph">Page ${pageNum}</p>`;
         return sheet;
     };
 
+    // Auto-upgrade reader stage sheets
+    const stageEl = document.getElementById('reader-pages-stage');
+    if (stageEl) {
+        let cachedBookId = null;
+        let cachedStructuredMap = {};
+        const obs = new MutationObserver(async () => {
+            const cards = stageEl.querySelectorAll('.v4-page-card:not([data-pf-upgraded="true"])');
+            if (!cards.length) return;
+            const activeBook = window.getActiveReaderBook ? window.getActiveReaderBook() : null;
+            if (!activeBook || activeBook.format === 'pdf') return;
+
+            if (cachedBookId !== activeBook.id) {
+                cachedBookId = activeBook.id;
+                const stored = await idbGet('bookFiles', activeBook.id);
+                cachedStructuredMap = {};
+                (stored?.structuredPages || []).forEach(sp => { cachedStructuredMap[sp.page] = sp; });
+            }
+
+            cards.forEach(card => {
+                card.setAttribute('data-pf-upgraded', 'true');
+                const pNum = parseInt(card.getAttribute('data-page')) || 1;
+                const oldSheet = card.querySelector('.pbook-page-sheet');
+                if (oldSheet) {
+                    const rawTxt = oldSheet.textContent || '';
+                    const newSheet = window.renderSemanticStructuredSheet(pNum, cachedStructuredMap[pNum], rawTxt);
+                    oldSheet.replaceWith(newSheet);
+                }
+            });
+        });
+        obs.observe(stageEl, { childList: true });
+    }
+
     /* =========================================================================
-       3. POMODOC FORGE MODAL (MERGE, IMAGES TO PDF, COMPRESS, SPLIT, CONVERT)
+       3. POMODOC FORGE MODAL & USER COLOR/BOLD STUDIO
        ========================================================================= */
+    window.toggleKeepMatrixOption = function(key, val) {
+        window.pomoForgeKeepMatrix[key] = Boolean(val);
+        window.safeSet('pages_pomodoro_forge_keep_v17', JSON.stringify(window.pomoForgeKeepMatrix));
+    };
+
+    window.updateSemanticStyleProp = function(prop, val) {
+        window.pomoSemanticStyles[prop] = val;
+        window.safeSet('pages_pomodoro_semantic_styles_v17', JSON.stringify(window.pomoSemanticStyles));
+        window.applyPomoSemanticStyles();
+    };
+
+    window.resetSemanticStylesToDefault = function() {
+        window.pomoSemanticStyles = { ...DEFAULT_SEMANTIC_STYLES };
+        window.safeSet('pages_pomodoro_semantic_styles_v17', JSON.stringify(window.pomoSemanticStyles));
+        window.applyPomoSemanticStyles();
+        window.openILovePdfStudioModal(activeILovePdfBookId);
+        showToast("🎨 Semantic Colors & Bolding reset to defaults!");
+    };
+
     window.openILovePdfStudioModal = function(bookId = null) {
         const sortedBySeq = [...(window.readerBooks || [])].sort((a, b) => (a.readSeq || 999) - (b.readSeq || 999));
         activeILovePdfBookId = bookId || sortedBySeq[0]?.id || null;
@@ -360,7 +232,6 @@
                 </select>
             </div>
 
-            <!-- 1. POMODOC FORGE SELECTIVE EXTRACTOR & SEMANTIC STYLER -->
             <div class="bg-gradient-to-br from-emerald-950/50 via-slate-950 to-slate-950 border border-emerald-500/50 rounded-2xl p-4 flex flex-col gap-3 shadow-lg">
                 <h4 class="text-sm font-extrabold text-white">1. PomoDoc Forge — Selective Visual Extractor & Semantic Styler</h4>
                 <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-3 flex flex-col gap-2">
@@ -383,6 +254,20 @@
                         </label>
                     </div>
                 </div>
+
+                <div class="bg-slate-900/90 border border-purple-500/40 rounded-xl p-3 flex flex-col gap-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[10px] font-extrabold uppercase text-purple-300">🎨 Manual Semantic Color & Bolding Studio:</span>
+                        <button type="button" onclick="window.resetSemanticStylesToDefault()" class="text-[10px] font-bold text-slate-400 hover:text-white underline">↺ Reset</button>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+                        <div class="bg-slate-950 p-2 rounded-lg border border-slate-800 flex items-center justify-between"><span class="font-bold" style="color:${st.chapterColor}">📘 Chapter</span><div class="flex items-center gap-1"><input type="color" value="${st.chapterColor}" oninput="window.updateSemanticStyleProp('chapterColor', this.value)" class="w-5 h-5 rounded cursor-pointer bg-transparent"><input type="checkbox" ${st.chapterBold ? 'checked' : ''} onchange="window.updateSemanticStyleProp('chapterBold', this.checked)"></div></div>
+                        <div class="bg-slate-950 p-2 rounded-lg border border-slate-800 flex items-center justify-between"><span class="font-bold" style="color:${st.headlineColor}">🔖 Headline</span><div class="flex items-center gap-1"><input type="color" value="${st.headlineColor}" oninput="window.updateSemanticStyleProp('headlineColor', this.value)" class="w-5 h-5 rounded cursor-pointer bg-transparent"><input type="checkbox" ${st.headlineBold ? 'checked' : ''} onchange="window.updateSemanticStyleProp('headlineBold', this.checked)"></div></div>
+                        <div class="bg-slate-950 p-2 rounded-lg border border-slate-800 flex items-center justify-between"><span class="font-bold" style="color:${st.topicColor}">📗 Topic</span><div class="flex items-center gap-1"><input type="color" value="${st.topicColor}" oninput="window.updateSemanticStyleProp('topicColor', this.value)" class="w-5 h-5 rounded cursor-pointer bg-transparent"><input type="checkbox" ${st.topicBold ? 'checked' : ''} onchange="window.updateSemanticStyleProp('topicBold', this.checked)"></div></div>
+                        <div class="bg-slate-950 p-2 rounded-lg border border-slate-800 flex items-center justify-between"><span class="font-bold" style="color:${st.questionColor}">❓ Question</span><div class="flex items-center gap-1"><input type="color" value="${st.questionColor}" oninput="window.updateSemanticStyleProp('questionColor', this.value)" class="w-5 h-5 rounded cursor-pointer bg-transparent"><input type="checkbox" ${st.questionBold ? 'checked' : ''} onchange="window.updateSemanticStyleProp('questionBold', this.checked)"></div></div>
+                    </div>
+                </div>
+
                 <div class="flex flex-wrap items-center gap-2 pt-1">
                     <button type="button" onclick="window.convertPdfToStructuredBook('replace')" class="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold px-4 py-2.5 rounded-xl text-xs shadow">🔄 Convert Book (Keep Visuals & Tables)</button>
                     <button type="button" onclick="window.convertPdfToStructuredBook('txt')" class="bg-slate-800 text-amber-300 font-bold px-3.5 py-2.5 rounded-xl text-xs">⬇️ Export Semantic .TXT</button>
@@ -390,38 +275,11 @@
                 <div id="pbook-convert-status" class="hidden text-xs font-mono font-bold text-emerald-400 bg-slate-900 p-2.5 rounded-xl border border-emerald-500/30"></div>
             </div>
 
-            <!-- 2. ADVANCED PDF UTILITIES (SPLIT, MERGE, IMAGES TO PDF) -->
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 flex flex-col justify-between gap-2.5">
-                    <div>
-                        <span class="text-xs font-extrabold text-rose-400">✂️ Split / Extract Chapter</span>
-                        <p class="text-[10px] text-slate-400 mt-0.5">Extract page range into a new shelf book.</p>
-                    </div>
-                    <div class="grid grid-cols-2 gap-2">
-                        <input type="number" id="ilove-split-start" value="${curP}" min="1" max="${totP}" class="bg-slate-900 border border-slate-700 rounded p-1 text-xs font-mono text-white text-center">
-                        <input type="number" id="ilove-split-end" value="${defaultEndP}" min="1" max="${totP}" class="bg-slate-900 border border-slate-700 rounded p-1 text-xs font-mono text-white text-center">
-                    </div>
-                    <button type="button" onclick="window.runILovePdfSplit(true)" class="w-full bg-rose-600 text-white font-bold py-2 rounded-xl text-xs">🪵 Extract to Shelf</button>
-                </div>
-
-                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 flex flex-col justify-between gap-2.5">
-                    <div>
-                        <span class="text-xs font-extrabold text-blue-400">📑 Merge Multiple PDFs</span>
-                        <p class="text-[10px] font-mono text-slate-400 mt-0.5">Combine two or more PDFs into one book.</p>
-                    </div>
-                    <button type="button" onclick="document.getElementById('ilovepdf-merge-files-input').click()" class="w-full bg-blue-600 text-white font-bold py-2.5 rounded-xl text-xs">📁 Select PDFs to Merge</button>
-                </div>
-
-                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 flex flex-col justify-between gap-2.5">
-                    <div>
-                        <span class="text-xs font-extrabold text-amber-400">🖼️ Images to PDF Book</span>
-                        <p class="text-[10px] font-mono text-slate-400 mt-0.5">Turn PNG/JPG scans into a reading book.</p>
-                    </div>
-                    <button type="button" onclick="document.getElementById('ilovepdf-images-input').click()" class="w-full bg-amber-600 text-slate-950 font-bold py-2.5 rounded-xl text-xs">🖼️ Select Images</button>
-                </div>
-            </div>
+            <!-- 2. ADVANCED PDF UTILITIES BRIDGE FOR PART 2 -->
+            <div id="forge-part2-utilities-slot"></div>
         `;
         document.getElementById('ilovepdf-book-select')?.addEventListener('change', (e) => window.openILovePdfStudioModal(e.target.value));
+        if (window.renderForgePart2Utilities) window.renderForgePart2Utilities(targetBook, curP, totP, defaultEndP);
         modal.classList.remove('hidden');
     };
 
@@ -429,15 +287,10 @@
     document.getElementById('reader-open-ilovepdf-btn')?.addEventListener('click', () => window.openILovePdfStudioModal(activeILovePdfBookId));
     document.getElementById('close-ilovepdf-modal-btn')?.addEventListener('click', () => document.getElementById('ilovepdf-studio-modal')?.classList.add('hidden'));
 
-    window.toggleKeepMatrixOption = function(key, val) {
-        window.pomoForgeKeepMatrix[key] = Boolean(val);
-        window.safeSet('pages_pomodoro_forge_keep_v17', JSON.stringify(window.pomoForgeKeepMatrix));
-    };
-
     window.convertPdfToStructuredBook = async function(actionMode = 'replace') {
         const b = (window.readerBooks || []).find(x => x.id === activeILovePdfBookId) || window.readerBooks?.[0];
         if (!b) return;
-        const stored = await window.idbGet('bookFiles', b.id);
+        const stored = await idbGet('bookFiles', b.id);
         if (!stored?.originalBytes) return;
 
         const statusEl = document.getElementById('pbook-convert-status');
@@ -467,7 +320,7 @@
             b.format = 'pbook';
             b.totalPages = structuredPages.length;
             await window.idbPut('bookFiles', { id: b.id, originalBytes: stored.originalBytes, structuredPages, extractedPagesText: extractedPlain });
-            window.saveReaderMeta();
+            saveReaderMeta();
             window.renderWoodenShelf();
             document.getElementById('ilovepdf-studio-modal')?.classList.add('hidden');
             window.openBookAtPage(b.id, b.currentPage || 1);
@@ -475,38 +328,6 @@
         } catch (e) { window.showToast("Conversion failed", true); }
     };
 
-    window.runILovePdfSplit = async function(addToShelf = true) {
-        const b = (window.readerBooks || []).find(x => x.id === activeILovePdfBookId);
-        if (!b || typeof PDFLib === 'undefined') return;
-        const stored = await window.idbGet('bookFiles', b.id);
-        if (!stored?.originalBytes) return;
-
-        const startP = Math.max(1, parseInt(document.getElementById('ilove-split-start')?.value) || 1);
-        const endP = Math.min(b.totalPages, Math.max(startP, parseInt(document.getElementById('ilove-split-end')?.value) || startP));
-        const customTitle = `${b.title} (p.${startP}-${endP})`;
-
-        try {
-            const srcDoc = await PDFLib.PDFDocument.load(stored.originalBytes, { ignoreEncryption: true });
-            const newDoc = await PDFLib.PDFDocument.create();
-            const indices = [];
-            for (let i = startP - 1; i <= endP - 1; i++) indices.push(i);
-            const copied = await newDoc.copyPages(srcDoc, indices);
-            copied.forEach(p => newDoc.addPage(p));
-            const newUint8 = await newDoc.save();
-
-            if (!addToShelf) {
-                const a = document.createElement('a');
-                a.href = URL.createObjectURL(new Blob([newUint8], { type: 'application/pdf' }));
-                a.download = `${customTitle}.pdf`;
-                a.click();
-                return;
-            }
-            const fileObj = new File([newUint8], `${customTitle}.pdf`, { type: 'application/pdf' });
-            await window.importBookFileObject(fileObj, 'local', null, { shelfName: b.shelfName, category: b.category, isManual: true });
-            window.renderWoodenShelf();
-            document.getElementById('ilovepdf-studio-modal')?.classList.add('hidden');
-            window.showToast(`✂️ Extracted "${customTitle}" onto Shelf!`);
-        } catch (e) { window.showToast("Split failed", true); }
-    };
+    window.getActiveILovePdfBookId = () => activeILovePdfBookId;
 })();
-// ✅ END OF FILE (05-pomodoc-forge.js v17.2 Full Master Restoration) — 100% RESTORED & UNCUT
+// ✅ END OF FILE (05-pomodoc-forge-part1.js v17.2) — 100% COMPLETE & UNCUT

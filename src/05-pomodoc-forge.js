@@ -1,8 +1,13 @@
 /* =========================================================================
-   05-POMODOC-FORGE-PART1.JS (v17.2 FULL MASTER RESTORATION — PART 1 OF 2)
-   MODULAR POMODOC FORGE, SELECTIVE VISUAL & TABLE EXTRACTOR (DIAGRAMS,
-   DATA TABLES, CHARTS, MIND MAPS, FORMULAS), DEEP LINE-BY-LINE SEMANTIC
-   ANALYZER & USER-CUSTOMIZABLE TYPOGRAPHY / COLOR STUDIO
+   05-POMODOC-FORGE.JS (v17.2 STANDALONE MODULAR EDITION — 100% UNCUT)
+   DEDICATED MODULE FOR POMODOC FORGE & PDF UTILITY SUITE:
+   1. LIVE CSS SEMANTIC TYPOGRAPHY & 8-ELEMENT COLOR/BOLD STUDIO
+   2. DEEP LINE-BY-LINE & INLINE SEMANTIC PARSER (QUOTES, BRACKETS, MATH, ?)
+   3. SELECTIVE VISUAL & TABLE EXTRACTOR (DIAGRAMS, DATA TABLES, CHARTS,
+      MIND MAPS & FORMULAS VIA PDF.JS OPERATOR LIST & GEOMETRIC ROW GROUPING)
+   4. FULL PDF UTILITY SUITE (SPLIT CHAPTER TO SHELF, INSERT RULED/GRID/BLANK
+      NOTE PAGE, INSERT EXTERNAL PDF/IMAGE PAGE, ROTATE 90°, DELETE PAGE,
+      MERGE MULTIPLE PDFS, IMAGES TO PDF BOOK, AND COMPRESS/OPTIMIZE PDF)
    ========================================================================= */
 (function() {
     const DEFAULT_SEMANTIC_STYLES = {
@@ -78,35 +83,59 @@
     window.applyPomoSemanticStyles();
 
     /* =========================================================================
-       2. DEEP LINE-BY-LINE & INLINE SEMANTIC PARSER
+       2. DEEP LINE-BY-LINE & INLINE SEMANTIC PARSER (QUOTES, BRACKETS, MATH, ?)
        ========================================================================= */
     window.formatInlineSemanticSpans = function(rawText) {
         if (!rawText) return '';
         let safe = window.escapeHtml(rawText);
-        safe = safe.replace(/(&quot;[^&]{2,240}?&quot;|&#39;&#39;[^&]{2,240}?&#39;&#39;|“[^”]{2,240}?”|‘[^’]{2,240}?’)/g, '<span class="pf-quoted-span">$1</span>');
-        safe = safe.replace(/(\([^()]{2,140}?\)|\[[^[\]]{2,140}?\])/g, '<span class="pf-bracket-span">$1</span>');
-        safe = safe.replace(/\b(\d+(?:\.\d+)?(?:\/\d+(?:\.\d+)?)?\s*(?:mmHg|bpm|mL\/min|L\/min|mL|mg\/dL|g\/dL|mmol\/L|mEq\/L|kPa|atm|Hz|kHz|ms|sec|min|hrs?|%|°C|°F|K|mol\/L|M|N|J|kJ|cal|kcal|W|V|mV|Ω|A|mA|nm|μm|mm|cm|m\/s²?|kg|g|mg|μg))\b/gi, '<span class="pf-math-data">$1</span>');
+
+        // 1. Highlight sentences enclosed in double quotes, double-single quotes ''abc'', or curly quotes
+        safe = safe.replace(/(&quot;[^&]{2,240}?&quot;|&#39;&#39;[^&]{2,240}?&#39;&#39;|“[^”]{2,240}?”|‘[^’]{2,240}?’)/g,
+            '<span class="pf-quoted-span">$1</span>');
+
+        // 2. Highlight clinical/scientific terms enclosed in parentheses (...) or square brackets [...]
+        safe = safe.replace(/(\([^()]{2,140}?\)|\[[^[\]]{2,140}?\])/g,
+            '<span class="pf-bracket-span">$1</span>');
+
+        // 3. Highlight mathematical & physiological numerical data (e.g. 120/80 mmHg, 72 bpm, 5 L/min, 98.6°F, 10^-4, pH 7.4)
+        safe = safe.replace(/\b(\d+(?:\.\d+)?(?:\/\d+(?:\.\d+)?)?\s*(?:mmHg|bpm|mL\/min|L\/min|mL|mg\/dL|g\/dL|mmol\/L|mEq\/L|kPa|atm|Hz|kHz|ms|sec|min|hrs?|%|°C|°F|K|mol\/L|M|N|J|kJ|cal|kcal|W|V|mV|Ω|A|mA|nm|μm|mm|cm|m\/s²?|kg|g|mg|μg))\b/gi,
+            '<span class="pf-math-data">$1</span>');
+
+        safe = safe.replace(/(\b(?:pH|pKa|pKb|GFR|CO|SV|HR|MAP|BP|ATP|ADP|NADH|FADH2|ΔG|ΔH|ΔS|Kc|Kp)\s*[=≈<>≤≥]\s*[-+]?\d+(?:\.\d+)?|\b\d+(?:\.\d+)?\s*[×x*÷+\-=→⇌]\s*\d+(?:\.\d+)?(?:\s*[×x*]\s*10\^?[-+]?\d+)?)/g,
+            '<span class="pf-math-data">$1</span>');
+
         return safe;
     };
 
     window.classifyAndRenderSemanticLine = function(rawLine) {
         const clean = String(rawLine || '').replace(/\s+/g, ' ').trim();
         if (!clean) return '';
+
+        // 1. Chapter Name Detection
         if (/^(chapter|unit|part|module|section)\s+([0-9ivxlcdm]+|one|two|three|four|five|six|seven|eight|nine|ten)\b/i.test(clean) && clean.length < 110) {
             return `<div class="pf-chapter-banner">📘 ${window.formatInlineSemanticSpans(clean)}</div>`;
         }
+        // 2. Question Line Detection (Any sentence/line ending with ?)
         if (/\?\s*$/.test(clean) && clean.length < 260) {
             return `<div class="pf-question-line">❓ ${window.formatInlineSemanticSpans(clean)}</div>`;
         }
+        // 3. Main Headline (ALL CAPS heading or Markdown #)
         if (/^#\s+/.test(clean) || (clean === clean.toUpperCase() && /[A-Z]{4,}/.test(clean) && clean.length >= 5 && clean.length <= 85)) {
             return `<h2 class="pbook-headline-h1 pf-headline">${window.formatInlineSemanticSpans(clean.replace(/^#+\s*/, ''))}</h2>`;
         }
+        // 4. Numbered Topic (e.g. 1.1 Cardiac Cycle, II. Systemic Circulation, ## Topic)
         if (/^##\s+/.test(clean) || (/^([0-9]+\.[0-9]+|[IVX]+\.)\s+[A-Z]/.test(clean) && clean.length <= 95)) {
             return `<h3 class="pbook-headline-h2 pf-topic">${window.formatInlineSemanticSpans(clean.replace(/^#+\s*/, ''))}</h3>`;
         }
+        // 5. Subtopic (e.g. Colon-ended short header or ### Subtopic)
         if (/^###\s+/.test(clean) || (/^[A-Z][A-Za-z0-9\s\-(),/]{3,60}:$/.test(clean))) {
             return `<h4 class="pf-subtopic">▸ ${window.formatInlineSemanticSpans(clean.replace(/^#+\s*/, ''))}</h4>`;
         }
+        // 6. Bullet / List Item
+        if (/^[•▪▸◦❖✦★☆✓✔✗✘\-*]\s+|^\(\d+\)\s+|^[a-z0-9]\)\s+/i.test(clean)) {
+            return `<div class="pbook-paragraph pl-4 border-l-2 border-blue-500/40">${window.formatInlineSemanticSpans(clean)}</div>`;
+        }
+        // 7. Standard Paragraph with Inline Semantic Highlighting
         return `<p class="pbook-paragraph">${window.formatInlineSemanticSpans(clean)}</p>`;
     };
 
@@ -144,19 +173,26 @@
                             <figcaption class="text-[11px] font-mono text-amber-300 mt-1.5 font-bold">${badgeIcon} — ${window.escapeHtml(blk.caption || `Page ${pageNum} Visual Reference`)}</figcaption>
                         </figure>
                     `;
+                } else if (blk.type === 'bullet') {
+                    html += `<div class="pbook-paragraph pl-4 border-l-2 border-blue-500/40">${window.formatInlineSemanticSpans(cleanText)}</div>`;
                 } else {
-                    html += `<p class="pbook-paragraph">${window.formatInlineSemanticSpans(cleanText)}</p>`;
+                    const isTrueQuote = (blk.align === 'center' && cleanText.length < 220 && /^["'“‘«]/.test(cleanText));
+                    const hasFirstIndent = (!isTrueQuote && blk.firstLineIndent);
+                    const extraCls = isTrueQuote ? 'pbook-centered-quote' : (hasFirstIndent ? 'pbook-first-indent' : '');
+                    html += `<p class="pbook-paragraph ${extraCls}">${window.formatInlineSemanticSpans(cleanText)}</p>`;
                 }
             });
         } else {
             const textSource = pData?.plainText || rawFallbackText || '';
-            html = textSource.split(/\n+/).map(ln => window.classifyAndRenderSemanticLine(ln)).join('');
+            const lines = textSource.split(/\n+/);
+            html = lines.map(ln => window.classifyAndRenderSemanticLine(ln)).join('');
         }
+
         sheet.innerHTML = html || `<p class="pbook-paragraph">Page ${pageNum}</p>`;
         return sheet;
     };
 
-    // Auto-upgrade reader stage sheets
+    // Automatically upgrade any .pbook or .txt page rendered in #reader-pages-stage
     const stageEl = document.getElementById('reader-pages-stage');
     if (stageEl) {
         let cachedBookId = null;
@@ -169,7 +205,7 @@
 
             if (cachedBookId !== activeBook.id) {
                 cachedBookId = activeBook.id;
-                const stored = await idbGet('bookFiles', activeBook.id);
+                const stored = await window.idbGet('bookFiles', activeBook.id);
                 cachedStructuredMap = {};
                 (stored?.structuredPages || []).forEach(sp => { cachedStructuredMap[sp.page] = sp; });
             }
@@ -189,7 +225,7 @@
     }
 
     /* =========================================================================
-       3. POMODOC FORGE MODAL & USER COLOR/BOLD STUDIO
+       3. POMODOC FORGE MODAL & USER SEMANTIC COLOR / STYLE STUDIO
        ========================================================================= */
     window.toggleKeepMatrixOption = function(key, val) {
         window.pomoForgeKeepMatrix[key] = Boolean(val);
@@ -207,12 +243,14 @@
         window.safeSet('pages_pomodoro_semantic_styles_v17', JSON.stringify(window.pomoSemanticStyles));
         window.applyPomoSemanticStyles();
         window.openILovePdfStudioModal(activeILovePdfBookId);
-        showToast("🎨 Semantic Colors & Bolding reset to defaults!");
+        window.showToast("🎨 Semantic Colors & Bolding reset to defaults!");
     };
 
     window.openILovePdfStudioModal = function(bookId = null) {
+        const activeBook = window.getActiveReaderBook ? window.getActiveReaderBook() : null;
         const sortedBySeq = [...(window.readerBooks || [])].sort((a, b) => (a.readSeq || 999) - (b.readSeq || 999));
-        activeILovePdfBookId = bookId || sortedBySeq[0]?.id || null;
+        activeILovePdfBookId = bookId || activeBook?.id || sortedBySeq[0]?.id || null;
+
         const modal = document.getElementById('ilovepdf-studio-modal');
         const body = document.getElementById('ilovepdf-studio-body');
         if (!modal || !body) return;
@@ -226,226 +264,521 @@
 
         body.innerHTML = `
             <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 flex flex-wrap items-center justify-between gap-2">
-                <span class="text-xs font-extrabold uppercase text-slate-300">Target Book:</span>
+                <div class="flex items-center gap-2">
+                    <span class="text-lg">📘</span>
+                    <span class="text-xs font-extrabold uppercase text-slate-300">Target Book:</span>
+                </div>
                 <select id="ilovepdf-book-select" class="flex-1 sm:max-w-md bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-white">
-                    ${sortedBySeq.map(b => `<option value="${escapeHtml(b.id)}" ${b.id === activeILovePdfBookId ? 'selected' : ''}>#${b.readSeq || 1} [${escapeHtml(b.shelfName)}] ${escapeHtml(b.title)} (${b.totalPages}p)</option>`).join('')}
+                    ${sortedBySeq.length ? sortedBySeq.map(b => `<option value="${escapeHtml(b.id)}" ${b.id === activeILovePdfBookId ? 'selected' : ''}>#${b.readSeq || 1} [${escapeHtml(b.shelfName || 'Shelf')}] ${escapeHtml(b.title)} (${b.totalPages}p • ${(b.format || 'pdf').toUpperCase()})</option>`).join('') : '<option value="">No books imported yet</option>'}
                 </select>
             </div>
 
+            <!-- 1. SELECTIVE EXTRACTION MATRIX + SEMANTIC BOOK CONVERTER -->
             <div class="bg-gradient-to-br from-emerald-950/50 via-slate-950 to-slate-950 border border-emerald-500/50 rounded-2xl p-4 flex flex-col gap-3 shadow-lg">
-                <h4 class="text-sm font-extrabold text-white">1. PomoDoc Forge — Selective Visual Extractor & Semantic Styler</h4>
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <span class="text-[9px] font-extrabold uppercase tracking-widest bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30">🧬 PomoDoc Forge v17.2 — Selective Visual Extractor & Deep Line-by-Line Semantic Styler</span>
+                        <h4 class="text-sm font-extrabold text-white mt-1">1. Tick What to Keep & Convert PDF to Rich Semantic Book (.pbook) or Styled .TXT</h4>
+                    </div>
+                </div>
+
+                <!-- TICK WHAT TO KEEP MATRIX -->
                 <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-3 flex flex-col gap-2">
-                    <span class="text-[10px] font-extrabold uppercase text-cyan-400">☑️ Tick Elements to Keep During Conversion:</span>
+                    <span class="text-[10px] font-extrabold uppercase text-cyan-400">☑️ Tick Elements to Keep During Conversion (Preserves Diagrams, Tables, ECGs & Mind Maps):</span>
                     <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
                         <label class="flex items-center gap-1.5 bg-slate-950 px-2.5 py-2 rounded-lg border border-slate-800 cursor-pointer font-bold text-slate-200">
-                            <input type="checkbox" ${km.diagrams ? 'checked' : ''} onchange="window.toggleKeepMatrixOption('diagrams', this.checked)"> <span>🖼️ Diagrams</span>
+                            <input type="checkbox" ${km.diagrams ? 'checked' : ''} onchange="window.toggleKeepMatrixOption('diagrams', this.checked)" class="accent-emerald-500">
+                            <span>🖼️ Diagrams & Anatomy</span>
                         </label>
                         <label class="flex items-center gap-1.5 bg-slate-950 px-2.5 py-2 rounded-lg border border-slate-800 cursor-pointer font-bold text-slate-200">
-                            <input type="checkbox" ${km.tables ? 'checked' : ''} onchange="window.toggleKeepMatrixOption('tables', this.checked)"> <span>📊 Tables</span>
+                            <input type="checkbox" ${km.tables ? 'checked' : ''} onchange="window.toggleKeepMatrixOption('tables', this.checked)" class="accent-emerald-500">
+                            <span>📊 Data Tables</span>
                         </label>
                         <label class="flex items-center gap-1.5 bg-slate-950 px-2.5 py-2 rounded-lg border border-slate-800 cursor-pointer font-bold text-slate-200">
-                            <input type="checkbox" ${km.charts ? 'checked' : ''} onchange="window.toggleKeepMatrixOption('charts', this.checked)"> <span>📈 Charts</span>
+                            <input type="checkbox" ${km.charts ? 'checked' : ''} onchange="window.toggleKeepMatrixOption('charts', this.checked)" class="accent-emerald-500">
+                            <span>📈 Charts & ECGs</span>
                         </label>
                         <label class="flex items-center gap-1.5 bg-slate-950 px-2.5 py-2 rounded-lg border border-slate-800 cursor-pointer font-bold text-slate-200">
-                            <input type="checkbox" ${km.mindmaps ? 'checked' : ''} onchange="window.toggleKeepMatrixOption('mindmaps', this.checked)"> <span>🧠 Mind Maps</span>
+                            <input type="checkbox" ${km.mindmaps ? 'checked' : ''} onchange="window.toggleKeepMatrixOption('mindmaps', this.checked)" class="accent-emerald-500">
+                            <span>🧠 Mind Maps & Flows</span>
                         </label>
                         <label class="flex items-center gap-1.5 bg-slate-950 px-2.5 py-2 rounded-lg border border-slate-800 cursor-pointer font-bold text-slate-200">
-                            <input type="checkbox" ${km.formulas ? 'checked' : ''} onchange="window.toggleKeepMatrixOption('formulas', this.checked)"> <span>📐 Math</span>
+                            <input type="checkbox" ${km.formulas ? 'checked' : ''} onchange="window.toggleKeepMatrixOption('formulas', this.checked)" class="accent-emerald-500">
+                            <span>📐 Math & Formulas</span>
                         </label>
                     </div>
                 </div>
 
+                <!-- MANUAL USER SEMANTIC COLOR & BOLDING CUSTOMIZER -->
                 <div class="bg-slate-900/90 border border-purple-500/40 rounded-xl p-3 flex flex-col gap-2">
                     <div class="flex items-center justify-between">
-                        <span class="text-[10px] font-extrabold uppercase text-purple-300">🎨 Manual Semantic Color & Bolding Studio:</span>
-                        <button type="button" onclick="window.resetSemanticStylesToDefault()" class="text-[10px] font-bold text-slate-400 hover:text-white underline">↺ Reset</button>
+                        <span class="text-[10px] font-extrabold uppercase text-purple-300">🎨 Manual Semantic Line Color & Bolding Studio (Applies Live to All Converted Books & .TXT):</span>
+                        <button type="button" onclick="window.resetSemanticStylesToDefault()" class="text-[10px] font-bold text-slate-400 hover:text-white underline">↺ Reset Colors</button>
                     </div>
                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
-                        <div class="bg-slate-950 p-2 rounded-lg border border-slate-800 flex items-center justify-between"><span class="font-bold" style="color:${st.chapterColor}">📘 Chapter</span><div class="flex items-center gap-1"><input type="color" value="${st.chapterColor}" oninput="window.updateSemanticStyleProp('chapterColor', this.value)" class="w-5 h-5 rounded cursor-pointer bg-transparent"><input type="checkbox" ${st.chapterBold ? 'checked' : ''} onchange="window.updateSemanticStyleProp('chapterBold', this.checked)"></div></div>
-                        <div class="bg-slate-950 p-2 rounded-lg border border-slate-800 flex items-center justify-between"><span class="font-bold" style="color:${st.headlineColor}">🔖 Headline</span><div class="flex items-center gap-1"><input type="color" value="${st.headlineColor}" oninput="window.updateSemanticStyleProp('headlineColor', this.value)" class="w-5 h-5 rounded cursor-pointer bg-transparent"><input type="checkbox" ${st.headlineBold ? 'checked' : ''} onchange="window.updateSemanticStyleProp('headlineBold', this.checked)"></div></div>
-                        <div class="bg-slate-950 p-2 rounded-lg border border-slate-800 flex items-center justify-between"><span class="font-bold" style="color:${st.topicColor}">📗 Topic</span><div class="flex items-center gap-1"><input type="color" value="${st.topicColor}" oninput="window.updateSemanticStyleProp('topicColor', this.value)" class="w-5 h-5 rounded cursor-pointer bg-transparent"><input type="checkbox" ${st.topicBold ? 'checked' : ''} onchange="window.updateSemanticStyleProp('topicBold', this.checked)"></div></div>
-                        <div class="bg-slate-950 p-2 rounded-lg border border-slate-800 flex items-center justify-between"><span class="font-bold" style="color:${st.questionColor}">❓ Question</span><div class="flex items-center gap-1"><input type="color" value="${st.questionColor}" oninput="window.updateSemanticStyleProp('questionColor', this.value)" class="w-5 h-5 rounded cursor-pointer bg-transparent"><input type="checkbox" ${st.questionBold ? 'checked' : ''} onchange="window.updateSemanticStyleProp('questionBold', this.checked)"></div></div>
+                        <div class="bg-slate-950 p-2 rounded-lg border border-slate-800 flex items-center justify-between">
+                            <span class="font-bold" style="color:${st.chapterColor}">📘 Chapter Name</span>
+                            <div class="flex items-center gap-1">
+                                <input type="color" value="${st.chapterColor}" oninput="window.updateSemanticStyleProp('chapterColor', this.value)" class="w-5 h-5 rounded cursor-pointer bg-transparent">
+                                <input type="checkbox" ${st.chapterBold ? 'checked' : ''} onchange="window.updateSemanticStyleProp('chapterBold', this.checked)" title="Bold">
+                            </div>
+                        </div>
+                        <div class="bg-slate-950 p-2 rounded-lg border border-slate-800 flex items-center justify-between">
+                            <span class="font-bold" style="color:${st.headlineColor}">🔖 Main Headline</span>
+                            <div class="flex items-center gap-1">
+                                <input type="color" value="${st.headlineColor}" oninput="window.updateSemanticStyleProp('headlineColor', this.value)" class="w-5 h-5 rounded cursor-pointer bg-transparent">
+                                <input type="checkbox" ${st.headlineBold ? 'checked' : ''} onchange="window.updateSemanticStyleProp('headlineBold', this.checked)" title="Bold">
+                            </div>
+                        </div>
+                        <div class="bg-slate-950 p-2 rounded-lg border border-slate-800 flex items-center justify-between">
+                            <span class="font-bold" style="color:${st.topicColor}">📗 Topic Header</span>
+                            <div class="flex items-center gap-1">
+                                <input type="color" value="${st.topicColor}" oninput="window.updateSemanticStyleProp('topicColor', this.value)" class="w-5 h-5 rounded cursor-pointer bg-transparent">
+                                <input type="checkbox" ${st.topicBold ? 'checked' : ''} onchange="window.updateSemanticStyleProp('topicBold', this.checked)" title="Bold">
+                            </div>
+                        </div>
+                        <div class="bg-slate-950 p-2 rounded-lg border border-slate-800 flex items-center justify-between">
+                            <span class="font-bold" style="color:${st.subtopicColor}">▸ Subtopic</span>
+                            <div class="flex items-center gap-1">
+                                <input type="color" value="${st.subtopicColor}" oninput="window.updateSemanticStyleProp('subtopicColor', this.value)" class="w-5 h-5 rounded cursor-pointer bg-transparent">
+                                <input type="checkbox" ${st.subtopicBold ? 'checked' : ''} onchange="window.updateSemanticStyleProp('subtopicBold', this.checked)" title="Bold">
+                            </div>
+                        </div>
+                        <div class="bg-slate-950 p-2 rounded-lg border border-slate-800 flex items-center justify-between">
+                            <span class="font-bold" style="color:${st.questionColor}">❓ Question (?)</span>
+                            <div class="flex items-center gap-1">
+                                <input type="color" value="${st.questionColor}" oninput="window.updateSemanticStyleProp('questionColor', this.value)" class="w-5 h-5 rounded cursor-pointer bg-transparent">
+                                <input type="checkbox" ${st.questionBold ? 'checked' : ''} onchange="window.updateSemanticStyleProp('questionBold', this.checked)" title="Bold">
+                            </div>
+                        </div>
+                        <div class="bg-slate-950 p-2 rounded-lg border border-slate-800 flex items-center justify-between">
+                            <span class="font-bold" style="color:${st.mathColor}">🧮 Math & Data</span>
+                            <div class="flex items-center gap-1">
+                                <input type="color" value="${st.mathColor}" oninput="window.updateSemanticStyleProp('mathColor', this.value)" class="w-5 h-5 rounded cursor-pointer bg-transparent">
+                                <input type="checkbox" ${st.mathBold ? 'checked' : ''} onchange="window.updateSemanticStyleProp('mathBold', this.checked)" title="Bold">
+                            </div>
+                        </div>
+                        <div class="bg-slate-950 p-2 rounded-lg border border-slate-800 flex items-center justify-between">
+                            <span class="font-bold" style="color:${st.quoteColor}">💬 Quotes (''abc'')</span>
+                            <div class="flex items-center gap-1">
+                                <input type="color" value="${st.quoteColor}" oninput="window.updateSemanticStyleProp('quoteColor', this.value)" class="w-5 h-5 rounded cursor-pointer bg-transparent">
+                                <input type="checkbox" ${st.quoteBold ? 'checked' : ''} onchange="window.updateSemanticStyleProp('quoteBold', this.checked)" title="Bold">
+                            </div>
+                        </div>
+                        <div class="bg-slate-950 p-2 rounded-lg border border-slate-800 flex items-center justify-between">
+                            <span class="font-bold" style="color:${st.bracketColor}">🟣 Brackets (...)</span>
+                            <div class="flex items-center gap-1">
+                                <input type="color" value="${st.bracketColor}" oninput="window.updateSemanticStyleProp('bracketColor', this.value)" class="w-5 h-5 rounded cursor-pointer bg-transparent">
+                                <input type="checkbox" ${st.bracketBold ? 'checked' : ''} onchange="window.updateSemanticStyleProp('bracketBold', this.checked)" title="Bold">
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2 pt-1">
-                    <button type="button" onclick="window.convertPdfToStructuredBook('replace')" class="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold px-4 py-2.5 rounded-xl text-xs shadow">🔄 Convert Book (Keep Visuals & Tables)</button>
-                    <button type="button" onclick="window.convertPdfToStructuredBook('txt')" class="bg-slate-800 text-amber-300 font-bold px-3.5 py-2.5 rounded-xl text-xs">⬇️ Export Semantic .TXT</button>
+                    <button type="button" onclick="window.convertPdfToStructuredBook('replace')" class="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold px-4 py-2.5 rounded-xl text-xs shadow active:scale-95">
+                        🔄 Convert in Same Book (Keep Ticked Visuals, Tables & Semantic Colors)
+                    </button>
+                    <button type="button" onclick="window.convertPdfToStructuredBook('add')" class="bg-blue-600 hover:bg-blue-500 text-white font-extrabold px-4 py-2.5 rounded-xl text-xs shadow active:scale-95">
+                        ➕ Add as New Semantic Book on Shelf
+                    </button>
+                    <button type="button" onclick="window.convertPdfToStructuredBook('txt')" class="bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 font-bold px-3.5 py-2.5 rounded-xl text-xs active:scale-95">
+                        ⬇️ Export Clean Semantic .TXT
+                    </button>
                 </div>
-                <div id="pbook-convert-status" class="hidden text-xs font-mono font-bold text-emerald-400 bg-slate-900 p-2.5 rounded-xl border border-emerald-500/30"></div>
+                <div id="pbook-convert-status" class="hidden text-xs font-mono font-bold text-emerald-400 bg-slate-900/90 p-2.5 rounded-xl border border-emerald-500/30"></div>
             </div>
 
-            <!-- 2. ADVANCED PDF UTILITIES BRIDGE FOR PART 2 -->
-            <div id="forge-part2-utilities-slot"></div>
-        `;
-        document.getElementById('ilovepdf-book-select')?.addEventListener('change', (e) => window.openILovePdfStudioModal(e.target.value));
-        if (window.renderForgePart2Utilities) window.renderForgePart2Utilities(targetBook, curP, totP, defaultEndP);
-        modal.classList.remove('hidden');
-    };
-
-    document.getElementById('shelf-open-ilovepdf-btn')?.addEventListener('click', () => window.openILovePdfStudioModal(window.readerBooks?.[0]?.id || null));
-    document.getElementById('reader-open-ilovepdf-btn')?.addEventListener('click', () => window.openILovePdfStudioModal(activeILovePdfBookId));
-    document.getElementById('close-ilovepdf-modal-btn')?.addEventListener('click', () => document.getElementById('ilovepdf-studio-modal')?.classList.add('hidden'));
-
-    window.convertPdfToStructuredBook = async function(actionMode = 'replace') {
-        const b = (window.readerBooks || []).find(x => x.id === activeILovePdfBookId) || window.readerBooks?.[0];
-        if (!b) return;
-        const stored = await idbGet('bookFiles', b.id);
-        if (!stored?.originalBytes) return;
-
-        const statusEl = document.getElementById('pbook-convert-status');
-        if (statusEl) { statusEl.classList.remove('hidden'); statusEl.textContent = `⏳ Converting ${b.title}...`; }
-
-        try {
-            const pdf = await pdfjsLib.getDocument({ data: stored.originalBytes.slice(0) }).promise;
-            const structuredPages = [];
-            const extractedPlain = [];
-            for (let p = 1; p <= pdf.numPages; p++) {
-                const page = await pdf.getPage(p);
-                const tc = await page.getTextContent();
-                const plainTxt = tc.items.map(i => i.str).join(' ');
-                structuredPages.push({ page: p, blocks: [{ type: 'p', text: plainTxt }], plainText: plainTxt });
-                extractedPlain.push(plainTxt);
-                try { page.cleanup(); } catch (e) {}
-            }
-            if (actionMode === 'txt') {
-                const fullTxt = extractedPlain.join('\n\n');
-                const a = document.createElement('a');
-                a.href = URL.createObjectURL(new Blob([fullTxt], { type: 'text/plain' }));
-                a.download = `${b.title}.txt`;
-                a.click();
-                if (statusEl) statusEl.textContent = "✅ Exported .TXT successfully!";
-                return;
-            }
-            b.format = 'pbook';
-            b.totalPages = structuredPages.length;
-            await window.idbPut('bookFiles', { id: b.id, originalBytes: stored.originalBytes, structuredPages, extractedPagesText: extractedPlain });
-            saveReaderMeta();
-            window.renderWoodenShelf();
-            document.getElementById('ilovepdf-studio-modal')?.classList.add('hidden');
-            window.openBookAtPage(b.id, b.currentPage || 1);
-            window.showToast(`🔄 Converted "${b.title}" to Rich Semantic Book!`);
-        } catch (e) { window.showToast("Conversion failed", true); }
-    };
-
-    window.getActiveILovePdfBookId = () => activeILovePdfBookId;
-})();
-// ✅ END OF FILE (05-pomodoc-forge-part1.js v17.2) — 100% COMPLETE & UNCUT
-/* =========================================================================
-   05-POMODOC-FORGE-PART2.JS (v17.2 FULL MASTER RESTORATION — PART 2 OF 2)
-   PDF UTILITY SUITE: MERGE MULTIPLE PDFS, IMAGES TO PDF BOOK, COMPRESS PDF,
-   SPLIT / EXTRACT CHAPTER, AND PAGE OPERATIONS (INSERT NOTE PAGE, ROTATE, DELETE)
-   ========================================================================= */
-(function() {
-    window.renderForgePart2Utilities = function(targetBook, curP, totP, defaultEndP) {
-        const slot = document.getElementById('forge-part2-utilities-slot');
-        if (!slot) return;
-
-        slot.innerHTML = `
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+            <!-- 2. SPLIT CHAPTER & PAGE OPERATIONS -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 flex flex-col justify-between gap-2.5">
                     <div>
-                        <span class="text-xs font-extrabold text-blue-400">📑 2. Merge Multiple PDFs</span>
-                        <p class="text-[10px] font-mono text-slate-400 mt-0.5">Combine two or more PDF files into one master book.</p>
+                        <span class="text-xs font-extrabold text-rose-400">✂️ 2. Split / Extract Chapter Into New Shelf Book</span>
+                        <p class="text-[11px] text-slate-400 mt-0.5">Extract a page range into a lightweight book on your Wooden Shelf.</p>
                     </div>
-                    <button type="button" onclick="document.getElementById('ilovepdf-merge-files-input').click()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-xl text-xs shadow">📁 Select PDFs to Merge</button>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div><label class="text-[9px] font-bold uppercase text-slate-400">From Page</label><input type="number" id="ilove-split-start" value="${curP}" min="1" max="${totP}" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-xs font-mono text-white text-center"></div>
+                        <div><label class="text-[9px] font-bold uppercase text-slate-400">To Page</label><input type="number" id="ilove-split-end" value="${defaultEndP}" min="1" max="${totP}" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-xs font-mono text-white text-center"></div>
+                    </div>
+                    <input type="text" id="ilove-split-title" placeholder="New Chapter Book Name" value="${targetBook ? `${escapeHtml(targetBook.title)} (p.${curP}-${defaultEndP})` : ''}" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white">
+                    <div class="flex gap-2">
+                        <button type="button" onclick="window.runILovePdfSplit(true)" class="flex-1 bg-rose-600 hover:bg-rose-500 text-white font-extrabold py-2 rounded-xl text-xs shadow">🪵 Extract to Shelf</button>
+                        <button type="button" onclick="window.runILovePdfSplit(false)" class="bg-slate-800 text-slate-200 border border-slate-700 font-bold px-3 py-2 rounded-xl text-xs">⬇️ Download</button>
+                    </div>
                 </div>
 
-                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 flex flex-col justify-between gap-2.5">
+                <div class="bg-slate-950 border border-amber-500/40 rounded-2xl p-3.5 flex flex-col justify-between gap-2.5">
                     <div>
-                        <span class="text-xs font-extrabold text-amber-400">🖼️ 3. Images to PDF Book</span>
-                        <p class="text-[10px] font-mono text-slate-400 mt-0.5">Turn PNG/JPG scans into a reading book.</p>
+                        <span class="text-xs font-extrabold text-amber-400">📄 3. Add Note Page, Insert External Page, Rotate 90° or Delete</span>
+                        <p class="text-[11px] text-slate-400 mt-0.5">Insert a Ruled/Dot-Grid Note Page or modify Target Page #:</p>
                     </div>
-                    <button type="button" onclick="document.getElementById('ilovepdf-images-input').click()" class="w-full bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold py-2.5 rounded-xl text-xs shadow">🖼️ Select Scan Images</button>
-                </div>
-
-                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 flex flex-col justify-between gap-2.5 sm:col-span-2">
-                    <div>
-                        <span class="text-xs font-extrabold text-emerald-400">📄 4. Insert Note Page, Rotate 90° or Delete Page</span>
-                        <p class="text-[10px] text-slate-400 mt-0.5">Modify Target Page #${curP}:</p>
-                    </div>
-                    <div class="flex items-center gap-2 flex-wrap">
+                    <div class="flex items-center gap-2">
                         <span class="text-[10px] font-bold text-slate-300">Page #:</span>
                         <input type="number" id="ilove-pageop-num" value="${curP}" min="1" max="${totP}" class="w-16 bg-slate-900 border border-slate-700 rounded-lg p-1 text-xs font-mono text-white text-center">
-                        <select id="ilove-blank-style-sel" class="bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-[11px] font-bold text-emerald-300">
+                        <select id="ilove-blank-style-sel" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-[11px] font-bold text-emerald-300">
                             <option value="ruled">📝 Ruled Note Page</option>
                             <option value="grid">⊞ Dot-Grid Diagram Page</option>
                             <option value="blank">⬜ Pure Blank Page</option>
                         </select>
-                        <button type="button" onclick="window.runILovePdfPageOp('insertBlank')" class="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold px-3 py-1.5 rounded-xl text-[11px]">➕ Add Note Page</button>
-                        <button type="button" onclick="window.runILovePdfPageOp('rotate90')" class="bg-amber-600/25 hover:bg-amber-600 text-amber-300 border border-amber-500/40 font-extrabold px-3 py-1.5 rounded-xl text-[11px]">🔄 Rotate 90°</button>
-                        <button type="button" onclick="window.runILovePdfPageOp('delete')" class="bg-red-600/25 hover:bg-red-600 text-red-300 border border-red-500/40 font-extrabold px-3 py-1.5 rounded-xl text-[11px]">🗑️ Delete</button>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                        <button type="button" onclick="window.runILovePdfPageOp('insertBlank')" class="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-2 rounded-xl text-[11px]">➕ Add Page</button>
+                        <button type="button" onclick="document.getElementById('ilovepdf-insert-page-file-input').click()" class="bg-blue-600/25 hover:bg-blue-600 text-blue-300 hover:text-white border border-blue-500/40 font-extrabold py-2 rounded-xl text-[11px]">📥 Insert File</button>
+                        <button type="button" onclick="window.runILovePdfPageOp('rotate90')" class="bg-amber-600/25 hover:bg-amber-600 text-amber-300 hover:text-white border border-amber-500/40 font-extrabold py-2 rounded-xl text-[11px]">🔄 Rotate 90°</button>
+                        <button type="button" onclick="window.runILovePdfPageOp('delete')" class="bg-red-600/25 hover:bg-red-600 text-red-300 hover:text-white border border-red-500/40 font-extrabold py-2 rounded-xl text-[11px]">🗑️ Delete</button>
                     </div>
                 </div>
             </div>
+
+            <!-- 3. MERGE PDFS, IMAGES TO PDF BOOK & COMPRESS PDF -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 flex flex-col justify-between gap-2.5">
+                    <div>
+                        <span class="text-xs font-extrabold text-blue-400">📑 4. Merge Multiple PDFs</span>
+                        <p class="text-[11px] text-slate-400 mt-0.5">Combine 2 or more PDF files into one unified book on your shelf.</p>
+                    </div>
+                    <button type="button" onclick="document.getElementById('ilovepdf-merge-files-input').click()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-extrabold py-2.5 rounded-xl text-xs shadow">📁 Select PDFs to Merge</button>
+                </div>
+
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 flex flex-col justify-between gap-2.5">
+                    <div>
+                        <span class="text-xs font-extrabold text-amber-400">🖼️ 5. Images to PDF Book</span>
+                        <p class="text-[11px] text-slate-400 mt-0.5">Convert PNG/JPG textbook scans or diagrams into a PDF book.</p>
+                    </div>
+                    <button type="button" onclick="document.getElementById('ilovepdf-images-input').click()" class="w-full bg-amber-600 hover:bg-amber-500 text-slate-950 font-extrabold py-2.5 rounded-xl text-xs shadow">🖼️ Select Images to Convert</button>
+                </div>
+
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 flex flex-col justify-between gap-2.5">
+                    <div>
+                        <span class="text-xs font-extrabold text-cyan-400">⚡ 6. Optimize & Compress PDF</span>
+                        <p class="text-[11px] text-slate-400 mt-0.5">Repackages PDF object streams to shrink file size for fast loading.</p>
+                    </div>
+                    <button type="button" onclick="window.runILovePdfCompress()" class="w-full bg-cyan-600/25 hover:bg-cyan-600 text-cyan-300 hover:text-white border border-cyan-500/40 font-extrabold py-2.5 rounded-xl text-xs shadow">⚡ Optimize Active PDF</button>
+                </div>
+            </div>
         `;
+
+        document.getElementById('ilovepdf-book-select')?.addEventListener('change', (e) => {
+            window.openILovePdfStudioModal(e.target.value);
+        });
+        modal.classList.remove('hidden');
     };
 
-    // MERGE MULTIPLE PDFS
-    document.getElementById('ilovepdf-merge-files-input')?.addEventListener('change', async (e) => {
-        const files = Array.from(e.target.files || []);
-        e.target.value = '';
-        if (files.length < 2 || typeof PDFLib === 'undefined') {
-            showToast("Select at least 2 PDF files to merge.", true);
+    document.getElementById('shelf-open-ilovepdf-btn')?.addEventListener('click', () => window.openILovePdfStudioModal(window.readerBooks?.[0]?.id || null));
+    document.getElementById('reader-open-ilovepdf-btn')?.addEventListener('click', () => {
+        const activeBook = window.getActiveReaderBook ? window.getActiveReaderBook() : null;
+        window.openILovePdfStudioModal(activeBook?.id || activeILovePdfBookId);
+    });
+    document.getElementById('close-ilovepdf-modal-btn')?.addEventListener('click', () => document.getElementById('ilovepdf-studio-modal')?.classList.add('hidden'));
+
+    /* =========================================================================
+       4. FULL DEEP-SCANNING VISUAL, TABLE & SEMANTIC CONVERSION ENGINE
+       ========================================================================= */
+    window.convertPdfToStructuredBook = async function(actionMode = 'replace') {
+        const b = (window.readerBooks || []).find(x => x.id === activeILovePdfBookId) || window.readerBooks?.[0];
+        if (!b) { window.showToast("Select a book first!", true); return; }
+        const stored = await window.idbGet('bookFiles', b.id);
+        if (!stored || (!stored.originalBytes && !stored.structuredPages)) {
+            window.showToast("Book binary not found in local storage.", true);
             return;
         }
-        showToast(`⏳ Merging ${files.length} PDF files...`);
-        try {
-            const mergedDoc = await PDFLib.PDFDocument.create();
-            for (const f of files) {
-                const buf = await f.arrayBuffer();
-                const pdf = await PDFLib.PDFDocument.load(buf, { ignoreEncryption: true });
-                const copiedPages = await mergedDoc.copyPages(pdf, pdf.getPageIndices());
-                copiedPages.forEach(p => mergedDoc.addPage(p));
-            }
-            const mergedBytes = await mergedDoc.save();
-            const mergedFile = new File([mergedBytes], `Merged_${Date.now()}.pdf`, { type: 'application/pdf' });
-            await window.importBookFileObject(mergedFile, 'local', null, { shelfName: 'Merged Library', category: 'study', isManual: true });
-            if (window.renderWoodenShelf) window.renderWoodenShelf();
-            document.getElementById('ilovepdf-studio-modal')?.classList.add('hidden');
-            showToast(`✅ Successfully merged ${files.length} PDFs into a new book!`);
-        } catch (err) {
-            showToast("PDF Merge failed", true);
-        }
-    });
 
-    // IMAGES TO PDF BOOK
-    document.getElementById('ilovepdf-images-input')?.addEventListener('change', async (e) => {
-        const files = Array.from(e.target.files || []);
-        e.target.value = '';
-        if (!files.length || typeof PDFLib === 'undefined') return;
-        showToast(`⏳ Converting ${files.length} image scans into PDF book...`);
-        try {
-            const pdfDoc = await PDFLib.PDFDocument.create();
-            for (const f of files) {
-                const buf = await f.arrayBuffer();
-                let img = null;
-                if (f.type === 'image/png') img = await pdfDoc.embedPng(buf);
-                else img = await pdfDoc.embedJpg(buf);
-
-                const page = pdfDoc.addPage([img.width, img.height]);
-                page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
-            }
-            const pdfBytes = await pdfDoc.save();
-            const scanFile = new File([pdfBytes], `ScanBook_${Date.now()}.pdf`, { type: 'application/pdf' });
-            await window.importBookFileObject(scanFile, 'local', null, { shelfName: 'Scanned Documents', category: 'study', isManual: true });
-            if (window.renderWoodenShelf) window.renderWoodenShelf();
-            document.getElementById('ilovepdf-studio-modal')?.classList.add('hidden');
-            showToast(`✅ Created readable book from ${files.length} image scans!`);
-        } catch (err) {
-            showToast("Images to PDF failed", true);
+        const statusEl = document.getElementById('pbook-convert-status');
+        const km = window.pomoForgeKeepMatrix;
+        if (statusEl) {
+            statusEl.classList.remove('hidden');
+            statusEl.textContent = `⏳ Analyzing ${b.totalPages} pages (Extracting Ticked Visuals, Data Tables & Semantic Hierarchy)...`;
         }
-    });
+
+        let pdf = null;
+        try {
+            let structuredPages = [];
+            let extractedPlain = [];
+            const autoChapters = [];
+            const seenChapKeys = new Set();
+
+            if (stored.originalBytes && typeof pdfjsLib !== 'undefined') {
+                pdf = await pdfjsLib.getDocument({ data: stored.originalBytes.slice(0) }).promise;
+                const numPages = pdf.numPages || b.totalPages;
+
+                for (let p = 1; p <= numPages; p++) {
+                    if (p % 4 === 0) {
+                        if (statusEl) statusEl.textContent = `⏳ Deep-Scanning Page ${p} / ${numPages} (Tables, Diagrams & Line Semantics)...`;
+                        await new Promise(r => setTimeout(r, 0));
+                    }
+                    const page = await pdf.getPage(p);
+                    const unitVp = page.getViewport({ scale: 1.0 });
+                    const tc = await page.getTextContent();
+
+                    // Inspect Operator List for Embedded Images, Charts, or Vector Diagrams
+                    let hasRasterImageOps = false, vectorPathCount = 0;
+                    if ((km.diagrams || km.charts || km.mindmaps) && page.getOperatorList) {
+                        try {
+                            const opList = await page.getOperatorList();
+                            const OPS = pdfjsLib.OPS || {};
+                            (opList.fnArray || []).forEach(fn => {
+                                if (fn === OPS.paintImageXObject || fn === OPS.paintInlineImageXObject || fn === OPS.paintImageMaskXObject) hasRasterImageOps = true;
+                                if (fn === OPS.constructPath || fn === OPS.stroke || fn === OPS.fill) vectorPathCount++;
+                            });
+                        } catch (e) {}
+                    }
+
+                    const rawItems = [];
+                    let totalFh = 0;
+                    tc.items.forEach(it => {
+                        if (!it.str || !it.str.trim()) return;
+                        const m = pdfjsLib.Util.transform(unitVp.transform, it.transform);
+                        const fh = Math.hypot(m[2], m[3]);
+                        const fhNorm = fh / unitVp.height;
+                        const w = ((it.width || (it.str.length * fh * 0.5)) * unitVp.scale) / unitVp.width;
+                        totalFh += fh;
+                        rawItems.push({ str: it.str.trim(), x: m[4] / unitVp.width, y: m[5] / unitVp.height, w, fh, fhNorm });
+                    });
+
+                    const avgFh = rawItems.length ? (totalFh / rawItems.length) : 12;
+                    rawItems.sort((a, b) => (Math.abs(a.y - b.y) < 0.009 ? a.x - b.x : a.y - b.y));
+
+                    // Group items into horizontal rows (preserving column cells for Data Table reconstruction)
+                    const rows = [];
+                    rawItems.forEach(item => {
+                        const last = rows[rows.length - 1];
+                        const sameLineTol = Math.max(0.008, item.fhNorm * 0.65);
+                        if (last && Math.abs(last.y - item.y) < sameLineTol) {
+                            const xGap = item.x - last.xEnd;
+                            if (xGap > 0.055) {
+                                last.cells.push(item.str);
+                            } else {
+                                last.cells[last.cells.length - 1] += (xGap >= 0.003 ? ' ' : '') + item.str;
+                            }
+                            last.text += (xGap >= 0.003 ? ' ' : '') + item.str;
+                            last.xEnd = Math.max(last.xEnd, item.x + item.w);
+                            last.maxFh = Math.max(last.maxFh, item.fh);
+                        } else {
+                            rows.push({
+                                y: item.y, xStart: item.x, xEnd: item.x + item.w,
+                                text: item.str, cells: [item.str], maxFh: item.fh
+                            });
+                        }
+                    });
+
+                    const blocks = [];
+                    let curPara = null;
+                    let tableBuffer = [];
+
+                    const flushTable = () => {
+                        if (tableBuffer.length >= 2 && km.tables) {
+                            blocks.push({ type: 'table', rows: tableBuffer.map(r => r.cells) });
+                        } else if (tableBuffer.length > 0) {
+                            tableBuffer.forEach(r => blocks.push({ type: 'p', text: r.cells.join('   '), align: 'justify' }));
+                        }
+                        tableBuffer = [];
+                    };
+
+                    const flushPara = () => {
+                        if (curPara && curPara.text.trim()) {
+                            blocks.push({
+                                type: /\?\s*$/.test(curPara.text.trim()) ? 'question' : 'p',
+                                text: curPara.text.replace(/\s{2,}/g, ' ').trim(),
+                                align: 'justify'
+                            });
+                            curPara = null;
+                        }
+                    };
+
+                    rows.forEach(ln => {
+                        const t = ln.text.replace(/\s+/g, ' ').trim();
+                        if (!t) return;
+
+                        if (km.tables && ln.cells.length >= 3) {
+                            flushPara();
+                            tableBuffer.push(ln);
+                            return;
+                        } else if (tableBuffer.length > 0) {
+                            flushTable();
+                        }
+
+                        const isChapter = /^(chapter|unit|part|module)\s+([0-9ivx]+|one|two|three|four|five|six|seven|eight|nine|ten)\b/i.test(t) && t.length < 105;
+                        const isH1 = !isChapter && (ln.maxFh >= avgFh * 1.28 || (t === t.toUpperCase() && /[A-Z]{4,}/.test(t) && t.length >= 5 && t.length <= 85));
+                        const isH2 = !isChapter && !isH1 && (ln.maxFh >= avgFh * 1.14 || (/^([0-9]+\.[0-9]+|[IVX]+\.)\s+[A-Z]/.test(t) && t.length < 95));
+                        const isSubtopic = !isChapter && !isH1 && !isH2 && /^[A-Z][A-Za-z0-9\s\-(),/]{3,55}:$/.test(t);
+                        const isQuestion = /\?\s*$/.test(t) && t.length < 240;
+                        const isBullet = /^[•▪▸◦❖✦★☆✓✔✗✘\-*]\s+|^\(\d+\)\s+|^[a-z0-9]\)\s+/i.test(t);
+
+                        if (isChapter) {
+                            flushPara();
+                            blocks.push({ type: 'chapter', text: t });
+                            const ck = t.toLowerCase().slice(0, 30);
+                            if (!seenChapKeys.has(ck)) { seenChapKeys.add(ck); autoChapters.push({ id: 'ch_' + Date.now() + '_' + autoChapters.length, title: t, page: p, level: 1 }); }
+                        } else if (isH1) {
+                            flushPara();
+                            blocks.push({ type: 'h1', text: t });
+                            const ck = t.toLowerCase().slice(0, 30);
+                            if (!seenChapKeys.has(ck)) { seenChapKeys.add(ck); autoChapters.push({ id: 'ch_' + Date.now() + '_' + autoChapters.length, title: t, page: p, level: 1 }); }
+                        } else if (isH2) {
+                            flushPara();
+                            blocks.push({ type: 'h2', text: t });
+                        } else if (isSubtopic) {
+                            flushPara();
+                            blocks.push({ type: 'subtopic', text: t });
+                        } else if (isQuestion) {
+                            flushPara();
+                            blocks.push({ type: 'question', text: t });
+                        } else if (isBullet) {
+                            flushPara();
+                            blocks.push({ type: 'bullet', text: t });
+                        } else {
+                            if (!curPara) {
+                                curPara = { text: t };
+                            } else {
+                                if (/[a-z]-\s*$/i.test(curPara.text) && /^[a-z]/.test(t)) {
+                                    curPara.text = curPara.text.replace(/-\s*$/, '') + t;
+                                } else {
+                                    curPara.text += ' ' + t;
+                                }
+                            }
+                        }
+                    });
+                    flushTable();
+                    flushPara();
+
+                    // Embed Visual Figure / Diagram / Chart / Mind Map if page contains graphics or figure captions
+                    const pageHasVisualCaption = rows.some(r => /\b(fig\.?|figure|diagram|chart|graph|ecg|flowchart|mind\s*map|pathway|circulation|anatomy)\b/i.test(r.text));
+                    const shouldCaptureVisual = (km.diagrams && (hasRasterImageOps || pageHasVisualCaption))
+                        || (km.charts && vectorPathCount > 60)
+                        || (km.mindmaps && (vectorPathCount > 45 || /\b(flowchart|mind\s*map|pathway|cycle)\b/i.test(rows.map(r => r.text).join(' '))));
+
+                    if (shouldCaptureVisual) {
+                        try {
+                            const renderVp = page.getViewport({ scale: 1.25 });
+                            const offCanvas = document.createElement('canvas');
+                            offCanvas.width = renderVp.width;
+                            offCanvas.height = renderVp.height;
+                            await page.render({ canvasContext: offCanvas.getContext('2d'), viewport: renderVp }).promise;
+                            const visType = km.mindmaps && /\b(flowchart|mind\s*map|pathway|cycle)\b/i.test(rows.map(r => r.text).join(' '))
+                                ? 'mindmap'
+                                : (km.charts && /\b(chart|graph|ecg|curve)\b/i.test(rows.map(r => r.text).join(' ')) ? 'chart' : 'diagram');
+                            blocks.push({
+                                type: visType,
+                                dataUrl: offCanvas.toDataURL('image/jpeg', 0.82),
+                                caption: `Page ${p} Preserved Visual (${b.title})`
+                            });
+                        } catch (e) {}
+                    }
+
+                    const plainTxt = blocks.map(blk => {
+                        if (blk.type === 'table') return blk.rows.map(r => r.join(' | ')).join('\n');
+                        return blk.text || '';
+                    }).filter(Boolean).join('\n\n');
+
+                    structuredPages.push({ page: p, blocks, plainText: plainTxt });
+                    extractedPlain.push(plainTxt);
+                    try { page.cleanup(); } catch (e) {}
+                }
+            } else if (Array.isArray(stored.structuredPages)) {
+                structuredPages = stored.structuredPages;
+                extractedPlain = stored.extractedPagesText || [];
+            }
+
+            if (actionMode === 'txt') {
+                const fullTxt = structuredPages.map(sp => `==================== PAGE ${sp.page} ====================\n\n${sp.plainText}`).join('\n\n\n');
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(new Blob([fullTxt], { type: 'text/plain;charset=utf-8' }));
+                a.download = `${b.title}_SemanticFormat.txt`;
+                a.click();
+                if (statusEl) statusEl.textContent = `✅ Exported Clean Semantic .TXT (${structuredPages.length} pages)!`;
+                window.showToast("⬇️ Semantic .TXT Downloaded!");
+                return;
+            }
+
+            if (autoChapters.length > 0) b.outline = autoChapters;
+
+            if (actionMode === 'replace') {
+                b.format = 'pbook';
+                b.totalPages = structuredPages.length;
+                b.lastModified = Date.now();
+                await window.idbPut('bookFiles', {
+                    id: b.id, originalBytes: stored.originalBytes || null, bakedBytes: null,
+                    structuredPages, extractedPagesText: extractedPlain
+                });
+                window.saveReaderMeta();
+                window.renderWoodenShelf();
+                document.getElementById('ilovepdf-studio-modal')?.classList.add('hidden');
+                window.openBookAtPage(b.id, b.currentPage || 1);
+                window.showToast(`🔄 Converted "${b.title}" with Semantic Colors, Tables & Diagrams!`);
+            } else {
+                const newBookId = 'pbook_' + Date.now();
+                const newBook = {
+                    ...JSON.parse(JSON.stringify(b)),
+                    id: newBookId,
+                    title: `${b.title} [📖 Semantic Book-OS]`,
+                    fileName: b.fileName.replace(/\.[^/.]+$/, '') + '.pbook',
+                    format: 'pbook',
+                    totalPages: structuredPages.length,
+                    outline: autoChapters.length ? autoChapters : (b.outline || []),
+                    lastOpened: Date.now(),
+                    lastModified: Date.now()
+                };
+                await window.idbPut('bookFiles', {
+                    id: newBookId, originalBytes: null, bakedBytes: null,
+                    structuredPages, extractedPagesText: extractedPlain
+                });
+                window.readerBooks.unshift(newBook);
+                window.saveReaderMeta();
+                window.renderWoodenShelf();
+                document.getElementById('ilovepdf-studio-modal')?.classList.add('hidden');
+                window.showToast(`➕ Added "${newBook.title}" to Wooden Shelf!`);
+            }
+        } catch (err) {
+            window.showToast("Conversion encountered an issue on this PDF.", true);
+        } finally {
+            if (pdf) { try { await pdf.destroy(); } catch (e) {} }
+        }
+    };
+
+    /* =========================================================================
+       5. FULL PDF UTILITY SUITE (SPLIT, RULED/GRID PAGE INSERT, MERGE, IMG2PDF)
+       ========================================================================= */
+    window.runILovePdfSplit = async function(addToShelf = true) {
+        const b = (window.readerBooks || []).find(x => x.id === activeILovePdfBookId);
+        if (!b || typeof PDFLib === 'undefined') return;
+        const stored = await window.idbGet('bookFiles', b.id);
+        if (!stored?.originalBytes) { window.showToast("Requires a PDF binary book.", true); return; }
+
+        const startP = Math.max(1, parseInt(document.getElementById('ilove-split-start')?.value) || 1);
+        const endP = Math.min(b.totalPages, Math.max(startP, parseInt(document.getElementById('ilove-split-end')?.value) || startP));
+        const customTitle = (document.getElementById('ilove-split-title')?.value || '').trim() || `${b.title} (p.${startP}-${endP})`;
+
+        try {
+            const srcDoc = await PDFLib.PDFDocument.load(stored.originalBytes, { ignoreEncryption: true });
+            const newDoc = await PDFLib.PDFDocument.create();
+            const indices = [];
+            for (let i = startP - 1; i <= endP - 1; i++) indices.push(i);
+            const copied = await newDoc.copyPages(srcDoc, indices);
+            copied.forEach(p => newDoc.addPage(p));
+            const newUint8 = await newDoc.save();
+
+            if (!addToShelf) {
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(new Blob([newUint8], { type: 'application/pdf' }));
+                a.download = `${customTitle.replace(/\s+/g, '_')}.pdf`;
+                a.click();
+                return;
+            }
+            const fileObj = new File([newUint8], `${customTitle}.pdf`, { type: 'application/pdf' });
+            await window.importBookFileObject(fileObj, 'local', null, { shelfName: b.shelfName, category: b.category, isManual: true });
+            window.renderWoodenShelf();
+            document.getElementById('ilovepdf-studio-modal')?.classList.add('hidden');
+            window.showToast(`✂️ Extracted "${customTitle}" onto Shelf!`);
+        } catch (e) { window.showToast("PDF Split failed.", true); }
+    };
 
     window.runILovePdfPageOp = async function(opType) {
-        const activeBookId = window.getActiveILovePdfBookId ? window.getActiveILovePdfBookId() : null;
-        const b = (window.readerBooks || []).find(x => x.id === activeBookId);
+        const b = (window.readerBooks || []).find(x => x.id === activeILovePdfBookId);
         if (!b || typeof PDFLib === 'undefined') return;
-        const stored = await idbGet('bookFiles', b.id);
+        const stored = await window.idbGet('bookFiles', b.id);
         if (!stored?.originalBytes) return;
-
         const targetP = Math.max(1, Math.min(b.totalPages, parseInt(document.getElementById('ilove-pageop-num')?.value) || 1));
-        const style = document.getElementById('ilove-blank-style-sel')?.value || 'ruled';
+        const blankStyle = document.getElementById('ilove-blank-style-sel')?.value || 'ruled';
 
         try {
             const pdfDoc = await PDFLib.PDFDocument.load(stored.originalBytes, { ignoreEncryption: true });
@@ -454,7 +787,24 @@
 
             if (opType === 'insertBlank') {
                 const refSize = pages[pIdx] ? pages[pIdx].getSize() : { width: 612, height: 792 };
-                pdfDoc.insertPage(pIdx + 1, [refSize.width, refSize.height]);
+                const newPage = pdfDoc.insertPage(pIdx + 1, [refSize.width, refSize.height]);
+                // Bake real Ruled lines or Dot-Grid into the new PDF page
+                if (blankStyle === 'ruled') {
+                    for (let y = 48; y < refSize.height - 48; y += 24) {
+                        newPage.drawLine({
+                            start: { x: 36, y },
+                            end: { x: refSize.width - 36, y },
+                            thickness: 0.6,
+                            color: PDFLib.rgb(0.75, 0.84, 0.96)
+                        });
+                    }
+                } else if (blankStyle === 'grid') {
+                    for (let x = 36; x < refSize.width - 36; x += 22) {
+                        for (let y = 36; y < refSize.height - 36; y += 22) {
+                            newPage.drawCircle({ x, y, size: 0.8, color: PDFLib.rgb(0.7, 0.75, 0.82) });
+                        }
+                    }
+                }
             } else if (opType === 'rotate90') {
                 const pg = pages[pIdx];
                 if (pg) pg.setRotation(PDFLib.degrees(((pg.getRotation().angle || 0) + 90) % 360));
@@ -464,15 +814,124 @@
 
             const updatedUint8 = await pdfDoc.save();
             stored.originalBytes = updatedUint8.buffer;
-            await idbPut('bookFiles', stored);
+            await window.idbPut('bookFiles', stored);
             b.totalPages = pdfDoc.getPageCount();
             window.saveReaderMeta();
             document.getElementById('ilovepdf-studio-modal')?.classList.add('hidden');
-            if (window.openBookAtPage) window.openBookAtPage(b.id, targetP);
-            showToast(`✅ Page operation '${opType}' completed successfully!`);
-        } catch (e) {
-            showToast("Page operation failed", true);
+            window.openBookAtPage(b.id, targetP);
+            window.showToast(`✅ Page operation (${opType}) completed!`);
+        } catch (e) { window.showToast("Page operation failed.", true); }
+    };
+
+    // INSERT EXTERNAL PDF OR IMAGE PAGE AT TARGET PAGE #
+    document.getElementById('ilovepdf-insert-page-file-input')?.addEventListener('change', async (e) => {
+        const file = e.target.files?.[0];
+        e.target.value = '';
+        const b = (window.readerBooks || []).find(x => x.id === activeILovePdfBookId);
+        if (!file || !b || typeof PDFLib === 'undefined') return;
+        const stored = await window.idbGet('bookFiles', b.id);
+        if (!stored?.originalBytes) return;
+        const targetP = Math.max(1, Math.min(b.totalPages, parseInt(document.getElementById('ilove-pageop-num')?.value) || 1));
+
+        try {
+            const pdfDoc = await PDFLib.PDFDocument.load(stored.originalBytes, { ignoreEncryption: true });
+            const buf = await file.arrayBuffer();
+            if (file.name.toLowerCase().endsWith('.pdf')) {
+                const extDoc = await PDFLib.PDFDocument.load(buf, { ignoreEncryption: true });
+                const copied = await pdfDoc.copyPages(extDoc, extDoc.getPageIndices());
+                copied.forEach((pg, idx) => pdfDoc.insertPage(targetP + idx, pg));
+            } else {
+                const img = file.type.includes('png') ? await pdfDoc.embedPng(buf) : await pdfDoc.embedJpg(buf);
+                const newPg = pdfDoc.insertPage(targetP, [img.width, img.height]);
+                newPg.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
+            }
+            const updatedUint8 = await pdfDoc.save();
+            stored.originalBytes = updatedUint8.buffer;
+            await window.idbPut('bookFiles', stored);
+            b.totalPages = pdfDoc.getPageCount();
+            window.saveReaderMeta();
+            document.getElementById('ilovepdf-studio-modal')?.classList.add('hidden');
+            window.openBookAtPage(b.id, targetP + 1);
+            window.showToast(`📥 Inserted "${file.name}" after Page ${targetP}!`);
+        } catch (err) { window.showToast("Could not insert external file.", true); }
+    });
+
+    // MERGE MULTIPLE PDFS INTO NEW SHELF BOOK
+    document.getElementById('ilovepdf-merge-files-input')?.addEventListener('change', async (e) => {
+        const files = Array.from(e.target.files || []);
+        e.target.value = '';
+        if (files.length < 2 || typeof PDFLib === 'undefined') {
+            window.showToast("Select at least 2 PDF files to merge.", true);
+            return;
         }
+        window.showToast(`⏳ Merging ${files.length} PDF files...`);
+        try {
+            const mergedDoc = await PDFLib.PDFDocument.create();
+            for (const f of files) {
+                const buf = await f.arrayBuffer();
+                const pdf = await PDFLib.PDFDocument.load(buf, { ignoreEncryption: true });
+                const copiedPages = await mergedDoc.copyPages(pdf, pdf.getPageIndices());
+                copiedPages.forEach(p => mergedDoc.addPage(p));
+            }
+            const mergedBytes = await mergedDoc.save();
+            const mergedFile = new File([mergedBytes], `Merged_${files[0].name.replace(/\.pdf$/i, '')}_${files.length}books.pdf`, { type: 'application/pdf' });
+            await window.importBookFileObject(mergedFile, 'local', null, { shelfName: window.customShelves?.[0]?.name || 'Medical Science & Anatomy', category: 'study', isManual: true });
+            window.renderWoodenShelf();
+            document.getElementById('ilovepdf-studio-modal')?.classList.add('hidden');
+            window.showToast(`✅ Merged ${files.length} PDFs into a new book on your shelf!`);
+        } catch (err) { window.showToast("PDF Merge failed.", true); }
+    });
+
+    // CONVERT MULTIPLE IMAGES TO PDF BOOK
+    document.getElementById('ilovepdf-images-input')?.addEventListener('change', async (e) => {
+        const files = Array.from(e.target.files || []);
+        e.target.value = '';
+        if (!files.length || typeof PDFLib === 'undefined') return;
+        window.showToast(`⏳ Converting ${files.length} image(s) into a PDF book...`);
+        try {
+            const pdfDoc = await PDFLib.PDFDocument.create();
+            for (const f of files) {
+                const buf = await f.arrayBuffer();
+                const img = f.type.includes('png') ? await pdfDoc.embedPng(buf) : await pdfDoc.embedJpg(buf);
+                const page = pdfDoc.addPage([img.width, img.height]);
+                page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
+            }
+            const pdfBytes = await pdfDoc.save();
+            const scanFile = new File([pdfBytes], `Visual_ScanBook_${files.length}p.pdf`, { type: 'application/pdf' });
+            await window.importBookFileObject(scanFile, 'local', null, { shelfName: window.customShelves?.[0]?.name || 'Medical Science & Anatomy', category: 'study', isManual: true });
+            window.renderWoodenShelf();
+            document.getElementById('ilovepdf-studio-modal')?.classList.add('hidden');
+            window.showToast(`✅ Created ${files.length}-page PDF book from images!`);
+        } catch (err) { window.showToast("Images to PDF conversion failed.", true); }
+    });
+
+    // OPTIMIZE & COMPRESS ACTIVE PDF
+    window.runILovePdfCompress = async function() {
+        const b = (window.readerBooks || []).find(x => x.id === activeILovePdfBookId);
+        if (!b || typeof PDFLib === 'undefined') return;
+        const stored = await window.idbGet('bookFiles', b.id);
+        if (!stored?.originalBytes) return;
+        const beforeMb = (stored.originalBytes.byteLength / 1048576).toFixed(2);
+        try {
+            const pdfDoc = await PDFLib.PDFDocument.load(stored.originalBytes, { ignoreEncryption: true });
+            const compressedUint8 = await pdfDoc.save({ useObjectStreams: true });
+            stored.originalBytes = compressedUint8.buffer;
+            b.fileSize = compressedUint8.byteLength;
+            await window.idbPut('bookFiles', stored);
+            window.saveReaderMeta();
+            const afterMb = (compressedUint8.byteLength / 1048576).toFixed(2);
+            window.showToast(`⚡ Optimized PDF streams (${beforeMb} MB ➔ ${afterMb} MB)!`);
+        } catch (e) { window.showToast("Optimization failed.", true); }
+    };
+
+    // Public Extension API so you can easily add new PomoDoc Forge tools in the future
+    window.PomoDocForge = {
+        openModal: window.openILovePdfStudioModal,
+        convertBook: window.convertPdfToStructuredBook,
+        splitBook: window.runILovePdfSplit,
+        pageOp: window.runILovePdfPageOp,
+        compressBook: window.runILovePdfCompress,
+        applySemanticStyles: window.applyPomoSemanticStyles
     };
 })();
-// ✅ END OF FILE (05-pomodoc-forge-part2.js v17.2) — 100% COMPLETE & UNCUT
+// ✅ END OF FILE (05-pomodoc-forge.js v17.2 Standalone Modular Edition) — 100% COMPLETE & UNCUT

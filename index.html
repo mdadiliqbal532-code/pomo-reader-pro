@@ -4,15 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#020617">
-    <title>DeenTimeR & PomoReader Pro (v17.0 Desktop) — Polymath Life OS & Memory Beast</title>
+    <title>DeenTimeR & PomoReader Pro (v17.2 Desktop) — Polymath Life OS & Memory Beast</title>
 
     <!-- Desktop PWA Manifest & App Icon -->
     <link rel="manifest" href="./manifest.json">
     <link rel="icon" type="image/svg+xml" href="./icon.svg">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Crect width='120' height='120' rx='28' fill='%23020617'/%3E%3Ccircle cx='60' cy='64' r='38' fill='none' stroke='%233b82f6' stroke-width='8'/%3E%3Cpath d='M60 42v22l14 10' fill='none' stroke='%23ff4757' stroke-width='8' stroke-linecap='round'/%3E%3Crect x='48' y='14' width='24' height='8' rx='4' fill='%233b82f6'/%3E%3C/svg%3E">
 
-    <!-- Master Desktop Stylesheet (v17.0) -->
-    <link rel="stylesheet" href="./styles.css?v=17.0">
+    <!-- Master Desktop Stylesheet (v17.2) -->
+    <link rel="stylesheet" href="./styles.css?v=17.2">
 
     <!-- Libraries (Cached 100% Offline by sw.js after first load) -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -658,9 +658,8 @@
             <div class="nav-indicator w-4 h-1 rounded-full bg-blue-500 opacity-0 transform scale-0 transition-all"></div>
         </button>
     </div>
-
     <!-- ========================================================================= -->
-    <!-- ALL IN-APP MODALS & FULL-SCREEN READER OVERLAY                            -->
+    <!-- ALL 17 IN-APP MODALS & FULL-SCREEN READER OVERLAY (100% UNCUT)            -->
     <!-- ========================================================================= -->
 
     <!-- 1. GOAL & DATE/COUNTDOWN MODAL -->
@@ -1033,7 +1032,7 @@
         </div>
     </div>
 
-    <!-- 12. FULL-SCREEN ACTIVE BOOK READER OVERLAY (WITH 50/50 SPLIT-SCREEN HOST) -->
+    <!-- 12. FULL-SCREEN ACTIVE BOOK READER OVERLAY (WITH 50/50 SPLIT-SCREEN HOST & FULL BOTTOM DASHBOARD) -->
     <div id="reader-fullscreen-overlay" class="hidden theme-night">
         <div id="reader-bluelight-shield"></div>
 
@@ -1265,7 +1264,7 @@
         <div class="bg-slate-900 border border-rose-500/50 rounded-3xl w-full max-w-5xl max-h-[92dvh] shadow-2xl flex flex-col overflow-hidden">
             <div class="flex items-center justify-between px-5 py-3.5 bg-slate-950 border-b border-slate-800 shrink-0">
                 <div>
-                    <span class="text-[9px] font-extrabold uppercase tracking-widest bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-full border border-rose-500/30">🛠️ Modular PomoDoc Forge v17.0 — Selective Visual Extractor & Deep Semantic Line Styler</span>
+                    <span class="text-[9px] font-extrabold uppercase tracking-widest bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-full border border-rose-500/30">🛠️ Modular PomoDoc Forge v17.2 — Selective Visual Extractor & Deep Semantic Line Styler</span>
                     <h3 class="text-base font-extrabold text-white mt-0.5">PomoDoc Forge • Keep Diagrams/Tables/Charts/Mind-Maps • Custom Line Colors</h3>
                 </div>
                 <button type="button" id="close-ilovepdf-modal-btn" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-3 py-1.5 rounded-xl text-xs">✕ Close</button>
@@ -1307,17 +1306,20 @@
     <div id="custom-toast" class="hidden fixed top-5 right-5 bg-slate-800/95 backdrop-blur-md border border-slate-700 text-white font-bold py-3 px-5 rounded-xl shadow-2xl z-[999] text-sm text-center transition-opacity"></div>
 
     <!-- ========================================================================= -->
-    <!-- 6 MODULAR FEATURE-SLICED SCRIPTS (LOADED IN STRICT ORDER v17.0 DESKTOP)   -->
+    <!-- MULTI-PART FEATURE-SLICED SCRIPTS (LOADED IN STRICT ORDER v17.2 DESKTOP)  -->
     <!-- ========================================================================= -->
-    <script src="./src/01-core-bus.js?v=17.0"></script>
-    <script src="./src/02-pomo-core.js?v=17.0"></script>
-    <script src="./src/03-vault-rpg.js?v=17.0"></script>
-    <script src="./src/04-reader-pro.js?v=17.0"></script>
-    <script src="./src/05-pomodoc-forge.js?v=17.0"></script>
-    <script src="./src/06-onenote-studio.js?v=17.0"></script>
+    <script src="./src/01-core-bus.js?v=17.2"></script>
+    <script src="./src/02-pomo-core.js?v=17.2"></script>
+    <script src="./src/03-vault-rpg.js?v=17.2"></script>
+    <script src="./src/04-reader-pro-part1.js?v=17.2"></script>
+    <script src="./src/04-reader-pro-part2.js?v=17.2"></script>
+    <script src="./src/05-pomodoc-forge-part1.js?v=17.2"></script>
+    <script src="./src/05-pomodoc-forge-part2.js?v=17.2"></script>
+    <script src="./src/06-onenote-studio-part1.js?v=17.2"></script>
+    <script src="./src/06-onenote-studio-part2.js?v=17.2"></script>
     <script>
         if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
-            navigator.serviceWorker.register('./sw.js?v=17.0').then(reg => {
+            navigator.serviceWorker.register('./sw.js?v=17.2').then(reg => {
                 reg.update();
             }).catch(() => {});
         }
